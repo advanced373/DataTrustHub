@@ -1,5 +1,4 @@
 ﻿using DataTrustHub.SharedKernel;
-using DataTrustHub.Domain.Clearance;
 
 namespace DataTrustHub.Domain.User
 {

@@ -1,14 +1,13 @@
 ﻿using DataTrustHub.SharedKernel;
+using DataTrustHub.Domain.Clearance;
 
 namespace DataTrustHub.Domain.User
 {
-    public sealed class User: Entity
+    public sealed class User : Entity, IAggregateRoot
     {
         public required Guid Id { get; set; }
         public required string Email { get; set; }
-        public required string FirstName { get; set; }
-        public required string LastName { get; set; }
-        public required string PasswordHash { get; set; }
-        public Guid OrganizationId { get; set; }
+        public required string HashedPassword { get; set; }
+        public List<Guid> ClearanceIds { get; set; } = new();
     }
 }

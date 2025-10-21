@@ -2,7 +2,7 @@
 
 namespace DataTrustHub.Domain.Organization
 {
-    public sealed class Organization: Entity
+    public sealed class Organization : Entity, IAggregateRoot
     {
         public required Guid Id { get; set; }
         public required string Name { get; set; }

@@ -1,10 +1,11 @@
+using DataTrustHub.SharedKernel;
 using MediatR;
 
 namespace DataTrustHub.Application.Organization.Create
 {
-    public class CreateOrganizationCommandHandler : IRequestHandler<CreateOrganizationCommand, Guid>
+    public class CreateOrganizationCommandHandler : IRequestHandler<CreateOrganizationCommand, Result<Guid>>
     {
-        public async Task<Guid> Handle(CreateOrganizationCommand request, CancellationToken cancellationToken)
+        public async Task<Result<Guid>> Handle(CreateOrganizationCommand request, CancellationToken cancellationToken)
         {
             var organizationId = Guid.NewGuid();
             // TODO: Persiste organizația

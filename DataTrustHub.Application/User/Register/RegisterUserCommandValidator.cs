@@ -7,7 +7,7 @@ namespace DataTrustHub.Application.User.Register
         public RegisterUserCommandValidator()
         {
             RuleFor(x => x.Email).NotEmpty().EmailAddress();
-            RuleFor(x => x.HashedPassword).NotEmpty();
+            RuleFor(x => x.Password).NotEmpty();
         }
     }
 }

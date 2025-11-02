@@ -1,0 +1,6 @@
+@DataTrustHub.API_HostAddress = http://localhost:5295
+
+GET {{DataTrustHub.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

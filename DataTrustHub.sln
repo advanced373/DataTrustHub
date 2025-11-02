@@ -1,9 +1,19 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.14.36603.0 d17.14
+VisualStudioVersion = 17.14.36603.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataTrustHub", "DataTrustHub\DataTrustHub.csproj", "{9187C568-B988-4885-8965-C64D843A9AAA}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataTrustHub.WebApp", "DataTrustHub\DataTrustHub.WebApp.csproj", "{9187C568-B988-4885-8965-C64D843A9AAA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataTrustHub.Domain", "DataTrustHub.Domain\DataTrustHub.Domain.csproj", "{F5A146CE-5EA1-44EA-9559-BCF39297A31E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataTrustHub.Application", "DataTrustHub.Application\DataTrustHub.Application.csproj", "{E91FB0C0-C1F9-4E73-8EC8-B74D3A673129}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataTrustHub.Infrastructure", "DataTrustHub.Infrastructure\DataTrustHub.Infrastructure.csproj", "{C96D1DE0-EE69-40FB-AAEA-C5702A14D782}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataTrustHub.SharedKernel", "DataTrustHub.SharedKernel\DataTrustHub.SharedKernel.csproj", "{303E4C50-1307-4C31-96B4-069B991C97F4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataTrustHub.API", "DataTrustHub.API\DataTrustHub.API.csproj", "{0886AC1E-4A60-485E-815A-5DCA2427C115}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +25,26 @@ Global
 		{9187C568-B988-4885-8965-C64D843A9AAA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9187C568-B988-4885-8965-C64D843A9AAA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9187C568-B988-4885-8965-C64D843A9AAA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F5A146CE-5EA1-44EA-9559-BCF39297A31E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F5A146CE-5EA1-44EA-9559-BCF39297A31E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F5A146CE-5EA1-44EA-9559-BCF39297A31E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F5A146CE-5EA1-44EA-9559-BCF39297A31E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E91FB0C0-C1F9-4E73-8EC8-B74D3A673129}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E91FB0C0-C1F9-4E73-8EC8-B74D3A673129}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E91FB0C0-C1F9-4E73-8EC8-B74D3A673129}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E91FB0C0-C1F9-4E73-8EC8-B74D3A673129}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C96D1DE0-EE69-40FB-AAEA-C5702A14D782}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C96D1DE0-EE69-40FB-AAEA-C5702A14D782}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C96D1DE0-EE69-40FB-AAEA-C5702A14D782}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C96D1DE0-EE69-40FB-AAEA-C5702A14D782}.Release|Any CPU.Build.0 = Release|Any CPU
+		{303E4C50-1307-4C31-96B4-069B991C97F4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{303E4C50-1307-4C31-96B4-069B991C97F4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{303E4C50-1307-4C31-96B4-069B991C97F4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{303E4C50-1307-4C31-96B4-069B991C97F4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0886AC1E-4A60-485E-815A-5DCA2427C115}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0886AC1E-4A60-485E-815A-5DCA2427C115}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0886AC1E-4A60-485E-815A-5DCA2427C115}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0886AC1E-4A60-485E-815A-5DCA2427C115}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

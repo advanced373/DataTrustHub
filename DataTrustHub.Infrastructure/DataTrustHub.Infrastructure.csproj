@@ -17,4 +17,8 @@
     <ProjectReference Include="..\DataTrustHub.SharedKernel\DataTrustHub.SharedKernel.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Persistance\Repositories\Clearance\" />
+  </ItemGroup>
+
 </Project>

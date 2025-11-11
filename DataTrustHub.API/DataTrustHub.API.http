@@ -1,6 +1,141 @@
 @DataTrustHub.API_HostAddress = http://localhost:5295
 
-GET {{DataTrustHub.API_HostAddress}}/weatherforecast/
-Accept: application/json
+###############################################################################
+# USER ENDPOINTS
+###############################################################################
 
-###
+### Register User
+# @name RegisterUser
+POST {{DataTrustHub.API_HostAddress}}/User
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "password": "SecurePassword123!"
+}
+
+### Register Another User
+POST {{DataTrustHub.API_HostAddress}}/User
+Content-Type: application/json
+
+{
+  "email": "admin@example.com",
+  "password": "AdminPassword123!"
+}
+
+###############################################################################
+# ORGANIZATION ENDPOINTS
+###############################################################################
+
+### Create Organization
+# @name CreateOrganization
+POST {{DataTrustHub.API_HostAddress}}/Organization
+Content-Type: application/json
+
+{
+  "name": "Acme Corporation"
+}
+
+### Create Another Organization
+POST {{DataTrustHub.API_HostAddress}}/Organization
+Content-Type: application/json
+
+{
+  "name": "Tech Solutions Inc."
+}
+
+###############################################################################
+# POLICY ENDPOINTS
+###############################################################################
+
+### Create Policy
+# Note: Replace organizationId with actual Organization ID from CreateOrganization response
+# @name CreatePolicy
+POST {{DataTrustHub.API_HostAddress}}/Policy
+Content-Type: application/json
+
+{
+  "name": "Confidential Data Policy",
+  "organizationId": "00000000-0000-0000-0000-000000000000"
+}
+
+### Create Another Policy
+POST {{DataTrustHub.API_HostAddress}}/Policy
+Content-Type: application/json
+
+{
+  "name": "Public Data Policy",
+  "organizationId": "00000000-0000-0000-0000-000000000000"
+}
+
+###############################################################################
+# DATA ITEM ENDPOINTS
+###############################################################################
+
+### Create Data Item
+# Note: Replace ownerUserId with actual User ID from RegisterUser response
+# @name CreateDataItem
+POST {{DataTrustHub.API_HostAddress}}/DataItem
+Content-Type: application/json
+
+{
+  "name": "Important Document",
+  "size": 1024,
+  "content": "This is the content of the document",
+  "ownerUserId": "00000000-0000-0000-0000-000000000000",
+  "securityMarking": "CONFIDENTIAL"
+}
+
+### Create Data Item (No Content)
+POST {{DataTrustHub.API_HostAddress}}/DataItem
+Content-Type: application/json
+
+{
+  "name": "Large File",
+  "size": 1048576,
+  "content": null,
+  "ownerUserId": "00000000-0000-0000-0000-000000000000",
+  "securityMarking": "PUBLIC"
+}
+
+###############################################################################
+# CLEARANCE ENDPOINTS
+###############################################################################
+
+### Create Clearance
+# Note: Replace userId and policyId with actual IDs from RegisterUser and CreatePolicy responses
+# @name CreateClearance
+POST {{DataTrustHub.API_HostAddress}}/Clearance
+Content-Type: application/json
+
+{
+  "userId": "00000000-0000-0000-0000-000000000000",
+  "policyId": "00000000-0000-0000-0000-000000000000",
+  "name": "Top Secret Clearance",
+  "classificationLevelName": "Top Secret",
+  "classificationLevelPriority": 3
+}
+
+### Create Clearance (Secret Level)
+POST {{DataTrustHub.API_HostAddress}}/Clearance
+Content-Type: application/json
+
+{
+  "userId": "00000000-0000-0000-0000-000000000000",
+  "policyId": "00000000-0000-0000-0000-000000000000",
+  "name": "Secret Clearance",
+  "classificationLevelName": "Secret",
+  "classificationLevelPriority": 2
+}
+
+### Create Clearance (Confidential Level)
+POST {{DataTrustHub.API_HostAddress}}/Clearance
+Content-Type: application/json
+
+{
+  "userId": "00000000-0000-0000-0000-000000000000",
+  "policyId": "00000000-0000-0000-0000-000000000000",
+  "name": "Confidential Clearance",
+  "classificationLevelName": "Confidential",
+  "classificationLevelPriority": 1
+}

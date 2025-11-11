@@ -1,4 +1,4 @@
-using DataTrustHub.Application.Abstractions.Data;
+using UserEntity = DataTrustHub.Domain.User.User;
 using DataTrustHub.Domain.User;
 using DataTrustHub.SharedKernel;
 using MediatR;
@@ -16,8 +16,13 @@ namespace DataTrustHub.Application.User.Register
         public async Task<Result<Guid>> Handle(RegisterUserCommand request, CancellationToken cancellationToken)
         {
             var newUserId = Guid.NewGuid();
-            var result = await UserRepository.CreateUserAsync(newUserId.ToString(), cancellationToken);
-            return await Task.FromResult(newUserId);
+            await UserRepository.AddAsync(new UserEntity
+            {
+                Id = newUserId,
+                Email = request.Email,
+                HashedPassword = request.Password
+            });
+            return Result.Success(newUserId);
         }
     }
 }

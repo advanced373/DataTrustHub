@@ -4,10 +4,9 @@ using DomainData = DataTrustHub.Domain.Data;
 
 namespace DataTrustHub.Infrastructure.Persistance.Repositories.Data
 {
-    public class DataItemRepository : DomainData.IDataRepository
+    public class DataItemRepository(DContext context) : DomainData.IDataItemRepository
     {
-        private readonly DContext _context;
-        public DataItemRepository(DContext context) => _context = context;
+        private readonly DContext _context = context;
 
         public async Task<List<DomainData.DataItem>> GetAllAsync() =>
             await _context.DataItems.Select(d => new DomainData.DataItem

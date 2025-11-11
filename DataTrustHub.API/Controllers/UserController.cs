@@ -1,5 +1,4 @@
 using DataTrustHub.API.User.DTOs;
-using DataTrustHub.Application.Clearance.Create;
 using DataTrustHub.Application.User.Register;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -24,7 +23,13 @@ namespace DataTrustHub.API.Controllers
         public async Task<IActionResult> CreateUser([FromBody] UserDto userDto)
         {
             var result = await _mediator.Send(new RegisterUserCommand(userDto.Email, userDto.Password));
-            return Ok();
+            
+            if (result.IsFailure)
+            {
+                return BadRequest(result.Error);
+            }
+
+            return Ok(new { Id = result.Value });
         }
         
     }

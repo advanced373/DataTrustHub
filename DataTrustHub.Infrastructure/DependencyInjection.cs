@@ -1,6 +1,14 @@
 ﻿
+using DataTrustHub.Domain.Clearance;
+using DataTrustHub.Domain.Data;
+using DataTrustHub.Domain.Organization;
+using DataTrustHub.Domain.Policy;
 using DataTrustHub.Domain.User;
 using DataTrustHub.Infrastructure.Persistance;
+using DataTrustHub.Infrastructure.Persistance.Repositories.Clearance;
+using DataTrustHub.Infrastructure.Persistance.Repositories.Data;
+using DataTrustHub.Infrastructure.Persistance.Repositories.Organization;
+using DataTrustHub.Infrastructure.Persistance.Repositories.Policy;
 using DataTrustHub.Infrastructure.Persistance.Repositories.User;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -22,6 +30,10 @@ namespace DataTrustHub.Infrastructure
             });
 
             services.AddScoped<IUserRepository, UserRepository>();
+            services.AddScoped<IClearanceRepository, ClearanceRepository>();
+            services.AddScoped<IOrganizationRepository, OrganizationRepository>();
+            services.AddScoped<IPolicyRepository, PolicyRepository>();
+            services.AddScoped<IDataItemRepository, DataItemRepository>();
 
             return services;
         }

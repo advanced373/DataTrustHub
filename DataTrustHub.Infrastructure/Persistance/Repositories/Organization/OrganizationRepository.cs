@@ -4,10 +4,9 @@ using DomainOrganization = DataTrustHub.Domain.Organization;
 
 namespace DataTrustHub.Infrastructure.Persistance.Repositories.Organization
 {
-    public class OrganizationRepository : DomainOrganization.IOrganizationRepository
+    public class OrganizationRepository(DContext context) : DomainOrganization.IOrganizationRepository
     {
-        private readonly DContext _context;
-        public OrganizationRepository(DContext context) => _context = context;
+        private readonly DContext _context = context;
 
         public async Task<List<DomainOrganization.Organization>> GetAllAsync() =>
             await _context.Organizations.Select(o => new DomainOrganization.Organization

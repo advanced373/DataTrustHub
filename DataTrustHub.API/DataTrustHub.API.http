@@ -23,6 +23,16 @@ Content-Type: application/json
   "password": "AdminPassword123!"
 }
 
+### Get Users
+# @name GetUsers
+GET {{DataTrustHub.API_HostAddress}}/User
+Accept: application/json
+
+### Get User By Id
+# Note: replace {{UserId}} with an ID from RegisterUser
+GET {{DataTrustHub.API_HostAddress}}/User/{{UserId}}
+Accept: application/json
+
 ###############################################################################
 # ORGANIZATION ENDPOINTS
 ###############################################################################
@@ -43,6 +53,16 @@ Content-Type: application/json
 {
   "name": "Tech Solutions Inc."
 }
+
+### Get Organizations
+# @name GetOrganizations
+GET {{DataTrustHub.API_HostAddress}}/Organization
+Accept: application/json
+
+### Get Organization By Id
+# Note: replace {{OrganizationId}} with an ID from CreateOrganization
+GET {{DataTrustHub.API_HostAddress}}/Organization/{{OrganizationId}}
+Accept: application/json
 
 ###############################################################################
 # POLICY ENDPOINTS
@@ -67,6 +87,16 @@ Content-Type: application/json
   "name": "Public Data Policy",
   "organizationId": "00000000-0000-0000-0000-000000000000"
 }
+
+### Get Policies
+# @name GetPolicies
+GET {{DataTrustHub.API_HostAddress}}/Policy
+Accept: application/json
+
+### Get Policy By Id
+# Note: replace {{PolicyId}} with an ID from CreatePolicy
+GET {{DataTrustHub.API_HostAddress}}/Policy/{{PolicyId}}
+Accept: application/json
 
 ###############################################################################
 # DATA ITEM ENDPOINTS
@@ -97,6 +127,16 @@ Content-Type: application/json
   "ownerUserId": "00000000-0000-0000-0000-000000000000",
   "securityMarking": "PUBLIC"
 }
+
+### Get Data Items
+# @name GetDataItems
+GET {{DataTrustHub.API_HostAddress}}/DataItem
+Accept: application/json
+
+### Get Data Item By Id
+# Note: replace {{DataItemId}} with an ID from CreateDataItem
+GET {{DataTrustHub.API_HostAddress}}/DataItem/{{DataItemId}}
+Accept: application/json
 
 ###############################################################################
 # CLEARANCE ENDPOINTS
@@ -139,3 +179,13 @@ Content-Type: application/json
   "classificationLevelName": "Confidential",
   "classificationLevelPriority": 1
 }
+
+### Get Clearances
+# @name GetClearances
+GET {{DataTrustHub.API_HostAddress}}/Clearance
+Accept: application/json
+
+### Get Clearance By Id
+# Note: replace {{ClearanceId}} with an ID from CreateClearance
+GET {{DataTrustHub.API_HostAddress}}/Clearance/{{ClearanceId}}
+Accept: application/json

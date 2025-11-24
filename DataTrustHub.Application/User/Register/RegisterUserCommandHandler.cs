@@ -8,9 +8,11 @@ namespace DataTrustHub.Application.User.Register
     public class RegisterUserCommandHandler : IRequestHandler<RegisterUserCommand, Result<Guid>>
     {
         public IUserRepository UserRepository { get; init; }
-        public RegisterUserCommandHandler(IUserRepository userRepository)
+        public IPasswordHasher PasswordHasher { get; init; }
+        public RegisterUserCommandHandler(IUserRepository userRepository, IPasswordHasher passwordHasher)
         {
             UserRepository = userRepository;
+            PasswordHasher = passwordHasher;
         }
 
         public async Task<Result<Guid>> Handle(RegisterUserCommand request, CancellationToken cancellationToken)
@@ -20,7 +22,7 @@ namespace DataTrustHub.Application.User.Register
             {
                 Id = newUserId,
                 Email = request.Email,
-                HashedPassword = request.Password
+                HashedPassword = PasswordHasher.HashPassword(request.Password)
             });
             return Result.Success(newUserId);
         }

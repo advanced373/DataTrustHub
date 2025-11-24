@@ -1,5 +1,8 @@
 using DataTrustHub.API.Data.DTOs;
 using DataTrustHub.Application.Data.Create;
+using DataTrustHub.Application.Data.Get;
+using DataTrustHub.SharedKernel;
+using System.Linq;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -16,6 +19,52 @@ namespace DataTrustHub.API.Controllers
         {
             _logger = logger;
             _mediator = mediator;
+        }
+
+        [HttpGet(Name = "GetDataItems")]
+        public async Task<IActionResult> GetDataItems()
+        {
+            var result = await _mediator.Send(new GetDataItemsQuery());
+
+            if (result.IsFailure)
+            {
+                return HandleFailure(result);
+            }
+
+            var response = result.Value.Select(dataItem => new DataItemResponseDto
+            {
+                Id = dataItem.Id,
+                Name = dataItem.Name,
+                Size = dataItem.Size,
+                Content = dataItem.Content,
+                OwnerUserId = dataItem.OwnerUserId,
+                SecurityMarking = dataItem.SecurityMarking
+            });
+
+            return Ok(response);
+        }
+
+        [HttpGet("{id:guid}", Name = "GetDataItemById")]
+        public async Task<IActionResult> GetDataItemById(Guid id)
+        {
+            var result = await _mediator.Send(new GetDataItemByIdQuery(id));
+
+            if (result.IsFailure)
+            {
+                return HandleFailure(result);
+            }
+
+            var dataItem = result.Value;
+
+            return Ok(new DataItemResponseDto
+            {
+                Id = dataItem.Id,
+                Name = dataItem.Name,
+                Size = dataItem.Size,
+                Content = dataItem.Content,
+                OwnerUserId = dataItem.OwnerUserId,
+                SecurityMarking = dataItem.SecurityMarking
+            });
         }
 
         [HttpPost(Name = "CreateDataItem")]
@@ -35,6 +84,12 @@ namespace DataTrustHub.API.Controllers
 
             return Ok(new { Id = result.Value });
         }
+
+        private IActionResult HandleFailure<T>(Result<T> result) => result.Error.Type switch
+        {
+            ErrorType.NotFound => NotFound(result.Error),
+            _ => BadRequest(result.Error)
+        };
     }
 }
 

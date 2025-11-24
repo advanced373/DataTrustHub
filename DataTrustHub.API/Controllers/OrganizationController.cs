@@ -1,5 +1,8 @@
 using DataTrustHub.API.Organization.DTOs;
 using DataTrustHub.Application.Organization.Create;
+using DataTrustHub.Application.Organization.Get;
+using DataTrustHub.SharedKernel;
+using System.Linq;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -18,6 +21,44 @@ namespace DataTrustHub.API.Controllers
             _mediator = mediator;
         }
 
+        [HttpGet(Name = "GetOrganizations")]
+        public async Task<IActionResult> GetOrganizations()
+        {
+            var result = await _mediator.Send(new GetOrganizationsQuery());
+
+            if (result.IsFailure)
+            {
+                return HandleFailure(result);
+            }
+
+            var response = result.Value.Select(organization => new OrganizationResponseDto
+            {
+                Id = organization.Id,
+                Name = organization.Name
+            });
+
+            return Ok(response);
+        }
+
+        [HttpGet("{id:guid}", Name = "GetOrganizationById")]
+        public async Task<IActionResult> GetOrganizationById(Guid id)
+        {
+            var result = await _mediator.Send(new GetOrganizationByIdQuery(id));
+
+            if (result.IsFailure)
+            {
+                return HandleFailure(result);
+            }
+
+            var organization = result.Value;
+
+            return Ok(new OrganizationResponseDto
+            {
+                Id = organization.Id,
+                Name = organization.Name
+            });
+        }
+
         [HttpPost(Name = "CreateOrganization")]
         public async Task<IActionResult> CreateOrganization([FromBody] OrganizationDto organizationDto)
         {
@@ -30,6 +71,12 @@ namespace DataTrustHub.API.Controllers
 
             return Ok(new { Id = result.Value });
         }
+
+        private IActionResult HandleFailure<T>(Result<T> result) => result.Error.Type switch
+        {
+            ErrorType.NotFound => NotFound(result.Error),
+            _ => BadRequest(result.Error)
+        };
     }
 }
 

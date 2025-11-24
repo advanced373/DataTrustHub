@@ -1,5 +1,4 @@
-﻿
-using DataTrustHub.Domain.Clearance;
+﻿using DataTrustHub.Domain.Clearance;
 using DataTrustHub.Domain.Data;
 using DataTrustHub.Domain.Organization;
 using DataTrustHub.Domain.Policy;
@@ -10,7 +9,7 @@ using DataTrustHub.Infrastructure.Persistance.Repositories.Data;
 using DataTrustHub.Infrastructure.Persistance.Repositories.Organization;
 using DataTrustHub.Infrastructure.Persistance.Repositories.Policy;
 using DataTrustHub.Infrastructure.Persistance.Repositories.User;
-using MediatR;
+using DataTrustHub.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -34,6 +33,8 @@ namespace DataTrustHub.Infrastructure
             services.AddScoped<IOrganizationRepository, OrganizationRepository>();
             services.AddScoped<IPolicyRepository, PolicyRepository>();
             services.AddScoped<IDataItemRepository, DataItemRepository>();
+
+            services.AddSingleton<IPasswordHasher, PasswordHasher>();
 
             return services;
         }

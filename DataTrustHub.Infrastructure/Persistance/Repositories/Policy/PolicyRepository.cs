@@ -49,11 +49,11 @@ namespace DataTrustHub.Infrastructure.Persistance.Repositories.Policy
                 Id = policy.Id,
                 Name = policy.Name,
                 OrganizationId = policy.OrganizationId,
-                ClassificationLevels = (DbSet<DbClassificationLevel>)policy.ClassificationLevels.Select(cl => new DbClassificationLevel
+                ClassificationLevels = policy.ClassificationLevels.Select(cl => new DbClassificationLevel
                 {
                     Name = cl.Name,
                     Priority = cl.Priority
-                })
+                }).ToList().AsReadOnly()
             };
             await _context.Policies.AddAsync(dbPolicy);
             await _context.SaveChangesAsync();
@@ -66,11 +66,11 @@ namespace DataTrustHub.Infrastructure.Persistance.Repositories.Policy
                 Id = policy.Id,
                 Name = policy.Name,
                 OrganizationId = policy.OrganizationId,
-                ClassificationLevels = (DbSet<DbClassificationLevel>)policy.ClassificationLevels.Select(cl => new DbClassificationLevel
+                ClassificationLevels = policy.ClassificationLevels.Select(cl => new DbClassificationLevel
                 {
                     Name = cl.Name,
                     Priority = cl.Priority
-                })
+                }).ToList().AsReadOnly()
             };
             _context.Policies.Update(dbPolicy);
             await _context.SaveChangesAsync();

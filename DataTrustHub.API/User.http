@@ -1,0 +1,40 @@
+@DataTrustHub.API_HostAddress = http://localhost:5295
+
+###############################################################################
+# USER ENDPOINTS
+###############################################################################
+
+### Register User
+# @name RegisterUser
+POST {{DataTrustHub.API_HostAddress}}/User
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "password": "SecurePassword123!"
+}
+
+### Register Another User
+POST {{DataTrustHub.API_HostAddress}}/User
+Content-Type: application/json
+
+{
+  "email": "admin@example.com",
+  "password": "AdminPassword123!"
+}
+
+### Get Users
+# @name GetUsers
+GET {{DataTrustHub.API_HostAddress}}/User
+Accept: application/json
+
+### Get User By Id
+# Note: replace {{UserId}} with an ID from RegisterUser
+GET {{DataTrustHub.API_HostAddress}}/User/{{UserId}}
+Accept: application/json
+
+### Delete User
+# Note: replace {{UserId}} with an ID from RegisterUser
+DELETE {{DataTrustHub.API_HostAddress}}/User/{{UserId}}
+Accept: application/json
+

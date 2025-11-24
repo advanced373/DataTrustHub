@@ -1,6 +1,7 @@
 using DataTrustHub.API.Clearance.DTOs;
 using DataTrustHub.API.Shared.DTOs;
 using DataTrustHub.Application.Clearance.Create;
+using DataTrustHub.Application.Clearance.Delete;
 using DataTrustHub.Application.Clearance.Get;
 using DataTrustHub.SharedKernel;
 using System.Linq;
@@ -94,7 +95,26 @@ namespace DataTrustHub.API.Controllers
             return Ok(new { Id = result.Value });
         }
 
+        [HttpDelete("{id:guid}", Name = "DeleteClearance")]
+        public async Task<IActionResult> DeleteClearance(Guid id)
+        {
+            var result = await _mediator.Send(new DeleteClearanceCommand(id));
+
+            if (result.IsFailure)
+            {
+                return HandleFailure(result);
+            }
+
+            return NoContent();
+        }
+
         private IActionResult HandleFailure<T>(Result<T> result) => result.Error.Type switch
+        {
+            ErrorType.NotFound => NotFound(result.Error),
+            _ => BadRequest(result.Error)
+        };
+
+        private IActionResult HandleFailure(Result result) => result.Error.Type switch
         {
             ErrorType.NotFound => NotFound(result.Error),
             _ => BadRequest(result.Error)

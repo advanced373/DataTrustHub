@@ -1,5 +1,6 @@
 using DataTrustHub.API.Organization.DTOs;
 using DataTrustHub.Application.Organization.Create;
+using DataTrustHub.Application.Organization.Delete;
 using DataTrustHub.Application.Organization.Get;
 using DataTrustHub.SharedKernel;
 using System.Linq;
@@ -72,7 +73,26 @@ namespace DataTrustHub.API.Controllers
             return Ok(new { Id = result.Value });
         }
 
+        [HttpDelete("{id:guid}", Name = "DeleteOrganization")]
+        public async Task<IActionResult> DeleteOrganization(Guid id)
+        {
+            var result = await _mediator.Send(new DeleteOrganizationCommand(id));
+
+            if (result.IsFailure)
+            {
+                return HandleFailure(result);
+            }
+
+            return NoContent();
+        }
+
         private IActionResult HandleFailure<T>(Result<T> result) => result.Error.Type switch
+        {
+            ErrorType.NotFound => NotFound(result.Error),
+            _ => BadRequest(result.Error)
+        };
+
+        private IActionResult HandleFailure(Result result) => result.Error.Type switch
         {
             ErrorType.NotFound => NotFound(result.Error),
             _ => BadRequest(result.Error)

@@ -1,4 +1,5 @@
 using DataTrustHub.API.User.DTOs;
+using DataTrustHub.Application.User.Delete;
 using DataTrustHub.Application.User.Get;
 using DataTrustHub.Application.User.Register;
 using DataTrustHub.SharedKernel;
@@ -71,8 +72,27 @@ namespace DataTrustHub.API.Controllers
 
             return Ok(new { Id = result.Value });
         }
+
+        [HttpDelete("{id:guid}", Name = "DeleteUser")]
+        public async Task<IActionResult> DeleteUser(Guid id)
+        {
+            var result = await _mediator.Send(new DeleteUserCommand(id));
+
+            if (result.IsFailure)
+            {
+                return HandleFailure(result);
+            }
+
+            return NoContent();
+        }
         
         private IActionResult HandleFailure<T>(Result<T> result) => result.Error.Type switch
+        {
+            ErrorType.NotFound => NotFound(result.Error),
+            _ => BadRequest(result.Error)
+        };
+
+        private IActionResult HandleFailure(Result result) => result.Error.Type switch
         {
             ErrorType.NotFound => NotFound(result.Error),
             _ => BadRequest(result.Error)

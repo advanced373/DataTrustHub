@@ -1,6 +1,7 @@
 using DataTrustHub.API.Policy.DTOs;
 using DataTrustHub.API.Shared.DTOs;
 using DataTrustHub.Application.Policy.Create;
+using DataTrustHub.Application.Policy.Delete;
 using DataTrustHub.Application.Policy.Get;
 using DataTrustHub.SharedKernel;
 using System.Linq;
@@ -87,7 +88,26 @@ namespace DataTrustHub.API.Controllers
             return Ok(new { Id = result.Value });
         }
 
+        [HttpDelete("{id:guid}", Name = "DeletePolicy")]
+        public async Task<IActionResult> DeletePolicy(Guid id)
+        {
+            var result = await _mediator.Send(new DeletePolicyCommand(id));
+
+            if (result.IsFailure)
+            {
+                return HandleFailure(result);
+            }
+
+            return NoContent();
+        }
+
         private IActionResult HandleFailure<T>(Result<T> result) => result.Error.Type switch
+        {
+            ErrorType.NotFound => NotFound(result.Error),
+            _ => BadRequest(result.Error)
+        };
+
+        private IActionResult HandleFailure(Result result) => result.Error.Type switch
         {
             ErrorType.NotFound => NotFound(result.Error),
             _ => BadRequest(result.Error)

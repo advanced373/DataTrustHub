@@ -9,11 +9,11 @@ public static class ApplicationDependencyInjection
 		_ = services.AddMediatR(config =>
 		{
 			_ = config.RegisterServicesFromAssembly(typeof(ApplicationDependencyInjection).Assembly);
-			//_ = config.AddOpenBehavior(typeof(ValidationPipelineBehavior<,>));
+			_ = config.AddOpenBehavior(typeof(Abstractions.Behaviors.AuditPipelineBehavior<,>));
 		});
 
-		//_ = services.AddValidatorsFromAssembly(typeof(ApplicationDependencyInjection).Assembly, includeInternalTypes: true);
+        services.AddHttpContextAccessor();
 
-		return services;
+        return services;
 	}
 }

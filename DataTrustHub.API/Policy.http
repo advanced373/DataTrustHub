@@ -1,0 +1,41 @@
+@DataTrustHub.API_HostAddress = http://localhost:5295
+
+###############################################################################
+# POLICY ENDPOINTS
+###############################################################################
+
+### Create Policy
+# Note: Replace organizationId with actual Organization ID from CreateOrganization response
+# @name CreatePolicy
+POST {{DataTrustHub.API_HostAddress}}/Policy
+Content-Type: application/json
+
+{
+  "name": "Confidential Data Policy",
+  "organizationId": "00000000-0000-0000-0000-000000000000"
+}
+
+### Create Another Policy
+POST {{DataTrustHub.API_HostAddress}}/Policy
+Content-Type: application/json
+
+{
+  "name": "Public Data Policy",
+  "organizationId": "00000000-0000-0000-0000-000000000000"
+}
+
+### Get Policies
+# @name GetPolicies
+GET {{DataTrustHub.API_HostAddress}}/Policy
+Accept: application/json
+
+### Get Policy By Id
+# Note: replace {{PolicyId}} with an ID from CreatePolicy
+GET {{DataTrustHub.API_HostAddress}}/Policy/{{PolicyId}}
+Accept: application/json
+
+### Delete Policy
+# Note: replace {{PolicyId}} with an ID from CreatePolicy
+DELETE {{DataTrustHub.API_HostAddress}}/Policy/{{PolicyId}}
+Accept: application/json
+

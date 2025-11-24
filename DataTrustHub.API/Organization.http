@@ -1,0 +1,38 @@
+@DataTrustHub.API_HostAddress = http://localhost:5295
+
+###############################################################################
+# ORGANIZATION ENDPOINTS
+###############################################################################
+
+### Create Organization
+# @name CreateOrganization
+POST {{DataTrustHub.API_HostAddress}}/Organization
+Content-Type: application/json
+
+{
+  "name": "Acme Corporation"
+}
+
+### Create Another Organization
+POST {{DataTrustHub.API_HostAddress}}/Organization
+Content-Type: application/json
+
+{
+  "name": "Tech Solutions Inc."
+}
+
+### Get Organizations
+# @name GetOrganizations
+GET {{DataTrustHub.API_HostAddress}}/Organization
+Accept: application/json
+
+### Get Organization By Id
+# Note: replace {{OrganizationId}} with an ID from CreateOrganization
+GET {{DataTrustHub.API_HostAddress}}/Organization/{{OrganizationId}}
+Accept: application/json
+
+### Delete Organization
+# Note: replace {{OrganizationId}} with an ID from CreateOrganization
+DELETE {{DataTrustHub.API_HostAddress}}/Organization/{{OrganizationId}}
+Accept: application/json
+

@@ -1,0 +1,59 @@
+@DataTrustHub.API_HostAddress = http://localhost:5295
+
+###############################################################################
+# CLEARANCE ENDPOINTS
+###############################################################################
+
+### Create Clearance
+# Note: Replace userId and policyId with actual IDs from RegisterUser and CreatePolicy responses
+# @name CreateClearance
+POST {{DataTrustHub.API_HostAddress}}/Clearance
+Content-Type: application/json
+
+{
+  "userId": "00000000-0000-0000-0000-000000000000",
+  "policyId": "00000000-0000-0000-0000-000000000000",
+  "name": "Top Secret Clearance",
+  "classificationLevelName": "Top Secret",
+  "classificationLevelPriority": 3
+}
+
+### Create Clearance (Secret Level)
+POST {{DataTrustHub.API_HostAddress}}/Clearance
+Content-Type: application/json
+
+{
+  "userId": "00000000-0000-0000-0000-000000000000",
+  "policyId": "00000000-0000-0000-0000-000000000000",
+  "name": "Secret Clearance",
+  "classificationLevelName": "Secret",
+  "classificationLevelPriority": 2
+}
+
+### Create Clearance (Confidential Level)
+POST {{DataTrustHub.API_HostAddress}}/Clearance
+Content-Type: application/json
+
+{
+  "userId": "00000000-0000-0000-0000-000000000000",
+  "policyId": "00000000-0000-0000-0000-000000000000",
+  "name": "Confidential Clearance",
+  "classificationLevelName": "Confidential",
+  "classificationLevelPriority": 1
+}
+
+### Get Clearances
+# @name GetClearances
+GET {{DataTrustHub.API_HostAddress}}/Clearance
+Accept: application/json
+
+### Get Clearance By Id
+# Note: replace {{ClearanceId}} with an ID from CreateClearance
+GET {{DataTrustHub.API_HostAddress}}/Clearance/{{ClearanceId}}
+Accept: application/json
+
+### Delete Clearance
+# Note: replace {{ClearanceId}} with an ID from CreateClearance
+DELETE {{DataTrustHub.API_HostAddress}}/Clearance/{{ClearanceId}}
+Accept: application/json
+

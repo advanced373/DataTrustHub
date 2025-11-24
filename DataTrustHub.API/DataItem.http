@@ -1,0 +1,47 @@
+@DataTrustHub.API_HostAddress = http://localhost:5295
+
+###############################################################################
+# DATA ITEM ENDPOINTS
+###############################################################################
+
+### Create Data Item
+# Note: Replace ownerUserId with actual User ID from RegisterUser response
+# @name CreateDataItem
+POST {{DataTrustHub.API_HostAddress}}/DataItem
+Content-Type: application/json
+
+{
+  "name": "Important Document",
+  "size": 1024,
+  "content": "This is the content of the document",
+  "ownerUserId": "00000000-0000-0000-0000-000000000000",
+  "securityMarking": "CONFIDENTIAL"
+}
+
+### Create Data Item (No Content)
+POST {{DataTrustHub.API_HostAddress}}/DataItem
+Content-Type: application/json
+
+{
+  "name": "Large File",
+  "size": 1048576,
+  "content": null,
+  "ownerUserId": "00000000-0000-0000-0000-000000000000",
+  "securityMarking": "PUBLIC"
+}
+
+### Get Data Items
+# @name GetDataItems
+GET {{DataTrustHub.API_HostAddress}}/DataItem
+Accept: application/json
+
+### Get Data Item By Id
+# Note: replace {{DataItemId}} with an ID from CreateDataItem
+GET {{DataTrustHub.API_HostAddress}}/DataItem/{{DataItemId}}
+Accept: application/json
+
+### Delete Data Item
+# Note: replace {{DataItemId}} with an ID from CreateDataItem
+DELETE {{DataTrustHub.API_HostAddress}}/DataItem/{{DataItemId}}
+Accept: application/json
+

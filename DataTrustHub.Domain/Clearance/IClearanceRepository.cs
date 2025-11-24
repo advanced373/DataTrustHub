@@ -1,12 +1,16 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
+﻿
 namespace DataTrustHub.Domain.Clearance
 {
-    internal class IClearanceRepository
+    public interface IClearanceRepository
     {
+        public Task<List<Clearance>> GetAllAsync();
+
+        public Task<Clearance?> GetByIdAsync(Guid id);
+
+        public Task AddAsync(Clearance clearance);
+
+        public Task UpdateAsync(Clearance clearance);
+
+        public Task DeleteAsync(Guid id);
     }
 }

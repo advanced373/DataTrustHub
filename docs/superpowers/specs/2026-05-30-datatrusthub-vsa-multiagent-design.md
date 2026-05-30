@@ -268,22 +268,130 @@ CLAUDE.md este citit automat de fiecare agent la pornire. Conține:
 
 ---
 
-## 6. Decizii arhitecturale (ADR)
+## 6. Code Style Rules
 
-### ADR-001: Proiect separat vs folder în API
-**Decizie:** Proiect separat `DataTrustHub.Features`  
-**Motiv:** Izolare clară la nivel de compilare; agenții nu pot accidental importa din proiectul greșit; migrare graduală fără a destabiliza API-ul existent.
+All code written in `DataTrustHub.Features` (and across the entire solution) must follow these rules. Agents must apply them without exception.
 
-### ADR-002: Carter pentru Minimal API endpoints
-**Decizie:** Folosim Carter (`ICarterModule`) pentru înregistrarea endpoint-urilor  
-**Motiv:** Pattern VSA-friendly, auto-discovery prin reflection, elimină boilerplate-ul din `Program.cs`.  
-**Acțiune necesară:** Adăugare NuGet `Carter` în `DataTrustHub.Features.csproj` — nu e prezent în soluție acum.
+### 6.1 Naming
 
-### ADR-003: MediatR rămâne în slice-uri
-**Decizie:** MediatR continuă ca mediator intern în fiecare slice  
-**Motiv:** Deja prezent în proiect, agenții îl cunosc deja.  
-**Notă:** `ValidationPipelineBehavior` și `AddValidatorsFromAssembly` sunt comentate în `DependencyInjection.cs` — se activează în proiectul `Features` de la bun început.
+- **camelCase** for local variables and parameters: `userId`, `dataItemList`, `hashedPassword`
+- **PascalCase** for types, methods, properties, and constants: `RegisterUserHandler`, `MaxPasswordLength`
+- **No abbreviations** unless universally known (`id`, `dto`, `db` are acceptable; `usr`, `mgr`, `svc` are not)
 
-### ADR-004: Migrații centralizate
-**Decizie:** Un singur "Database Owner" per sprint aplică migrațiile  
-**Motiv:** EF Core nu suportă migrații paralele pe același context fără conflicte de timestamp și snapshot.
+### 6.2 Language
+
+- All **comments must be written in English**
+- All **documentation, specs, and ADRs must be written in English**
+- Commit messages in English
+
+### 6.3 Constants — No Magic Strings or Numbers
+
+Every string literal or numeric value used as a configuration or rule must be extracted to a named constant. Inline literals in logic are forbidden.
+
+```csharp
+// BAD
+if (password.Length < 8) ...
+app.MapPost("/auth/register", Handle);
+
+// GOOD
+private const int MinPasswordLength = 8;
+private const string RegisterEndpoint = "/auth/register";
+
+if (password.Length < MinPasswordLength) ...
+app.MapPost(RegisterEndpoint, Handle);
+```
+
+Constants live in a `Constants.cs` file inside the slice folder, or in `_Shared/Constants/` if shared across slices.
+
+### 6.4 Function Length — Maximum 30 Lines
+
+No method body may exceed 30 lines (excluding blank lines and braces). If a method grows beyond this, extract private helper methods.
+
+```csharp
+// BAD — one long Handle method doing validation + business logic + mapping
+public async Task<Result<Guid>> Handle(RegisterUserCommand cmd, CancellationToken ct)
+{
+    // 40 lines of mixed concerns
+}
+
+// GOOD — each concern is its own method
+public async Task<Result<Guid>> Handle(RegisterUserCommand cmd, CancellationToken ct)
+{
+    var validationResult = await ValidateUserDoesNotExist(cmd.Email, ct);
+    if (validationResult.IsFailure) return validationResult;
+
+    var user = CreateUser(cmd);
+    await PersistUser(user, ct);
+    return Result.Success(user.Id);
+}
+
+private async Task<Result> ValidateUserDoesNotExist(string email, CancellationToken ct) { ... }
+private User CreateUser(RegisterUserCommand cmd) { ... }
+private async Task PersistUser(User user, CancellationToken ct) { ... }
+```
+
+### 6.5 Abstraction
+
+- **Depend on interfaces, not concrete types.** Services injected into handlers must be defined as interfaces.
+- **No direct instantiation** of services inside handlers (`new SomeService()` is forbidden — use DI).
+- Infrastructure concerns (email sending, file storage, external APIs) must be behind an interface defined in the slice or in `_Shared/Abstractions/`.
+
+```csharp
+// BAD
+public class ShareDataHandler
+{
+    private readonly EmailService _emailService = new EmailService(); // forbidden
+}
+
+// GOOD
+public class ShareDataHandler
+{
+    private readonly IEmailNotifier _emailNotifier;
+    public ShareDataHandler(IEmailNotifier emailNotifier) => _emailNotifier = emailNotifier;
+}
+```
+
+### 6.6 SOLID Principles
+
+| Principle | Rule |
+|---|---|
+| **Single Responsibility** | Each class has one reason to change. Handlers handle; validators validate; endpoints route. Never mix. |
+| **Open/Closed** | Extend behavior via new classes or interfaces, not by modifying existing handlers. |
+| **Liskov Substitution** | Implementations must be substitutable for their interfaces without altering correctness. |
+| **Interface Segregation** | Define narrow interfaces per use case. Avoid fat interfaces with methods unrelated to the caller. |
+| **Dependency Inversion** | Handlers depend on abstractions (`IRepository`, `IEmailNotifier`), never on concrete infrastructure types. |
+
+### 6.7 Summary Checklist (per slice, before PR)
+
+- [ ] All comments in English
+- [ ] No inline string or numeric literals in logic
+- [ ] No method exceeds 30 lines
+- [ ] All injected dependencies are interfaces
+- [ ] Each class has a single responsibility
+- [ ] Constants extracted to `Constants.cs`
+
+---
+
+## 7. Decizii arhitecturale (ADR)
+
+### ADR-001: Separate project vs folder inside API
+**Decision:** Separate project `DataTrustHub.Features`  
+**Reason:** Clear compile-time isolation; agents cannot accidentally import from the wrong project; gradual migration without destabilizing the existing API.
+
+### ADR-002: Carter for Minimal API endpoints
+**Decision:** Use Carter (`ICarterModule`) for endpoint registration  
+**Reason:** VSA-friendly pattern, auto-discovery via reflection, eliminates boilerplate from `Program.cs`.  
+**Required action:** Add NuGet `Carter` to `DataTrustHub.Features.csproj` — not present in the solution yet.
+
+### ADR-003: MediatR stays inside slices
+**Decision:** MediatR continues as the internal mediator within each slice  
+**Reason:** Already present in the project; agents are familiar with it.  
+**Note:** `ValidationPipelineBehavior` and `AddValidatorsFromAssembly` are commented out in `DependencyInjection.cs` — enable them from the start in the `Features` project.
+
+### ADR-004: Centralized migrations
+**Decision:** A single "Database Owner" per sprint applies all migrations  
+**Reason:** EF Core does not support parallel migrations on the same context without timestamp and snapshot conflicts.
+
+### ADR-005: English as the project language
+**Decision:** All code artifacts (comments, specs, docs, commit messages, constant names) are written in English  
+**Reason:** Consistency across agents; English is the universal default for technical artifacts and avoids encoding issues with diacritics in identifiers.

@@ -4,7 +4,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 
-namespace DataTrustHub.Features.Authentication._Shared;
+namespace DataTrustHub.Features._Shared.Jwt;
 
 public class JwtTokenGenerator(IOptions<JwtConfig> jwtOptions) : IJwtTokenGenerator
 {

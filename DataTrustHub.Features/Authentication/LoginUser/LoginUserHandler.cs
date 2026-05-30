@@ -1,4 +1,4 @@
-using DataTrustHub.Features.Authentication._Shared;
+using DataTrustHub.Features._Shared.Jwt;
 using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.Infrastructure.Persistance.Model;
 using DataTrustHub.SharedKernel;

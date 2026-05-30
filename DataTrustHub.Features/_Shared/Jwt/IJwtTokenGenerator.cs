@@ -1,4 +1,4 @@
-namespace DataTrustHub.Features.Authentication._Shared;
+namespace DataTrustHub.Features._Shared.Jwt;
 
 public interface IJwtTokenGenerator
 {

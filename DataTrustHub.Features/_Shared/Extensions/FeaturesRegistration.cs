@@ -1,6 +1,6 @@
 using Carter;
 using DataTrustHub.Features._Shared.Behaviors;
-using DataTrustHub.Features.Authentication._Shared;
+using DataTrustHub.Features._Shared.Jwt;
 using FluentValidation;
 using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;

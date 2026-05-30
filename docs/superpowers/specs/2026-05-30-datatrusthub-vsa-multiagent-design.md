@@ -139,6 +139,7 @@ Migrarea se face feature cu feature, nu big-bang:
 | 4 | Migrare `DataManagement`, `Sharing`, `Administration`, `MainView` |
 | 5 | Dezactivare treptat a `DataTrustHub.Application` și `DataTrustHub.API` vechi |
 | 6 | `DataTrustHub.Domain` și `DataTrustHub.Infrastructure` rămân, se curăță ce nu mai e folosit |
+| 7 | `DataTrustHub.WebApp` (Razor/MVC frontend) rămâne neatins în această fază — migrarea UI este un epic separat |
 
 **Regula migrației:** Niciun slice nou nu se scrie în proiectele vechi (Application, Domain). Toate feature-urile noi merg direct în `DataTrustHub.Features`.
 
@@ -147,8 +148,9 @@ Migrarea se face feature cu feature, nu big-bang:
 Migrațiile EF Core sunt singura zonă de potențial conflict între agenți. Regula:
 
 - Agentul definește entitățile și marchează cu `// NEEDS MIGRATION`
-- Un singur agent ("Database Owner" per sprint) rulează `Add-Migration` și aplică toate migrațiile pending
-- Niciun agent nu rulează migrații autonom fără coordonare
+- Orchestratorul (dezvoltatorul) desemnează explicit un "Database Owner" înainte de fiecare sprint prin mesaj direct agentului respectiv
+- Database Owner-ul rulează `Add-Migration` și aplică toate migrațiile marcate `// NEEDS MIGRATION`
+- Niciun alt agent nu rulează migrații fără această desemnare explicită
 
 ---
 
@@ -164,14 +166,14 @@ Agenții nu comunică între ei și nu partajează stare. Izolarea este garantat
 
 ### 3.2 Maparea task-urilor
 
-| GitHub Issue | Feature Folder | Branch | Prioritate |
+| GitHub Issue | Feature Folder | Branch | Sprint |
 |---|---|---|---|
-| #1 Autentification | `Features/Authentication/` | `feat/1-authentication` | P1 |
-| #2 Add data | `Features/DataManagement/` | `feat/2-add-data` | P1 |
-| #3 Share data | `Features/Sharing/` | `feat/3-share-data` | P2 |
-| #4 Administration of data | `Features/Administration/` | `feat/4-administration` | P2 |
-| #5 View data | `Features/DataManagement/` | `feat/5-view-data` | P1 |
-| #16 Build basic structure for main view | `Features/MainView/` | `feat/16-main-view` | P1 |
+| #1 Autentification | `Features/Authentication/` | `feat/1-authentication` | 1 |
+| #16 Build basic structure for main view | `Features/MainView/` | `feat/16-main-view` | 1 |
+| #2 Add data | `Features/DataManagement/` | `feat/2-add-data` | 2 |
+| #5 View data | `Features/DataManagement/` | `feat/5-view-data` | 2 |
+| #4 Administration of data | `Features/Administration/` | `feat/4-administration` | 2 |
+| #3 Share data | `Features/Sharing/` | `feat/3-share-data` | 3 (depinde de #2, #4) |
 
 ### 3.3 Fluxul de lucru per agent
 
@@ -274,11 +276,13 @@ CLAUDE.md este citit automat de fiecare agent la pornire. Conține:
 
 ### ADR-002: Carter pentru Minimal API endpoints
 **Decizie:** Folosim Carter (`ICarterModule`) pentru înregistrarea endpoint-urilor  
-**Motiv:** Pattern VSA-friendly, auto-discovery prin reflection, elimină boilerplate-ul din `Program.cs`.
+**Motiv:** Pattern VSA-friendly, auto-discovery prin reflection, elimină boilerplate-ul din `Program.cs`.  
+**Acțiune necesară:** Adăugare NuGet `Carter` în `DataTrustHub.Features.csproj` — nu e prezent în soluție acum.
 
 ### ADR-003: MediatR rămâne în slice-uri
 **Decizie:** MediatR continuă ca mediator intern în fiecare slice  
-**Motiv:** Deja prezent în proiect, ValidationPipelineBehavior funcționează, agenții îl cunosc deja.
+**Motiv:** Deja prezent în proiect, agenții îl cunosc deja.  
+**Notă:** `ValidationPipelineBehavior` și `AddValidatorsFromAssembly` sunt comentate în `DependencyInjection.cs` — se activează în proiectul `Features` de la bun început.
 
 ### ADR-004: Migrații centralizate
 **Decizie:** Un singur "Database Owner" per sprint aplică migrațiile  

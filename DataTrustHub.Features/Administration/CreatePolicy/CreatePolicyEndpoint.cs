@@ -15,7 +15,7 @@ public class CreatePolicyEndpoint : ICarterModule
     public void AddRoutes(IEndpointRouteBuilder app) =>
         app.MapPost(Constants.EndpointRoute, Handle)
            .WithTags(Constants.EndpointTag)
-           .RequireAuthorization(); // TODO: require admin role
+           .RequireAuthorization(policy => policy.RequireRole("Admin"));
 
     private static async Task<IResult> Handle(
         CreatePolicyRequest request,

@@ -41,7 +41,8 @@ public class CreatePolicyHandler(DContext db)
         {
             Id = policyId,
             Name = name,
-            OrganizationId = organizationId
+            OrganizationId = organizationId,
+            ClassificationLevels = []
         };
         await _db.Policies.AddAsync(dbPolicy, ct);
         await _db.SaveChangesAsync(ct);

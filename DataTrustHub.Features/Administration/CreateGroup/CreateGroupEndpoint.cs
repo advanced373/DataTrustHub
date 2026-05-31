@@ -15,7 +15,7 @@ public class CreateGroupEndpoint : ICarterModule
     public void AddRoutes(IEndpointRouteBuilder app) =>
         app.MapPost(Constants.EndpointRoute, Handle)
            .WithTags(Constants.EndpointTag)
-           .RequireAuthorization(); // TODO: require admin role
+           .RequireAuthorization(policy => policy.RequireRole("Admin"));
 
     private static async Task<IResult> Handle(
         CreateGroupRequest request,

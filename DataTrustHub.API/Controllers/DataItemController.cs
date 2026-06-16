@@ -85,10 +85,6 @@ namespace DataTrustHub.API.Controllers
             return Ok(new { Id = result.Value });
         }
 
-        // Delete is handled exclusively by the VSA slice at DELETE /data/{id:guid}
-        // (DataTrustHub.Features.DataManagement.DeleteDataItem), which enforces ownership
-        // and soft-deletes. This legacy action was removed because it bypassed both checks.
-
         private IActionResult HandleFailure<T>(Result<T> result) => result.Error.Type switch
         {
             ErrorType.NotFound => NotFound(result.Error),

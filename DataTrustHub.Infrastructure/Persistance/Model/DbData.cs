@@ -7,5 +7,6 @@
         public string? Content { get; set; }
         public required Guid OwnerUserId { get; set; }
         public required string SecurityMarking { get; set; }
+        public bool IsDeleted { get; set; } = false; // NEEDS MIGRATION
     }
 }

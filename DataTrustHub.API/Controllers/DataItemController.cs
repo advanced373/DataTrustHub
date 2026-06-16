@@ -1,6 +1,5 @@
 using DataTrustHub.API.Data.DTOs;
 using DataTrustHub.Application.Data.Create;
-using DataTrustHub.Application.Data.Delete;
 using DataTrustHub.Application.Data.Get;
 using DataTrustHub.SharedKernel;
 using System.Linq;
@@ -84,19 +83,6 @@ namespace DataTrustHub.API.Controllers
             }
 
             return Ok(new { Id = result.Value });
-        }
-
-        [HttpDelete("{id:guid}", Name = "DeleteDataItem")]
-        public async Task<IActionResult> DeleteDataItem(Guid id)
-        {
-            var result = await _mediator.Send(new DeleteDataItemCommand(id));
-
-            if (result.IsFailure)
-            {
-                return HandleFailure(result);
-            }
-
-            return NoContent();
         }
 
         private IActionResult HandleFailure<T>(Result<T> result) => result.Error.Type switch

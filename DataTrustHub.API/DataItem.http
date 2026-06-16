@@ -41,7 +41,5 @@ GET {{DataTrustHub.API_HostAddress}}/DataItem/{{DataItemId}}
 Accept: application/json
 
 ### Delete Data Item
-# Note: replace {{DataItemId}} with an ID from CreateDataItem
-DELETE {{DataTrustHub.API_HostAddress}}/DataItem/{{DataItemId}}
-Accept: application/json
+# Owner-only soft delete now lives on the VSA endpoint: DELETE {{DataTrustHub.API_HostAddress}}/data/{{DataItemId}}
 

@@ -2,6 +2,9 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using DataTrustHub.Features.Tests.Helpers;
+using DataTrustHub.Infrastructure.Persistance;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace DataTrustHub.Features.Tests.DataManagement;
@@ -25,6 +28,7 @@ public class DeleteDataItemTests(ApiFactory factory) : IClassFixture<ApiFactory>
         var response = await _client.DeleteAsync($"/data/{itemId}");
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.True(await IsMarkedDeletedAsync(itemId));
     }
 
     [Fact]
@@ -105,6 +109,14 @@ public class DeleteDataItemTests(ApiFactory factory) : IClassFixture<ApiFactory>
         var response = await client.PostAsync(UploadEndpoint, form);
         var result = await response.Content.ReadFromJsonAsync<AddDataItemResponse>();
         return result!.DataItemId;
+    }
+
+    private async Task<bool> IsMarkedDeletedAsync(Guid itemId)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<DContext>();
+        var item = await db.DataItems.FirstAsync(d => d.Id == itemId);
+        return item.IsDeleted;
     }
 
     private record AddDataItemResponse(Guid DataItemId);

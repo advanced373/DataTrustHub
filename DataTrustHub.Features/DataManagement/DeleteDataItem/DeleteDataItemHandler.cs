@@ -16,10 +16,10 @@ public class DeleteDataItemHandler(DContext db) : IRequestHandler<DeleteDataItem
         CancellationToken cancellationToken)
     {
         var dataItem = await _db.DataItems.FirstOrDefaultAsync(
-            d => d.Id == command.DataItemId && !d.IsDeleted,
+            d => d.Id == command.DataItemId && !d.IsDeleted && d.OwnerUserId == command.RequesterId,
             cancellationToken);
 
-        if (dataItem is null || dataItem.OwnerUserId != command.RequesterId)
+        if (dataItem is null)
             return Result.Failure<Guid>(Errors.DataItemNotFound);
 
         dataItem.IsDeleted = true;

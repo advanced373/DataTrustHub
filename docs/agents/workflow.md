@@ -42,6 +42,21 @@ Claude Code automatically reads CLAUDE.md from the root. The agent now has full 
 Paste the GitHub issue title and description into the Claude Code session.
 The agent reads CLAUDE.md, identifies its feature folder, and starts implementing.
 
+### Step 3a: Agent marks the issue "In Progress"
+
+Before writing any code, the agent updates the issue's status on the GitHub Project
+board so the orchestrator can see at a glance which issues are actively being worked.
+
+```
+gh project item-list 2 --owner advanced373 --format json   # find the item id for the issue
+gh project item-edit --project-id PVT_kwHOAyuapc4BFjHG --id <item-id> \
+  --field-id PVTSSF_lAHOAyuapc4BFjHGzg22mlU --single-select-option-id 47fc9ee4
+```
+
+Requires `gh` authenticated with the `project` scope (`gh auth refresh -h github.com -s project`).
+If the agent cannot reach GitHub (no `gh` auth available in its environment), it skips this
+step rather than blocking — status hygiene is best-effort, not a gate on implementation.
+
 ### Step 4: Agent works in isolation
 
 The agent creates files only inside Features/<FeatureName>/ and

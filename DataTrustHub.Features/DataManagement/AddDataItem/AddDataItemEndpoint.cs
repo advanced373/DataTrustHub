@@ -3,6 +3,7 @@ using DataTrustHub.Features._Shared.Extensions;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -17,7 +18,10 @@ public class AddDataItemEndpoint : ICarterModule
         app.MapPost(Constants.EndpointRoute, Handle)
            .WithTags(Constants.EndpointTag)
            .RequireAuthorization()
-           .DisableAntiforgery();
+           .DisableAntiforgery()
+           // Kestrel defaults to 30 MB per request; allow the full file size plus multipart overhead
+           .WithMetadata(new RequestSizeLimitAttribute(Constants.MaxRequestSizeBytes))
+           .WithMetadata(new RequestFormLimitsAttribute { MultipartBodyLengthLimit = Constants.MaxRequestSizeBytes });
 
     private static async Task<IResult> Handle(
         IFormFile? file,

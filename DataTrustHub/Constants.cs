@@ -9,6 +9,8 @@ internal static class Constants
     internal const string AdminRole = "Admin";
     internal const string UploadFormField = "file";
     internal const long MaxUploadSizeBytes = 104_857_600; // 100 MB, mirrors the API limit
+    internal const long MultipartOverheadBytes = 1_048_576; // 1 MB for boundaries and headers
+    internal const long MaxUploadRequestBytes = MaxUploadSizeBytes + MultipartOverheadBytes;
     internal const int MinPasswordLength = 8;
     internal const int MaxEmailLength = 256;
     internal const int MaxNameLength = 256;

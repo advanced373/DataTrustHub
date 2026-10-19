@@ -1,4 +1,20 @@
-﻿// Please see documentation at https://learn.microsoft.com/aspnet/core/client-side/bundling-and-minification
-// for details on configuring this project to bundle and minify static web assets.
+// Blocks files over the size limit before they are sent, so large uploads fail fast with a clear message
+document.querySelectorAll('input[type="file"][data-max-bytes]').forEach(input => {
+    const isWithinLimit = () => {
+        const file = input.files[0];
+        const tooLarge = file !== undefined && file.size > Number(input.dataset.maxBytes);
+        input.setCustomValidity(tooLarge ? input.dataset.maxMessage : '');
+        return !tooLarge;
+    };
 
-// Write your JavaScript code.
+    input.addEventListener('change', () => {
+        isWithinLimit();
+        input.reportValidity();
+    });
+
+    input.form?.addEventListener('submit', event => {
+        if (isWithinLimit()) return;
+        event.preventDefault();
+        input.reportValidity();
+    });
+});

@@ -12,7 +12,9 @@
                     <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
                     <div class="mb-3">
                         <label asp-for="File" class="form-label"></label>
-                        <input asp-for="File" type="file" class="form-control" />
+                        <input asp-for="File" type="file" class="form-control"
+                               data-max-bytes="@DataTrustHub.Constants.MaxUploadSizeBytes"
+                               data-max-message="@DataTrustHub.Messages.FileTooLarge" />
                         <div class="form-text">Maximum size: 100 MB.</div>
                         <span asp-validation-for="File" class="text-danger"></span>
                     </div>

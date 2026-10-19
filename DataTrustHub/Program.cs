@@ -1,11 +1,9 @@
-using DataTrustHub.Application;
-using DataTrustHub.Infrastructure;
+using DataTrustHub.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllersWithViews();
-builder.Services.AddApplication();
-builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddWebAppServices();
 
 var app = builder.Build();
 

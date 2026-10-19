@@ -1,5 +1,6 @@
 ﻿@{
     ViewData["Title"] = "Dashboard";
+    var isAdmin = User.IsInRole(DataTrustHub.Constants.AdminRole);
 }
 
 <h1 class="h3 mb-1">Welcome, @User.Identity?.Name</h1>
@@ -24,4 +25,16 @@
             </div>
         </div>
     </div>
+    @if (isAdmin)
+    {
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <h2 class="h5 card-title"><i class="bi bi-gear"></i> Administration</h2>
+                    <p class="card-text text-muted">Create accounts, policies and groups.</p>
+                    <a class="btn btn-outline-primary" asp-controller="Admin" asp-action="Index">Manage</a>
+                </div>
+            </div>
+        </div>
+    }
 </div>

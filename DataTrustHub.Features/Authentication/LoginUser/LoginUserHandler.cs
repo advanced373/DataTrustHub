@@ -29,7 +29,7 @@ public class LoginUserHandler(
         if (!_hasher.VerifyHashedPassword(dbUser.HashedPassword, command.Password))
             return Result.Failure<string>(Errors.InvalidCredentials);
 
-        var token = _jwtGenerator.Generate(dbUser.Id, dbUser.Email);
+        var token = _jwtGenerator.Generate(dbUser.Id, dbUser.Email, dbUser.Role);
         return Result.Success(token);
     }
 

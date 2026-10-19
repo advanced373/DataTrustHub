@@ -1,6 +1,7 @@
 using Carter;
 using DataTrustHub.Features._Shared.Behaviors;
 using DataTrustHub.Features._Shared.Jwt;
+using DataTrustHub.Features._Shared.Seeding;
 using FluentValidation;
 using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -21,6 +22,7 @@ public static class FeaturesRegistration
         services.AddCarter();
         RegisterMediatR(services);
         RegisterJwt(services, configuration);
+        RegisterAdminSeeding(services, configuration);
         return services;
     }
 
@@ -57,6 +59,12 @@ public static class FeaturesRegistration
             {
                 options.TokenValidationParameters = BuildTokenValidationParameters(jwtConfig);
             });
+    }
+
+    private static void RegisterAdminSeeding(IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<AdminSeedOptions>(configuration.GetSection(AdminSeedOptions.SectionName));
+        services.AddHostedService<AdminSeeder>();
     }
 
     private static TokenValidationParameters BuildTokenValidationParameters(JwtConfig config) =>

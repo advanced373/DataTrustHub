@@ -1,45 +1,25 @@
-@DataTrustHub.API_HostAddress = http://localhost:5295
+@DataTrustHub.API_HostAddress = https://localhost:7215
 
 ###############################################################################
-# DATA ITEM ENDPOINTS
+# DATA ITEM ENDPOINTS (DataTrustHub.Features/DataManagement)
+# All endpoints require a bearer token from POST /auth/login
 ###############################################################################
 
-### Create Data Item
-# Note: Replace ownerUserId with actual User ID from RegisterUser response
-# @name CreateDataItem
-POST {{DataTrustHub.API_HostAddress}}/DataItem
-Content-Type: application/json
+@Token = paste-a-token-from-auth-login
 
-{
-  "name": "Important Document",
-  "size": 1024,
-  "content": "This is the content of the document",
-  "ownerUserId": "00000000-0000-0000-0000-000000000000",
-  "securityMarking": "CONFIDENTIAL"
-}
+### Upload a file
+POST {{DataTrustHub.API_HostAddress}}/data/upload
+Authorization: Bearer {{Token}}
+Content-Type: multipart/form-data; boundary=boundary
 
-### Create Data Item (No Content)
-POST {{DataTrustHub.API_HostAddress}}/DataItem
-Content-Type: application/json
+--boundary
+Content-Disposition: form-data; name="file"; filename="example.txt"
+Content-Type: text/plain
 
-{
-  "name": "Large File",
-  "size": 1048576,
-  "content": null,
-  "ownerUserId": "00000000-0000-0000-0000-000000000000",
-  "securityMarking": "PUBLIC"
-}
+Example content
+--boundary--
 
-### Get Data Items
-# @name GetDataItems
-GET {{DataTrustHub.API_HostAddress}}/DataItem
-Accept: application/json
-
-### Get Data Item By Id
-# Note: replace {{DataItemId}} with an ID from CreateDataItem
-GET {{DataTrustHub.API_HostAddress}}/DataItem/{{DataItemId}}
-Accept: application/json
-
-### Delete Data Item
-# Owner-only soft delete now lives on the VSA endpoint: DELETE {{DataTrustHub.API_HostAddress}}/data/{{DataItemId}}
-
+### Delete a data item (owner-only soft delete)
+# Replace {{DataItemId}} with the dataItemId returned by the upload
+DELETE {{DataTrustHub.API_HostAddress}}/data/{{DataItemId}}
+Authorization: Bearer {{Token}}

@@ -1,0 +1,29 @@
+@model UploadDataViewModel
+@{
+    ViewData["Title"] = "Upload";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <h1 class="h3 mb-4">Upload a file</h1>
+                <form asp-action="Upload" method="post" enctype="multipart/form-data">
+                    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+                    <div class="mb-3">
+                        <label asp-for="File" class="form-label"></label>
+                        <input asp-for="File" type="file" class="form-control" />
+                        <div class="form-text">Maximum size: 100 MB.</div>
+                        <span asp-validation-for="File" class="text-danger"></span>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Upload</button>
+                    <a class="btn btn-link" asp-action="Index">Cancel</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

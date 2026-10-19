@@ -1,0 +1,16 @@
+@{
+    ViewData["Title"] = "My data";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 m-0">My data</h1>
+    <a class="btn btn-primary" asp-action="Upload"><i class="bi bi-cloud-upload"></i> Upload</a>
+</div>
+
+@* Placeholder until the API exposes GET /data (issue #5 View data) *@
+<div class="card shadow-sm">
+    <div class="card-body text-center py-5">
+        <i class="bi bi-hourglass-split display-5 text-muted"></i>
+        <p class="mt-3 mb-0 text-muted">The data list will be available once browsing data is supported by the API.</p>
+    </div>
+</div>

@@ -1,8 +1,15 @@
 using DataTrustHub.Services;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllersWithViews();
+builder.Services.AddControllersWithViews(options =>
+{
+    // Every page requires a signed-in user unless marked [AllowAnonymous]
+    options.Filters.Add(new AuthorizeFilter());
+    options.Filters.Add(new AutoValidateAntiforgeryTokenAttribute());
+});
 builder.Services.AddWebAppServices();
 
 var app = builder.Build();
@@ -21,14 +28,11 @@ app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
 
-
-
 app.MapStaticAssets();
 
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}")
     .WithStaticAssets();
-
 
 app.Run();

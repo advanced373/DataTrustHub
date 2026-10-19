@@ -1,0 +1,18 @@
+@if (User.Identity?.IsAuthenticated == true)
+{
+    <div class="d-flex align-items-center gap-3">
+        <span class="text-muted">
+            <i class="bi bi-person-circle"></i> @User.Identity.Name
+        </span>
+        <form asp-controller="Account" asp-action="Logout" method="post" class="m-0">
+            <button type="submit" class="btn btn-outline-secondary btn-sm">Sign out</button>
+        </form>
+    </div>
+}
+else
+{
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-primary btn-sm" asp-controller="Account" asp-action="Login">Sign in</a>
+        <a class="btn btn-primary btn-sm" asp-controller="Account" asp-action="Register">Register</a>
+    </div>
+}

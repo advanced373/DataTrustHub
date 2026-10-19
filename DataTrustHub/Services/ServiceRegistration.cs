@@ -7,17 +7,18 @@ namespace DataTrustHub.Services;
 
 internal static class ServiceRegistration
 {
-    internal static IServiceCollection AddWebAppServices(this IServiceCollection services)
+    internal static IServiceCollection AddWebAppServices(
+        this IServiceCollection services, IHostEnvironment environment)
     {
         services.AddHttpContextAccessor();
         services.AddScoped<IUserSessionService, UserSessionService>();
         services.AddTransient<BearerTokenHandler>();
-        services.AddCookieAuthentication();
+        services.AddCookieAuthentication(environment);
         services.AddApiClients();
         return services;
     }
 
-    private static void AddCookieAuthentication(this IServiceCollection services)
+    private static void AddCookieAuthentication(this IServiceCollection services, IHostEnvironment environment)
     {
         services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
             .AddCookie(options =>
@@ -27,7 +28,10 @@ internal static class ServiceRegistration
                 options.AccessDeniedPath = Constants.AccessDeniedPath;
                 options.SlidingExpiration = false;
                 options.Cookie.HttpOnly = true;
-                options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+                // Allows signing in on the plain-http launch profile during development only
+                options.Cookie.SecurePolicy = environment.IsDevelopment()
+                    ? CookieSecurePolicy.SameAsRequest
+                    : CookieSecurePolicy.Always;
                 options.Cookie.SameSite = SameSiteMode.Strict;
             });
     }

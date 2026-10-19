@@ -10,7 +10,7 @@ builder.Services.AddControllersWithViews(options =>
     options.Filters.Add(new AuthorizeFilter());
     options.Filters.Add(new AutoValidateAntiforgeryTokenAttribute());
 });
-builder.Services.AddWebAppServices();
+builder.Services.AddWebAppServices(builder.Environment);
 
 var app = builder.Build();
 

@@ -4,3 +4,24 @@
 
 <h1 class="h3 mb-1">Welcome, @User.Identity?.Name</h1>
 <p class="text-muted mb-4">Manage your classified data and access policies.</p>
+
+<div class="row g-3">
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body">
+                <h2 class="h5 card-title"><i class="bi bi-folder2-open"></i> My data</h2>
+                <p class="card-text text-muted">Browse the data items available to you.</p>
+                <a class="btn btn-outline-primary" asp-controller="Data" asp-action="Index">Open</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body">
+                <h2 class="h5 card-title"><i class="bi bi-cloud-upload"></i> Upload</h2>
+                <p class="card-text text-muted">Add a new file to DataTrustHub.</p>
+                <a class="btn btn-outline-primary" asp-controller="Data" asp-action="Upload">Upload a file</a>
+            </div>
+        </div>
+    </div>
+</div>

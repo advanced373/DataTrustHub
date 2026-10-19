@@ -7,6 +7,7 @@ internal static class Constants
     internal const string JwtRoleClaim = "role";
     internal const string BearerScheme = "Bearer";
     internal const string UploadFormField = "file";
+    internal const long MaxUploadSizeBytes = 104_857_600; // 100 MB, mirrors the API limit
     internal const int MinPasswordLength = 8;
     internal const int MaxEmailLength = 256;
     internal const string LoginPath = "/Account/Login";
@@ -28,6 +29,7 @@ internal static class ControllerNames
 {
     internal const string Account = "Account";
     internal const string Home = "Home";
+    internal const string Data = "Data";
 }
 
 internal static class TempDataKeys
@@ -45,4 +47,7 @@ internal static class Messages
     internal const string Forbidden = "You do not have permission to perform this action.";
     internal const string SessionExpired = "Your session has expired. Please sign in again.";
     internal const string Registered = "Account created. You can now sign in.";
+    internal const string FileUploaded = "File uploaded. Item id: {0}";
+    internal const string FileRequired = "Select a file to upload.";
+    internal const string FileTooLarge = "The file exceeds the maximum size of 100 MB.";
 }

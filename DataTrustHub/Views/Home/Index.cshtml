@@ -1,7 +1,6 @@
 ﻿@{
-    ViewData["User"] = "Stoica Mihai";
-    ViewData["Organization"] = "S.M.P.F.A";
+    ViewData["Title"] = "Dashboard";
 }
 
-<div class="text-center">
-</div>
+<h1 class="h3 mb-1">Welcome, @User.Identity?.Name</h1>
+<p class="text-muted mb-4">Manage your classified data and access policies.</p>

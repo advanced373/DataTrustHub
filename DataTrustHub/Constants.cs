@@ -4,8 +4,14 @@ internal static class Constants
 {
     internal const string ApiSectionName = "Api";
     internal const string AccessTokenClaim = "access_token";
+    internal const string JwtRoleClaim = "role";
     internal const string BearerScheme = "Bearer";
     internal const string UploadFormField = "file";
+    internal const int MinPasswordLength = 8;
+    internal const int MaxEmailLength = 256;
+    internal const string LoginPath = "/Account/Login";
+    internal const string LogoutPath = "/Account/Logout";
+    internal const string AccessDeniedPath = "/Account/AccessDenied";
 }
 
 internal static class ApiRoutes
@@ -18,6 +24,18 @@ internal static class ApiRoutes
     internal const string AdminGroups = "admin/groups";
 }
 
+internal static class ControllerNames
+{
+    internal const string Account = "Account";
+    internal const string Home = "Home";
+}
+
+internal static class TempDataKeys
+{
+    internal const string Success = "Success";
+    internal const string Warning = "Warning";
+}
+
 internal static class Messages
 {
     internal const string InvalidCredentials = "Invalid email or password.";
@@ -26,4 +44,5 @@ internal static class Messages
     internal const string UnexpectedResponse = "The API returned an unexpected response.";
     internal const string Forbidden = "You do not have permission to perform this action.";
     internal const string SessionExpired = "Your session has expired. Please sign in again.";
+    internal const string Registered = "Account created. You can now sign in.";
 }

@@ -35,8 +35,21 @@ internal static class ApiRequest
         {
             HttpStatusCode.Unauthorized => ApiResult<T>.Unauthorized(),
             HttpStatusCode.Forbidden => ApiResult<T>.Failure(Messages.Forbidden),
-            _ => ApiResult<T>.Failure(await ReadErrorMessageAsync(response, cancellationToken))
+            _ => await ReadFailureAsync<T>(response, cancellationToken)
         };
+    }
+
+    private static async Task<ApiResult<T>> ReadFailureAsync<T>(
+        HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        var error = await TryReadJsonAsync<ApiError>(response, cancellationToken);
+        var message = error?.Description ?? error?.Detail ?? Messages.RequestFailed;
+        var details = error?.Errors?
+            .Select(validationError => validationError.Description)
+            .OfType<string>()
+            .ToArray();
+
+        return ApiResult<T>.Failure(message, details);
     }
 
     private static async Task<ApiResult<T>> ReadValueAsync<T>(
@@ -46,13 +59,6 @@ internal static class ApiRequest
         return value is null
             ? ApiResult<T>.Failure(Messages.UnexpectedResponse)
             : ApiResult<T>.Success(value);
-    }
-
-    private static async Task<string> ReadErrorMessageAsync(
-        HttpResponseMessage response, CancellationToken cancellationToken)
-    {
-        var error = await TryReadJsonAsync<ApiError>(response, cancellationToken);
-        return error?.Description ?? error?.Detail ?? Messages.RequestFailed;
     }
 
     private static async Task<T?> TryReadJsonAsync<T>(

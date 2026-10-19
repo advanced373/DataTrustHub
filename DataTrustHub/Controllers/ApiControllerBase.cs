@@ -13,8 +13,19 @@ public abstract class ApiControllerBase(IUserSessionService userSession) : Contr
     {
         if (result.IsUnauthorized) return await SessionExpiredAsync();
 
-        ModelState.AddModelError(string.Empty, result.ErrorMessage ?? Messages.RequestFailed);
+        AddApiErrors(result);
         return View(model);
+    }
+
+    // Shows the individual validation messages when the API sends them, otherwise the summary message
+    private void AddApiErrors<T>(ApiResult<T> result)
+    {
+        IEnumerable<string> messages = result.Details.Count > 0
+            ? result.Details
+            : [result.ErrorMessage ?? Messages.RequestFailed];
+
+        foreach (var message in messages)
+            ModelState.AddModelError(string.Empty, message);
     }
 
     protected IActionResult RedirectWithSuccess(string message, string action, string controller)

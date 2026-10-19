@@ -28,5 +28,5 @@ removes anything an audit could later need.
 ## Consequences
 
 - Every query that reads data items must filter `IsDeleted`. A global EF query filter would
-  enforce this centrally; it is not in place yet, and the legacy `GET /DataItem` does not filter (#41).
+  enforce this centrally; it is not in place yet. The legacy DataItem endpoints are covered by #41.
 - Deleted rows still take space. Purging is a future decision.

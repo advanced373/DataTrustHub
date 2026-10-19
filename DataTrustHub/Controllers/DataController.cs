@@ -16,8 +16,10 @@ public class DataController(IDataApiClient dataApi, IUserSessionService userSess
     public IActionResult Upload() => View(new UploadDataViewModel());
 
     [HttpPost]
-    [RequestSizeLimit(Constants.MaxUploadSizeBytes)]
-    [RequestFormLimits(MultipartBodyLengthLimit = Constants.MaxUploadSizeBytes)]
+    // The request limit leaves room for multipart overhead, so a file just over the size limit
+    // reaches the friendly validation message below instead of a bare 413 response
+    [RequestSizeLimit(Constants.MaxUploadRequestBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = Constants.MaxUploadRequestBytes)]
     public async Task<IActionResult> Upload(UploadDataViewModel model, CancellationToken cancellationToken)
     {
         if (model.File?.Length > Constants.MaxUploadSizeBytes)

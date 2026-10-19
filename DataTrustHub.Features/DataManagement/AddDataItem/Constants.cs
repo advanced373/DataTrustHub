@@ -8,6 +8,8 @@ internal static class Constants
     internal const string EndpointTag = "DataManagement";
     internal const int MaxFileNameLength = 512;
     internal const long MaxFileSizeBytes = 104_857_600; // 100 MB
+    internal const long MultipartOverheadBytes = 1_048_576; // 1 MB for boundaries and headers
+    internal const long MaxRequestSizeBytes = MaxFileSizeBytes + MultipartOverheadBytes;
 }
 
 internal static class Errors

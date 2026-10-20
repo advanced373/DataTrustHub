@@ -6,14 +6,26 @@ namespace DataTrustHub.Services.Api;
 // Sends a request to the API and translates the HTTP response into an ApiResult
 internal static class ApiRequest
 {
-    internal static async Task<ApiResult<T>> SendAsync<T>(
+    internal static Task<ApiResult<T>> SendAsync<T>(
         Func<CancellationToken, Task<HttpResponseMessage>> send,
+        CancellationToken cancellationToken) =>
+        SendCoreAsync(send, ReadValueAsync<T>, cancellationToken);
+
+    // For endpoints that answer 204 No Content, such as deletes
+    internal static Task<ApiResult<bool>> SendWithoutContentAsync(
+        Func<CancellationToken, Task<HttpResponseMessage>> send,
+        CancellationToken cancellationToken) =>
+        SendCoreAsync(send, (_, _) => Task.FromResult(ApiResult<bool>.Success(true)), cancellationToken);
+
+    private static async Task<ApiResult<T>> SendCoreAsync<T>(
+        Func<CancellationToken, Task<HttpResponseMessage>> send,
+        Func<HttpResponseMessage, CancellationToken, Task<ApiResult<T>>> readSuccess,
         CancellationToken cancellationToken)
     {
         try
         {
             using var response = await send(cancellationToken);
-            return await ReadAsync<T>(response, cancellationToken);
+            return await ReadAsync(response, readSuccess, cancellationToken);
         }
         catch (HttpRequestException)
         {
@@ -26,10 +38,12 @@ internal static class ApiRequest
     }
 
     private static async Task<ApiResult<T>> ReadAsync<T>(
-        HttpResponseMessage response, CancellationToken cancellationToken)
+        HttpResponseMessage response,
+        Func<HttpResponseMessage, CancellationToken, Task<ApiResult<T>>> readSuccess,
+        CancellationToken cancellationToken)
     {
         if (response.IsSuccessStatusCode)
-            return await ReadValueAsync<T>(response, cancellationToken);
+            return await readSuccess(response, cancellationToken);
 
         return response.StatusCode switch
         {

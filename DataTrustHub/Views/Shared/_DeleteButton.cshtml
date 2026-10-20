@@ -1,0 +1,8 @@
+@model DeleteButtonModel
+@* Posts to the current controller's Delete action, after the browser confirms *@
+<form asp-action="Delete" asp-route-id="@Model.Id" method="post" class="d-inline"
+      onsubmit="return confirm(this.dataset.confirm);" data-confirm="@Model.ConfirmMessage">
+    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+        <i class="bi bi-trash"></i> Delete
+    </button>
+</form>

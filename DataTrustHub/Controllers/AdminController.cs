@@ -41,20 +41,6 @@ public class AdminController(IAdminApiClient adminApi, IUserSessionService userS
         return RedirectToAdmin(string.Format(Messages.PolicyCreated, result.Value));
     }
 
-    [HttpGet]
-    public IActionResult CreateGroup() => View(new CreateGroupViewModel());
-
-    [HttpPost]
-    public async Task<IActionResult> CreateGroup(CreateGroupViewModel model, CancellationToken cancellationToken)
-    {
-        if (!ModelState.IsValid) return View(model);
-
-        var result = await adminApi.CreateGroupAsync(model.Name, cancellationToken);
-        if (!result.IsSuccess) return await HandleFailureAsync(result, model);
-
-        return RedirectToAdmin(string.Format(Messages.GroupCreated, result.Value));
-    }
-
     private IActionResult RedirectToAdmin(string message) =>
         RedirectWithSuccess(message, nameof(Index), ControllerNames.Admin);
 }

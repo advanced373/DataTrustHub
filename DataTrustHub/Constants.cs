@@ -27,6 +27,15 @@ internal static class ApiRoutes
     internal const string AdminAccounts = "admin/accounts";
     internal const string AdminPolicies = "admin/policies";
     internal const string AdminGroups = "admin/groups";
+    internal const string AdminGroupById = "admin/groups/{0}";
+}
+
+// Attribute routes of the administration pages, under /Admin/<section>
+internal static class AdminRoutes
+{
+    internal const string Groups = "Admin/Groups";
+    internal const string Create = "Create";
+    internal const string Delete = "{id:guid}/Delete";
 }
 
 internal static class ControllerNames
@@ -35,6 +44,7 @@ internal static class ControllerNames
     internal const string Home = "Home";
     internal const string Data = "Data";
     internal const string Admin = "Admin";
+    internal const string Groups = "Groups";
 }
 
 internal static class TempDataKeys
@@ -55,7 +65,8 @@ internal static class Messages
     internal const string FileUploaded = "File uploaded. Item id: {0}";
     internal const string AccountCreated = "Account created. User id: {0}";
     internal const string PolicyCreated = "Policy created. Policy id: {0}";
-    internal const string GroupCreated = "Group created. Group id: {0}";
+    internal const string GroupCreated = "Group \"{0}\" created.";
+    internal const string GroupDeleted = "Group deleted.";
     internal const string FileRequired = "Select a file to upload.";
     internal const string FileTooLarge = "The file exceeds the maximum size of 100 MB.";
 }

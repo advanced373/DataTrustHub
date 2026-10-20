@@ -18,6 +18,8 @@ internal sealed record PolicyCreatedResponse(Guid PolicyId);
 
 internal sealed record GroupCreatedResponse(Guid GroupId);
 
+public sealed record AccountResponse(Guid Id, string Email, string Role);
+
 public sealed record GroupResponse(Guid Id, string Name);
 
 public sealed record PolicyResponse(Guid Id, string Name, Guid OrganizationId);

@@ -32,6 +32,9 @@ else if (Model.Items.Count > 0)
                     <tr>
                         <td>@group.Name</td>
                         <td class="text-end">
+                            <a class="btn btn-sm btn-outline-secondary" asp-controller="Policies" asp-action="Index" asp-route-groupId="@group.Id">
+                                <i class="bi bi-file-earmark-lock"></i> Policies
+                            </a>
                             <partial name="_DeleteButton" model="@(new DeleteButtonModel(group.Id, $"Delete the group \"{group.Name}\"?"))" />
                         </td>
                     </tr>

@@ -1,4 +1,5 @@
 @model CreatePolicyViewModel
+@using Microsoft.AspNetCore.Mvc.Rendering
 @{
     ViewData["Title"] = "Create policy";
 }
@@ -8,7 +9,13 @@
         <div class="card shadow-sm">
             <div class="card-body p-4">
                 <h1 class="h3 mb-4">Create policy</h1>
-                <form asp-action="CreatePolicy" method="post">
+                @if (Model.Groups.Count == 0)
+                {
+                    <div class="alert alert-info">
+                        A policy belongs to a group. <a asp-controller="Groups" asp-action="Create">Create a group</a> first.
+                    </div>
+                }
+                <form asp-action="Create" method="post">
                     <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
                     <div class="form-floating mb-3">
                         <input asp-for="Name" class="form-control" placeholder="Name" />
@@ -16,7 +23,10 @@
                         <span asp-validation-for="Name" class="text-danger"></span>
                     </div>
                     <div class="form-floating mb-3">
-                        <input asp-for="OrganizationId" class="form-control" placeholder="00000000-0000-0000-0000-000000000000" />
+                        <select asp-for="OrganizationId" class="form-select"
+                                asp-items="@(new SelectList(Model.Groups, nameof(DataTrustHub.Services.Api.GroupResponse.Id), nameof(DataTrustHub.Services.Api.GroupResponse.Name)))">
+                            <option value="">Select a group</option>
+                        </select>
                         <label asp-for="OrganizationId"></label>
                         <span asp-validation-for="OrganizationId" class="text-danger"></span>
                     </div>

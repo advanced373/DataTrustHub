@@ -1,0 +1,23 @@
+@model string
+@* Tabs shared by the administration pages; the model is the active controller name *@
+@{
+    var tabs = new[]
+    {
+        (Controller: ControllerNames.Admin, Label: "Overview", Icon: "bi-gear"),
+        (Controller: ControllerNames.Users, Label: "Users", Icon: "bi-person"),
+        (Controller: ControllerNames.Groups, Label: "Groups", Icon: "bi-people"),
+        (Controller: ControllerNames.Policies, Label: "Policies", Icon: "bi-file-earmark-lock"),
+        (Controller: ControllerNames.Clearances, Label: "Clearances", Icon: "bi-shield-lock")
+    };
+}
+<ul class="nav nav-tabs mb-4">
+    @foreach (var tab in tabs)
+    {
+        <li class="nav-item">
+            <a class="nav-link @(tab.Controller == Model ? "active" : "")"
+               asp-controller="@tab.Controller" asp-action="Index">
+                <i class="bi @tab.Icon"></i> @tab.Label
+            </a>
+        </li>
+    }
+</ul>

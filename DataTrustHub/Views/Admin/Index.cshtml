@@ -2,19 +2,25 @@
     ViewData["Title"] = "Administration";
 }
 
+<partial name="_AdminNav" model="@ControllerNames.Admin" />
+
 <h1 class="h3 mb-4">Administration</h1>
 
 <div class="list-group shadow-sm">
-    <a class="list-group-item list-group-item-action py-3" asp-action="CreateAccount">
-        <i class="bi bi-person-plus"></i> Create account
-        <div class="small text-muted">Add a user who can sign in to DataTrustHub.</div>
+    <a class="list-group-item list-group-item-action py-3" asp-controller="Users" asp-action="Index">
+        <i class="bi bi-person"></i> Users
+        <div class="small text-muted">Accounts that can sign in to DataTrustHub. List, create and delete them.</div>
     </a>
-    <a class="list-group-item list-group-item-action py-3" asp-action="CreatePolicy">
-        <i class="bi bi-file-earmark-lock"></i> Create policy
-        <div class="small text-muted">Define a data access policy for an organization.</div>
+    <a class="list-group-item list-group-item-action py-3" asp-controller="Groups" asp-action="Index">
+        <i class="bi bi-people"></i> Groups
+        <div class="small text-muted">Organizations that own policies. List, create and delete them.</div>
     </a>
-    <a class="list-group-item list-group-item-action py-3" asp-action="CreateGroup">
-        <i class="bi bi-people"></i> Create group
-        <div class="small text-muted">Group users together.</div>
+    <a class="list-group-item list-group-item-action py-3" asp-controller="Policies" asp-action="Index">
+        <i class="bi bi-file-earmark-lock"></i> Policies
+        <div class="small text-muted">Data access policies of each group. List, create and delete them.</div>
+    </a>
+    <a class="list-group-item list-group-item-action py-3" asp-controller="Clearances" asp-action="Index">
+        <i class="bi bi-shield-lock"></i> Clearances
+        <div class="small text-muted">Grant users a classification level on a policy, or revoke it.</div>
     </a>
 </div>

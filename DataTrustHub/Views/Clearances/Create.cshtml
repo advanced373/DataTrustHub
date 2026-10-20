@@ -1,0 +1,60 @@
+@model GrantClearanceViewModel
+@using Microsoft.AspNetCore.Mvc.Rendering
+@{
+    ViewData["Title"] = "Grant clearance";
+    var levels = ClassificationLevels.All.Select(level => new SelectListItem($"{level.Name} ({level.Priority})", level.Priority.ToString()));
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-7 col-lg-6">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <h1 class="h3 mb-1">Grant clearance</h1>
+                <p class="text-muted mb-4">The user gets this classification level on the policy. A higher level sees more.</p>
+                @if (Model.Policies.Count == 0)
+                {
+                    <div class="alert alert-info">
+                        A clearance is granted on a policy. <a asp-controller="Policies" asp-action="Create">Create a policy</a> first.
+                    </div>
+                }
+                <form asp-action="Create" method="post">
+                    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+                    <div class="form-floating mb-3">
+                        <select asp-for="UserId" class="form-select"
+                                asp-items="@(new SelectList(Model.Users, nameof(DataTrustHub.Services.Api.AccountResponse.Id), nameof(DataTrustHub.Services.Api.AccountResponse.Email)))">
+                            <option value="">Select a user</option>
+                        </select>
+                        <label asp-for="UserId"></label>
+                        <span asp-validation-for="UserId" class="text-danger"></span>
+                    </div>
+                    <div class="form-floating mb-3">
+                        <select asp-for="PolicyId" class="form-select"
+                                asp-items="@(new SelectList(Model.Policies, nameof(PolicyOption.Id), nameof(PolicyOption.Label)))">
+                            <option value="">Select a policy</option>
+                        </select>
+                        <label asp-for="PolicyId"></label>
+                        <span asp-validation-for="PolicyId" class="text-danger"></span>
+                    </div>
+                    <div class="form-floating mb-3">
+                        <select asp-for="LevelPriority" class="form-select" asp-items="levels">
+                            <option value="">Select a level</option>
+                        </select>
+                        <label asp-for="LevelPriority"></label>
+                        <span asp-validation-for="LevelPriority" class="text-danger"></span>
+                    </div>
+                    <div class="form-floating mb-3">
+                        <input asp-for="Name" class="form-control" placeholder="Name" />
+                        <label asp-for="Name"></label>
+                        <span asp-validation-for="Name" class="text-danger"></span>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Grant</button>
+                    <a class="btn btn-link" asp-action="Index">Cancel</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

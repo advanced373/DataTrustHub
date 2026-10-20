@@ -1,0 +1,45 @@
+@model ListViewModel<DataTrustHub.Services.Api.GroupResponse>
+@{
+    ViewData["Title"] = "Groups";
+}
+
+<partial name="_AdminNav" model="@ControllerNames.Groups" />
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 m-0">Groups</h1>
+    <a class="btn btn-primary" asp-action="Create"><i class="bi bi-plus-lg"></i> New group</a>
+</div>
+
+<partial name="_ListError" model="Model.ErrorMessage" />
+
+@if (Model.Items.Count == 0 && Model.ErrorMessage is null)
+{
+    <p class="text-muted">No groups yet. Create one to start defining policies.</p>
+}
+else if (Model.Items.Count > 0)
+{
+    <div class="card shadow-sm">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Name</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var group in Model.Items)
+                {
+                    <tr>
+                        <td>@group.Name</td>
+                        <td class="text-end">
+                            <a class="btn btn-sm btn-outline-secondary" asp-controller="Policies" asp-action="Index" asp-route-groupId="@group.Id">
+                                <i class="bi bi-file-earmark-lock"></i> Policies
+                            </a>
+                            <partial name="_DeleteButton" model="@(new DeleteButtonModel(group.Id, $"Delete the group \"{group.Name}\"?"))" />
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

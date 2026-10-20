@@ -18,7 +18,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\DataTrustHub.Application\DataTrustHub.Application.csproj" />
     <ProjectReference Include="..\DataTrustHub.Infrastructure\DataTrustHub.Infrastructure.csproj" />
     <ProjectReference Include="..\DataTrustHub.Features\DataTrustHub.Features.csproj" />
   </ItemGroup>

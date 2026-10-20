@@ -4,6 +4,10 @@ public interface IAdminApiClient
 {
     Task<ApiResult<Guid>> CreateAccountAsync(string email, string password, CancellationToken cancellationToken);
 
+    Task<ApiResult<IReadOnlyList<AccountResponse>>> ListAccountsAsync(CancellationToken cancellationToken);
+
+    Task<ApiResult<bool>> DeleteAccountAsync(Guid accountId, CancellationToken cancellationToken);
+
     Task<ApiResult<Guid>> CreatePolicyAsync(string name, Guid organizationId, CancellationToken cancellationToken);
 
     Task<ApiResult<Guid>> CreateGroupAsync(string name, CancellationToken cancellationToken);
@@ -45,6 +49,12 @@ internal sealed class AdminApiClient(HttpClient httpClient) : IAdminApiClient
 
         return result.Map(response => response.GroupId);
     }
+
+    public Task<ApiResult<IReadOnlyList<AccountResponse>>> ListAccountsAsync(CancellationToken cancellationToken) =>
+        GetAsync<IReadOnlyList<AccountResponse>>(ApiRoutes.AdminAccounts, cancellationToken);
+
+    public Task<ApiResult<bool>> DeleteAccountAsync(Guid accountId, CancellationToken cancellationToken) =>
+        DeleteAsync(string.Format(ApiRoutes.AdminAccountById, accountId), cancellationToken);
 
     public Task<ApiResult<IReadOnlyList<GroupResponse>>> ListGroupsAsync(CancellationToken cancellationToken) =>
         GetAsync<IReadOnlyList<GroupResponse>>(ApiRoutes.AdminGroups, cancellationToken);

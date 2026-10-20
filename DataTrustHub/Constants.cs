@@ -25,6 +25,7 @@ internal static class ApiRoutes
     internal const string Register = "auth/register";
     internal const string UploadData = "data/upload";
     internal const string AdminAccounts = "admin/accounts";
+    internal const string AdminAccountById = "admin/accounts/{0}";
     internal const string AdminPolicies = "admin/policies";
     internal const string AdminGroups = "admin/groups";
     internal const string AdminGroupById = "admin/groups/{0}";
@@ -35,6 +36,7 @@ internal static class ApiRoutes
 // Attribute routes of the administration pages, under /Admin/<section>
 internal static class AdminRoutes
 {
+    internal const string Users = "Admin/Users";
     internal const string Groups = "Admin/Groups";
     internal const string Policies = "Admin/Policies";
     internal const string Create = "Create";
@@ -47,6 +49,7 @@ internal static class ControllerNames
     internal const string Home = "Home";
     internal const string Data = "Data";
     internal const string Admin = "Admin";
+    internal const string Users = "Users";
     internal const string Groups = "Groups";
     internal const string Policies = "Policies";
 }
@@ -67,7 +70,8 @@ internal static class Messages
     internal const string SessionExpired = "Your session has expired. Please sign in again.";
     internal const string Registered = "Account created. You can now sign in.";
     internal const string FileUploaded = "File uploaded. Item id: {0}";
-    internal const string AccountCreated = "Account created. User id: {0}";
+    internal const string AccountCreated = "Account {0} created.";
+    internal const string AccountDeleted = "Account deleted. Its clearances were removed and its data was deleted.";
     internal const string PolicyCreated = "Policy \"{0}\" created.";
     internal const string PolicyDeleted = "Policy deleted.";
     internal const string GroupCreated = "Group \"{0}\" created.";

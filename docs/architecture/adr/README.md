@@ -23,5 +23,6 @@ Status values: `Proposed`, `Accepted`, `Superseded by ADR-NNNN`, `Deprecated`.
 | [0005](0005-mvc-webapp-as-api-client.md) | MVC WebApp as a client of the API, JWT in the auth cookie | Accepted | 2026-10-19 |
 | [0006](0006-roles-in-jwt-and-admin-seeding.md) | User roles in the JWT, first admin seeded from configuration | Accepted | 2026-10-19 |
 | [0007](0007-local-secrets-in-user-secrets.md) | Local configuration and secrets in User Secrets | Accepted | 2026-10-19 |
-| [0008](0008-secure-legacy-controllers-until-replaced.md) | Secure the legacy API controllers until VSA slices replace them | Accepted | 2026-10-19 |
+| [0008](0008-secure-legacy-controllers-until-replaced.md) | Secure the legacy API controllers until VSA slices replace them | Superseded by [0010](0010-port-legacy-endpoints-and-remove-the-layered-code.md) | 2026-10-19 |
 | [0009](0009-gitflow-and-small-stacked-prs.md) | GitFlow with small, stacked PRs and explicit issue tracking | Accepted | 2026-10-19 |
+| [0010](0010-port-legacy-endpoints-and-remove-the-layered-code.md) | Port the legacy endpoints to VSA slices and remove the layered code | Accepted | 2026-10-20 |

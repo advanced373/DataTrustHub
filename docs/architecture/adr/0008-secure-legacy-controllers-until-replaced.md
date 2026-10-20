@@ -1,6 +1,6 @@
 # ADR-0008: Secure the legacy API controllers until VSA slices replace them
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR-0010](0010-port-legacy-endpoints-and-remove-the-layered-code.md)
 - **Date:** 2026-10-19
 - **Related:** #25, #34, #35, #41
 

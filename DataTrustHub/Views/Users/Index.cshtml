@@ -40,6 +40,9 @@
                             <span class="badge @(account.Role == Constants.AdminRole ? "text-bg-primary" : "text-bg-secondary")">@account.Role</span>
                         </td>
                         <td class="text-end">
+                            <a class="btn btn-sm btn-outline-secondary" asp-controller="Clearances" asp-action="Index" asp-route-userId="@account.Id">
+                                <i class="bi bi-shield-lock"></i> Clearances
+                            </a>
                             @* The API refuses to delete your own account, so the button is not offered *@
                             @if (!isCurrentUser)
                             {

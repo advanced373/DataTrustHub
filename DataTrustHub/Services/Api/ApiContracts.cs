@@ -8,6 +8,9 @@ internal sealed record CreatePolicyRequest(string Name, Guid OrganizationId);
 
 internal sealed record CreateGroupRequest(string Name);
 
+internal sealed record CreateClearanceRequest(
+    Guid UserId, Guid PolicyId, string Name, string ClassificationLevelName, int ClassificationLevelPriority);
+
 internal sealed record LoginResponse(string Token);
 
 internal sealed record UserCreatedResponse(Guid UserId);
@@ -18,11 +21,19 @@ internal sealed record PolicyCreatedResponse(Guid PolicyId);
 
 internal sealed record GroupCreatedResponse(Guid GroupId);
 
+internal sealed record ClearanceCreatedResponse(Guid ClearanceId);
+
 public sealed record AccountResponse(Guid Id, string Email, string Role);
 
 public sealed record GroupResponse(Guid Id, string Name);
 
 public sealed record PolicyResponse(Guid Id, string Name, Guid OrganizationId);
+
+public sealed record ClearanceResponse(
+    Guid Id, string Name, Guid UserId, Guid PolicyId, string ClassificationLevelName, int ClassificationLevelPriority);
+
+// What the admin fills in to grant a clearance
+public sealed record ClearanceGrant(Guid UserId, Guid PolicyId, string Name, string LevelName, int LevelPriority);
 
 // Covers SharedKernel.Error (description), ValidationError (errors) and ProblemDetails (detail) bodies
 internal sealed record ApiError(string? Code, string? Description, string? Detail, ApiError[]? Errors);

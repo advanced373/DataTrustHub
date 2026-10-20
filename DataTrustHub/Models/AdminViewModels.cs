@@ -43,3 +43,36 @@ public sealed class CreateGroupViewModel
     [Required, StringLength(Constants.MaxNameLength)]
     public string Name { get; set; } = string.Empty;
 }
+
+// A policy in a dropdown, labelled with its group so same-named policies can be told apart
+public sealed record PolicyOption(Guid Id, string Label);
+
+public sealed record ClearanceRow(
+    Guid Id, string UserEmail, string PolicyLabel, string Name, string LevelName, int LevelPriority);
+
+public sealed record ClearanceListViewModel(
+    IReadOnlyList<ClearanceRow> Items,
+    IReadOnlyList<AccountResponse> Users,
+    Guid? SelectedUserId,
+    string? ErrorMessage = null);
+
+public sealed class GrantClearanceViewModel
+{
+    [Required(ErrorMessage = Messages.UserRequired), Display(Name = "User")]
+    public Guid? UserId { get; set; }
+
+    [Required(ErrorMessage = Messages.PolicyRequired), Display(Name = "Policy")]
+    public Guid? PolicyId { get; set; }
+
+    [Required(ErrorMessage = Messages.LevelRequired), Display(Name = "Classification level")]
+    public int? LevelPriority { get; set; }
+
+    // Optional; defaults to "<level> on <policy>"
+    [StringLength(Constants.MaxNameLength), Display(Name = "Clearance name (optional)")]
+    public string? Name { get; set; }
+
+    // Dropdown options; filled by the controller, not posted back
+    public IReadOnlyList<AccountResponse> Users { get; set; } = [];
+
+    public IReadOnlyList<PolicyOption> Policies { get; set; } = [];
+}

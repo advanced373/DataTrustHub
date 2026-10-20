@@ -7,6 +7,10 @@ public interface IAdminApiClient
     Task<ApiResult<Guid>> CreatePolicyAsync(string name, Guid organizationId, CancellationToken cancellationToken);
 
     Task<ApiResult<Guid>> CreateGroupAsync(string name, CancellationToken cancellationToken);
+
+    Task<ApiResult<IReadOnlyList<GroupResponse>>> ListGroupsAsync(CancellationToken cancellationToken);
+
+    Task<ApiResult<bool>> DeleteGroupAsync(Guid groupId, CancellationToken cancellationToken);
 }
 
 internal sealed class AdminApiClient(HttpClient httpClient) : IAdminApiClient
@@ -36,6 +40,18 @@ internal sealed class AdminApiClient(HttpClient httpClient) : IAdminApiClient
 
         return result.Map(response => response.GroupId);
     }
+
+    public Task<ApiResult<IReadOnlyList<GroupResponse>>> ListGroupsAsync(CancellationToken cancellationToken) =>
+        GetAsync<IReadOnlyList<GroupResponse>>(ApiRoutes.AdminGroups, cancellationToken);
+
+    public Task<ApiResult<bool>> DeleteGroupAsync(Guid groupId, CancellationToken cancellationToken) =>
+        DeleteAsync(string.Format(ApiRoutes.AdminGroupById, groupId), cancellationToken);
+
+    private Task<ApiResult<TResponse>> GetAsync<TResponse>(string route, CancellationToken cancellationToken) =>
+        ApiRequest.SendAsync<TResponse>(token => httpClient.GetAsync(route, token), cancellationToken);
+
+    private Task<ApiResult<bool>> DeleteAsync(string route, CancellationToken cancellationToken) =>
+        ApiRequest.SendWithoutContentAsync(token => httpClient.DeleteAsync(route, token), cancellationToken);
 
     private Task<ApiResult<TResponse>> PostAsync<TRequest, TResponse>(
         string route, TRequest request, CancellationToken cancellationToken) =>

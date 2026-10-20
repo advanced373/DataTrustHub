@@ -18,5 +18,7 @@ internal sealed record PolicyCreatedResponse(Guid PolicyId);
 
 internal sealed record GroupCreatedResponse(Guid GroupId);
 
+public sealed record GroupResponse(Guid Id, string Name);
+
 // Covers SharedKernel.Error (description), ValidationError (errors) and ProblemDetails (detail) bodies
 internal sealed record ApiError(string? Code, string? Description, string? Detail, ApiError[]? Errors);

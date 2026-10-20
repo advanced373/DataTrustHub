@@ -1,3 +1,4 @@
+using DataTrustHub.Models;
 using DataTrustHub.Services.Api;
 using DataTrustHub.Services.Session;
 using Microsoft.AspNetCore.Mvc;
@@ -31,6 +32,28 @@ public abstract class ApiControllerBase(IUserSessionService userSession) : Contr
     protected IActionResult RedirectWithSuccess(string message, string action, string controller)
     {
         TempData[TempDataKeys.Success] = message;
+        return RedirectToAction(action, controller);
+    }
+
+    // Renders a list page; a failed load shows the error above an empty list
+    protected async Task<IActionResult> ListViewAsync<T>(ApiResult<IReadOnlyList<T>> result)
+    {
+        if (result.IsUnauthorized) return await SessionExpiredAsync();
+
+        var model = result.IsSuccess
+            ? new ListViewModel<T>(result.Value!)
+            : new ListViewModel<T>([], result.ErrorMessage);
+        return View(model);
+    }
+
+    // For actions without a form, such as deletes: the outcome is shown as an alert after the redirect
+    protected async Task<IActionResult> RedirectWithOutcomeAsync<T>(
+        ApiResult<T> result, string successMessage, string action, string controller)
+    {
+        if (result.IsUnauthorized) return await SessionExpiredAsync();
+        if (result.IsSuccess) return RedirectWithSuccess(successMessage, action, controller);
+
+        TempData[TempDataKeys.Warning] = result.ErrorMessage;
         return RedirectToAction(action, controller);
     }
 

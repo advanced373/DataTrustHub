@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using DataTrustHub.Services.Api;
 
 namespace DataTrustHub.Models;
 
@@ -22,9 +23,20 @@ public sealed class CreatePolicyViewModel
     [Required, StringLength(Constants.MaxNameLength)]
     public string Name { get; set; } = string.Empty;
 
-    [Required, Display(Name = "Organization id")]
+    [Required(ErrorMessage = Messages.GroupRequired), Display(Name = "Group")]
     public Guid? OrganizationId { get; set; }
+
+    // Options for the group dropdown; filled by the controller, not posted back
+    public IReadOnlyList<GroupResponse> Groups { get; set; } = [];
 }
+
+public sealed record PolicyRow(Guid Id, string Name, Guid GroupId, string GroupName);
+
+public sealed record PolicyListViewModel(
+    IReadOnlyList<PolicyRow> Items,
+    IReadOnlyList<GroupResponse> Groups,
+    Guid? SelectedGroupId,
+    string? ErrorMessage = null);
 
 public sealed class CreateGroupViewModel
 {

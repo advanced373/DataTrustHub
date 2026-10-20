@@ -27,20 +27,6 @@ public class AdminController(IAdminApiClient adminApi, IUserSessionService userS
         return RedirectToAdmin(string.Format(Messages.AccountCreated, result.Value));
     }
 
-    [HttpGet]
-    public IActionResult CreatePolicy() => View(new CreatePolicyViewModel());
-
-    [HttpPost]
-    public async Task<IActionResult> CreatePolicy(CreatePolicyViewModel model, CancellationToken cancellationToken)
-    {
-        if (!ModelState.IsValid) return View(model);
-
-        var result = await adminApi.CreatePolicyAsync(model.Name, model.OrganizationId!.Value, cancellationToken);
-        if (!result.IsSuccess) return await HandleFailureAsync(result, model);
-
-        return RedirectToAdmin(string.Format(Messages.PolicyCreated, result.Value));
-    }
-
     private IActionResult RedirectToAdmin(string message) =>
         RedirectWithSuccess(message, nameof(Index), ControllerNames.Admin);
 }

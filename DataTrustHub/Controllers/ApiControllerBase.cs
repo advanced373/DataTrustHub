@@ -57,7 +57,7 @@ public abstract class ApiControllerBase(IUserSessionService userSession) : Contr
         return RedirectToAction(action, controller);
     }
 
-    private async Task<IActionResult> SessionExpiredAsync()
+    protected async Task<IActionResult> SessionExpiredAsync()
     {
         await UserSession.SignOutAsync();
         TempData[TempDataKeys.Warning] = Messages.SessionExpired;

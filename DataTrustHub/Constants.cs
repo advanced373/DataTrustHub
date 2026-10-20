@@ -31,6 +31,9 @@ internal static class ApiRoutes
     internal const string AdminGroupById = "admin/groups/{0}";
     internal const string AdminPolicyById = "admin/policies/{0}";
     internal const string AdminPoliciesByGroup = "admin/policies?organizationId={0}";
+    internal const string AdminClearances = "admin/clearances";
+    internal const string AdminClearanceById = "admin/clearances/{0}";
+    internal const string AdminClearancesByUser = "admin/clearances?userId={0}";
 }
 
 // Attribute routes of the administration pages, under /Admin/<section>
@@ -39,8 +42,22 @@ internal static class AdminRoutes
     internal const string Users = "Admin/Users";
     internal const string Groups = "Admin/Groups";
     internal const string Policies = "Admin/Policies";
+    internal const string Clearances = "Admin/Clearances";
     internal const string Create = "Create";
     internal const string Delete = "{id:guid}/Delete";
+}
+
+// Classification levels offered when granting a clearance; a higher priority sees more
+internal static class ClassificationLevels
+{
+    internal static readonly IReadOnlyList<(string Name, int Priority)> All =
+    [
+        ("Public", 0),
+        ("Internal", 1),
+        ("Confidential", 2),
+        ("Secret", 3),
+        ("Top Secret", 4)
+    ];
 }
 
 internal static class ControllerNames
@@ -52,6 +69,7 @@ internal static class ControllerNames
     internal const string Users = "Users";
     internal const string Groups = "Groups";
     internal const string Policies = "Policies";
+    internal const string Clearances = "Clearances";
 }
 
 internal static class TempDataKeys
@@ -79,5 +97,13 @@ internal static class Messages
     internal const string FileRequired = "Select a file to upload.";
     internal const string GroupRequired = "Select a group.";
     internal const string UnknownGroup = "(deleted group)";
+    internal const string UnknownUser = "(deleted user)";
+    internal const string UnknownPolicy = "(deleted policy)";
+    internal const string UserRequired = "Select a user.";
+    internal const string PolicyRequired = "Select a policy.";
+    internal const string LevelRequired = "Select a classification level.";
+    internal const string ClearanceGranted = "Clearance granted to {0}.";
+    internal const string ClearanceRevoked = "Clearance revoked.";
+    internal const string DefaultClearanceName = "{0} on {1}";
     internal const string FileTooLarge = "The file exceeds the maximum size of 100 MB.";
 }

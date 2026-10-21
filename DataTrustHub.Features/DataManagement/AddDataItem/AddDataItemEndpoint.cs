@@ -25,6 +25,8 @@ public class AddDataItemEndpoint : ICarterModule
 
     private static async Task<IResult> Handle(
         IFormFile? file,
+        [FromForm] Guid? policyId,
+        [FromForm] int? levelPriority,
         ISender sender,
         HttpContext httpContext,
         CancellationToken cancellationToken)
@@ -32,7 +34,7 @@ public class AddDataItemEndpoint : ICarterModule
         var userIdResult = ExtractUserId(httpContext.User);
         if (userIdResult is null) return Results.Unauthorized();
 
-        var command = new AddDataItemCommand(file, userIdResult.Value);
+        var command = new AddDataItemCommand(file, userIdResult.Value, policyId, levelPriority);
         var result = await sender.Send(command, cancellationToken);
         return result.ToHttpResult(id => Results.Ok(new AddDataItemResponse(id)));
     }

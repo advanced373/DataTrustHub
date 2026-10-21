@@ -7,7 +7,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace DataTrustHub.Features.DataManagement.AddDataItem;
 
-public record AddDataItemCommand(IFormFile? File, Guid OwnerUserId) : IRequest<Result<Guid>>;
+// PolicyId and LevelPriority are both set for a classified item and both null for a personal one
+public record AddDataItemCommand(IFormFile? File, Guid OwnerUserId, Guid? PolicyId = null, int? LevelPriority = null)
+    : IRequest<Result<Guid>>;
 
 public class AddDataItemHandler(DContext db) : IRequestHandler<AddDataItemCommand, Result<Guid>>
 {
@@ -26,14 +28,26 @@ public class AddDataItemHandler(DContext db) : IRequestHandler<AddDataItemComman
         var ownerExists = await CheckUserExists(command.OwnerUserId, cancellationToken);
         if (!ownerExists) return Result.Failure<Guid>(Errors.UserNotFound);
 
+        var level = command.LevelPriority is int priority ? ClassificationLevels.FindByPriority(priority) : null;
+        if (level is not null && !await HoldsClearance(command, level, cancellationToken))
+            return Result.Failure<Guid>(Errors.NotCleared);
+
         var content = await ReadFileContent(command.File, cancellationToken);
         var itemId = Guid.NewGuid();
-        await PersistDataItem(itemId, command.File, content, command.OwnerUserId, cancellationToken);
+        await PersistDataItem(itemId, command, level, content, cancellationToken);
         return Result.Success(itemId);
     }
 
     private Task<bool> CheckUserExists(Guid userId, CancellationToken ct) =>
         _db.Users.AnyAsync(u => u.Id == userId, ct);
+
+    // An owner may classify only under a policy they are cleared on, and at most at their own level
+    private Task<bool> HoldsClearance(AddDataItemCommand command, ClassificationLevel level, CancellationToken ct) =>
+        _db.Clearances.AnyAsync(
+            c => c.UserId == command.OwnerUserId
+                 && c.PolicyId == command.PolicyId
+                 && c.ClassificationLevel.Priority >= level.Priority,
+            ct);
 
     private static async Task<byte[]> ReadFileContent(IFormFile file, CancellationToken ct)
     {
@@ -44,19 +58,21 @@ public class AddDataItemHandler(DContext db) : IRequestHandler<AddDataItemComman
 
     private async Task PersistDataItem(
         Guid itemId,
-        IFormFile file,
+        AddDataItemCommand command,
+        ClassificationLevel? level,
         byte[] content,
-        Guid ownerId,
         CancellationToken ct)
     {
         var dbItem = new DbDataItem
         {
             Id = itemId,
-            Name = file.FileName,
-            Size = file.Length,
+            Name = command.File!.FileName,
+            Size = command.File.Length,
             Content = Convert.ToBase64String(content),
-            OwnerUserId = ownerId,
-            SecurityMarking = "UNCLASSIFIED"
+            OwnerUserId = command.OwnerUserId,
+            SecurityMarking = level?.Name ?? ClassificationLevels.PersonalMarking,
+            PolicyId = level is null ? null : command.PolicyId,
+            ClassificationPriority = level?.Priority
         };
         await _db.DataItems.AddAsync(dbItem, ct);
         await _db.SaveChangesAsync(ct);

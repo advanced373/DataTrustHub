@@ -39,7 +39,7 @@ namespace DataTrustHub.Infrastructure
             services.AddScoped<IPolicyRepository, PolicyRepository>();
             services.AddScoped<IClearanceRepository, ClearanceRepository>();
             services.AddScoped<IDataItemRepository, DataItemRepository>();
-            services.AddScoped<IUnitOfWork, UnitOfWork>();
+            services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<DContext>());
         }
     }
 }

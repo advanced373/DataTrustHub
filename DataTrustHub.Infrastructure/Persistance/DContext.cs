@@ -1,10 +1,12 @@
-﻿using DataTrustHub.Infrastructure.Persistance.Model;
+﻿using DataTrustHub.Domain.Abstractions;
+using DataTrustHub.Infrastructure.Persistance.Model;
 using Microsoft.EntityFrameworkCore;
 using System.Reflection;
 
 namespace DataTrustHub.Infrastructure.Persistance
 {
-    public class DContext(DbContextOptions<DContext> options) : DbContext(options)
+    // Also the unit of work: the repositories of a request share this scoped context (ADR-0012)
+    public class DContext(DbContextOptions<DContext> options) : DbContext(options), IUnitOfWork
     {
         public DbSet<DbUser> Users => Set<DbUser>();
         public DbSet<DbOrganization> Organizations => Set<DbOrganization>();

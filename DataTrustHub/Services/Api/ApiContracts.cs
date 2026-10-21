@@ -29,6 +29,16 @@ public sealed record DataItemResponse(
     string? OwnerEmail,
     bool IsOwner);
 
+// What the user may classify an upload as: all levels, and the policies they are cleared on
+public sealed record ClassificationOptionsResponse(
+    IReadOnlyList<ClassificationLevelOption> Levels,
+    IReadOnlyList<ClassificationPolicyOption> Policies);
+
+public sealed record ClassificationLevelOption(string Name, int Priority);
+
+// MaxPriority is the user's highest clearance level on the policy
+public sealed record ClassificationPolicyOption(Guid PolicyId, string PolicyName, string GroupName, int MaxPriority);
+
 // One item with its content, base64-encoded by the API
 public sealed record DataItemContentResponse(Guid Id, string Name, string? Content);
 

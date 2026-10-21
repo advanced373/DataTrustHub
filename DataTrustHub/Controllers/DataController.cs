@@ -36,7 +36,8 @@ public class DataController(IDataApiClient dataApi, IUserSessionService userSess
     }
 
     [HttpGet]
-    public IActionResult Upload() => View(new UploadDataViewModel());
+    public async Task<IActionResult> Upload(CancellationToken cancellationToken) =>
+        await UploadViewAsync(new UploadDataViewModel(), cancellationToken);
 
     [HttpPost]
     // The request limit leaves room for multipart overhead, so a file just over the size limit
@@ -48,13 +49,32 @@ public class DataController(IDataApiClient dataApi, IUserSessionService userSess
         if (model.File?.Length > Constants.MaxUploadSizeBytes)
             ModelState.AddModelError(nameof(model.File), Messages.FileTooLarge);
 
-        if (!ModelState.IsValid) return View(model);
+        if (model.PolicyId is not null && model.LevelPriority is null)
+            ModelState.AddModelError(nameof(model.LevelPriority), Messages.LevelRequiredForPolicy);
 
-        var result = await dataApi.UploadAsync(model.File!, cancellationToken);
-        if (!result.IsSuccess) return await HandleFailureAsync(result, model);
+        if (!ModelState.IsValid) return await UploadViewAsync(model, cancellationToken);
+
+        // Without a policy the level is ignored and the file stays personal
+        var levelPriority = model.PolicyId is null ? null : model.LevelPriority;
+        var result = await dataApi.UploadAsync(model.File!, model.PolicyId, levelPriority, cancellationToken);
+        if (!result.IsSuccess)
+        {
+            model.Options = (await dataApi.GetClassificationOptionsAsync(cancellationToken)).Value ?? model.Options;
+            return await HandleFailureAsync(result, model);
+        }
 
         var message = string.Format(Messages.FileUploaded, model.File!.FileName);
         return RedirectWithSuccess(message, nameof(Index), ControllerNames.Data);
+    }
+
+    private async Task<IActionResult> UploadViewAsync(UploadDataViewModel model, CancellationToken cancellationToken)
+    {
+        var options = await dataApi.GetClassificationOptionsAsync(cancellationToken);
+        if (options.IsUnauthorized) return await SessionExpiredAsync();
+        if (!options.IsSuccess) ModelState.AddModelError(string.Empty, options.ErrorMessage!);
+
+        model.Options = options.Value ?? model.Options;
+        return View(nameof(Upload), model);
     }
 
     // The API stores file content base64-encoded

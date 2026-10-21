@@ -1,5 +1,11 @@
-﻿using DataTrustHub.Domain.Users;
+﻿using DataTrustHub.Domain.Abstractions;
+using DataTrustHub.Domain.Clearances;
+using DataTrustHub.Domain.DataItems;
+using DataTrustHub.Domain.Organizations;
+using DataTrustHub.Domain.Policies;
+using DataTrustHub.Domain.Users;
 using DataTrustHub.Infrastructure.Persistance;
+using DataTrustHub.Infrastructure.Persistance.Repositories;
 using DataTrustHub.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -20,8 +26,20 @@ namespace DataTrustHub.Infrastructure
             });
 
             services.AddSingleton<IPasswordHasher, PasswordHasher>();
+            AddRepositories(services);
 
             return services;
+        }
+
+        // Scoped like DContext, so the repositories of one request share it with the unit of work (ADR-0012)
+        private static void AddRepositories(IServiceCollection services)
+        {
+            services.AddScoped<IUserRepository, UserRepository>();
+            services.AddScoped<IOrganizationRepository, OrganizationRepository>();
+            services.AddScoped<IPolicyRepository, PolicyRepository>();
+            services.AddScoped<IClearanceRepository, ClearanceRepository>();
+            services.AddScoped<IDataItemRepository, DataItemRepository>();
+            services.AddScoped<IUnitOfWork, UnitOfWork>();
         }
     }
 }

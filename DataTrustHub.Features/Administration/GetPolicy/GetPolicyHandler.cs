@@ -1,13 +1,13 @@
+using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.SharedKernel;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace DataTrustHub.Features.Administration.GetPolicy;
 
-public record GetPolicyQuery(Guid PolicyId) : IRequest<Result<GetPolicyResponse>>;
+public record GetPolicyQuery(Guid PolicyId);
 
-public class GetPolicyHandler(DContext db) : IRequestHandler<GetPolicyQuery, Result<GetPolicyResponse>>
+public class GetPolicyHandler(DContext db) : IQueryHandler<GetPolicyQuery, Result<GetPolicyResponse>>
 {
     private readonly DContext _db = db;
 

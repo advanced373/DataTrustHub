@@ -1,13 +1,13 @@
+using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.SharedKernel;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace DataTrustHub.Features.Administration.DeleteGroup;
 
-public record DeleteGroupCommand(Guid GroupId) : IRequest<Result<Guid>>;
+public record DeleteGroupCommand(Guid GroupId);
 
-public class DeleteGroupHandler(DContext db) : IRequestHandler<DeleteGroupCommand, Result<Guid>>
+public class DeleteGroupHandler(DContext db) : ICommandHandler<DeleteGroupCommand, Result<Guid>>
 {
     private readonly DContext _db = db;
 

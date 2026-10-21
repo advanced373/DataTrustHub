@@ -1,14 +1,14 @@
+using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.SharedKernel;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace DataTrustHub.Features.Administration.ListPolicies;
 
-public record ListPoliciesQuery(Guid? OrganizationId) : IRequest<Result<IReadOnlyList<PolicySummary>>>;
+public record ListPoliciesQuery(Guid? OrganizationId);
 
 public class ListPoliciesHandler(DContext db)
-    : IRequestHandler<ListPoliciesQuery, Result<IReadOnlyList<PolicySummary>>>
+    : IQueryHandler<ListPoliciesQuery, Result<IReadOnlyList<PolicySummary>>>
 {
     private readonly DContext _db = db;
 

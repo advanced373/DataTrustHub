@@ -1,6 +1,6 @@
 using Carter;
 using FluentValidation;
-using MediatR;
+using DataTrustHub.Features._Shared.Messaging;
 using NetArchTest.Rules;
 using Xunit;
 using static DataTrustHub.Features.Tests.Architecture.ArchitectureConstants;
@@ -10,14 +10,25 @@ namespace DataTrustHub.Features.Tests.Architecture;
 public class NamingConventionTests
 {
     [Fact]
-    public void RequestHandlers_ShouldEndWithHandler()
+    public void CommandHandlers_ShouldEndWithHandler()
     {
-        var handlers = SliceClasses().And().ImplementInterface(typeof(IRequestHandler<,>));
+        var handlers = SliceClasses().And().ImplementInterface(typeof(ICommandHandler<,>));
 
-        ArchitectureAssert.NotEmpty(handlers, nameof(IRequestHandler<IRequest<object>, object>));
+        ArchitectureAssert.NotEmpty(handlers, nameof(ICommandHandler<object, object>));
         ArchitectureAssert.Passed(
             handlers.Should().HaveNameEndingWith(HandlerSuffix).GetResult(),
-            $"Request handlers must end with '{HandlerSuffix}'");
+            $"Command handlers must end with '{HandlerSuffix}'");
+    }
+
+    [Fact]
+    public void QueryHandlers_ShouldEndWithHandler()
+    {
+        var handlers = SliceClasses().And().ImplementInterface(typeof(IQueryHandler<,>));
+
+        ArchitectureAssert.NotEmpty(handlers, nameof(IQueryHandler<object, object>));
+        ArchitectureAssert.Passed(
+            handlers.Should().HaveNameEndingWith(HandlerSuffix).GetResult(),
+            $"Query handlers must end with '{HandlerSuffix}'");
     }
 
     [Fact]

@@ -1,15 +1,14 @@
+using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.SharedKernel;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace DataTrustHub.Features.Administration.ListClearances;
 
-public record ListClearancesQuery(Guid? UserId, Guid? PolicyId)
-    : IRequest<Result<IReadOnlyList<ClearanceSummary>>>;
+public record ListClearancesQuery(Guid? UserId, Guid? PolicyId);
 
 public class ListClearancesHandler(DContext db)
-    : IRequestHandler<ListClearancesQuery, Result<IReadOnlyList<ClearanceSummary>>>
+    : IQueryHandler<ListClearancesQuery, Result<IReadOnlyList<ClearanceSummary>>>
 {
     private readonly DContext _db = db;
 

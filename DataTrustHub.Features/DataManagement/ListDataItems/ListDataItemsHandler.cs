@@ -1,14 +1,14 @@
+using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.SharedKernel;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace DataTrustHub.Features.DataManagement.ListDataItems;
 
-public record ListDataItemsQuery(Guid RequesterId) : IRequest<Result<IReadOnlyList<DataItemSummary>>>;
+public record ListDataItemsQuery(Guid RequesterId);
 
 public class ListDataItemsHandler(DContext db)
-    : IRequestHandler<ListDataItemsQuery, Result<IReadOnlyList<DataItemSummary>>>
+    : IQueryHandler<ListDataItemsQuery, Result<IReadOnlyList<DataItemSummary>>>
 {
     private readonly DContext _db = db;
 

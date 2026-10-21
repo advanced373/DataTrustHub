@@ -1,7 +1,7 @@
 using Carter;
 using DataTrustHub.Features._Shared.Extensions;
+using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.SharedKernel;
-using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -19,14 +19,14 @@ public class DeleteAccountEndpoint : ICarterModule
 
     private static async Task<IResult> Handle(
         Guid id,
-        ISender sender,
+        ICommandHandler<DeleteAccountCommand, Result<Guid>> handler,
         HttpContext httpContext,
         CancellationToken cancellationToken)
     {
         var requesterId = ExtractUserId(httpContext.User);
         if (requesterId is null) return Results.Unauthorized();
 
-        var result = await sender.Send(new DeleteAccountCommand(id, requesterId.Value), cancellationToken);
+        var result = await handler.Handle(new DeleteAccountCommand(id, requesterId.Value), cancellationToken);
         return result.ToHttpResult(_ => Results.NoContent());
     }
 

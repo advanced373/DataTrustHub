@@ -1,7 +1,7 @@
 using Carter;
 using DataTrustHub.Features._Shared.Extensions;
+using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.SharedKernel;
-using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -20,10 +20,10 @@ public class ListPoliciesEndpoint : ICarterModule
     // organizationId is optional: without it every policy is listed
     private static async Task<IResult> Handle(
         Guid? organizationId,
-        ISender sender,
+        IQueryHandler<ListPoliciesQuery, Result<IReadOnlyList<PolicySummary>>> handler,
         CancellationToken cancellationToken)
     {
-        var result = await sender.Send(new ListPoliciesQuery(organizationId), cancellationToken);
+        var result = await handler.Handle(new ListPoliciesQuery(organizationId), cancellationToken);
         return result.ToHttpResult(Results.Ok);
     }
 }

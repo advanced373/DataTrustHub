@@ -1,9 +1,8 @@
 using Carter;
-using DataTrustHub.Features._Shared.Behaviors;
+using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Features._Shared.Jwt;
 using DataTrustHub.Features._Shared.Seeding;
 using FluentValidation;
-using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
@@ -20,7 +19,7 @@ public static class FeaturesRegistration
         IConfiguration configuration)
     {
         services.AddCarter();
-        RegisterMediatR(services);
+        RegisterHandlers(services);
         RegisterJwt(services, configuration);
         RegisterAdminSeeding(services, configuration);
         return services;
@@ -32,13 +31,22 @@ public static class FeaturesRegistration
         return app;
     }
 
-    private static void RegisterMediatR(IServiceCollection services)
+    // Scrutor: Scan registers every slice handler, Decorate wraps each one in the validation decorator.
+    // Further cross-cutting decorators (e.g. auditing, #24) are added with another Decorate call;
+    // the last one registered is the outermost (ADR-0012).
+    private static void RegisterHandlers(IServiceCollection services)
     {
-        services.AddMediatR(config =>
-        {
-            config.RegisterServicesFromAssembly(typeof(FeaturesRegistration).Assembly);
-            config.AddOpenBehavior(typeof(ValidationPipelineBehavior<,>));
-        });
+        services.Scan(scan => scan
+            .FromAssemblies(typeof(FeaturesRegistration).Assembly)
+            .AddClasses(classes => classes.AssignableTo(typeof(ICommandHandler<,>)), publicOnly: false)
+                .AsImplementedInterfaces()
+                .WithScopedLifetime()
+            .AddClasses(classes => classes.AssignableTo(typeof(IQueryHandler<,>)), publicOnly: false)
+                .AsImplementedInterfaces()
+                .WithScopedLifetime());
+
+        services.Decorate(typeof(ICommandHandler<,>), typeof(CommandValidationDecorator<,>));
+        services.Decorate(typeof(IQueryHandler<,>), typeof(QueryValidationDecorator<,>));
 
         services.AddValidatorsFromAssembly(
             typeof(FeaturesRegistration).Assembly,

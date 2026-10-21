@@ -1,13 +1,13 @@
+using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.SharedKernel;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace DataTrustHub.Features.Administration.DeleteClearance;
 
-public record DeleteClearanceCommand(Guid ClearanceId) : IRequest<Result<Guid>>;
+public record DeleteClearanceCommand(Guid ClearanceId);
 
-public class DeleteClearanceHandler(DContext db) : IRequestHandler<DeleteClearanceCommand, Result<Guid>>
+public class DeleteClearanceHandler(DContext db) : ICommandHandler<DeleteClearanceCommand, Result<Guid>>
 {
     private readonly DContext _db = db;
 

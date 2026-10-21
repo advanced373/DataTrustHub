@@ -48,6 +48,21 @@ Every piece of work has an issue, and the issue always reflects reality, both on
 - Before reporting status, sync: `gh pr list --state all --limit 20`. Close any issue whose final PR is merged but which is still open, update any issue whose state lags behind, and check the board matches.
 - Pull status live from `gh`. Never keep a static status file in the repo.
 
+## 3. Record decisions in ADRs
+
+Every important decision gets an ADR in `docs/architecture/adr/`, written right after the decision is
+taken, not later.
+
+- **What counts:** architecture, data model, access rules, technology and process choices, and any
+  choice the user makes between options.
+- **How:**
+  - Copy `template.md` and use the next free number.
+  - Link the issue and the PRs.
+  - Add a row to the index in `README.md`.
+  - Open it as its own small docs PR, next to the code PRs.
+- **When a decision changes:** write a new ADR that supersedes the old one, and set the old one's
+  status to `Superseded by ADR-NNNN`. Never rewrite an accepted ADR.
+
 ## Project board commands
 
 These need the `project` token scope. If it is missing, ask the user to run `! gh auth refresh -h github.com -s project`. Until then, skip board updates; never block on them.

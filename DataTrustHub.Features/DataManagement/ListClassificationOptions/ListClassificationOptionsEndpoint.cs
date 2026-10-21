@@ -13,8 +13,11 @@ namespace DataTrustHub.Features.DataManagement.ListClassificationOptions;
 // A policy the requester may classify under, and the highest level they may use on it
 public record ClassificationPolicyOption(Guid PolicyId, string PolicyName, string GroupName, int MaxPriority);
 
+// A level an item can be classified at
+public record ClassificationLevelOption(string Name, int Priority);
+
 public record ClassificationOptionsResponse(
-    IReadOnlyList<ClassificationLevel> Levels,
+    IReadOnlyList<ClassificationLevelOption> Levels,
     IReadOnlyList<ClassificationPolicyOption> Policies);
 
 public class ListClassificationOptionsEndpoint : ICarterModule

@@ -1,3 +1,4 @@
+using DataTrustHub.Domain.Clearances;
 using FluentValidation;
 
 namespace DataTrustHub.Features.DataManagement.AddDataItem;
@@ -32,7 +33,7 @@ internal class AddDataItemValidator : AbstractValidator<AddDataItemCommand>
             .When(x => x.PolicyId.HasValue);
 
         RuleFor(x => x.LevelPriority)
-            .Must(priority => ClassificationLevels.FindByPriority(priority!.Value) is not null)
+            .Must(priority => ClassificationLevel.FindStandard(priority!.Value) is not null)
             .When(x => x.LevelPriority.HasValue)
             .WithMessage("Unknown classification level.");
     }

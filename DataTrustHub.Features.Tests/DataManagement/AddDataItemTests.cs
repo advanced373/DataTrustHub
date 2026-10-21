@@ -2,6 +2,9 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using DataTrustHub.Features.Tests.Helpers;
+using DataTrustHub.Infrastructure.Persistance;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace DataTrustHub.Features.Tests.DataManagement;
@@ -11,6 +14,9 @@ public class AddDataItemTests(ApiFactory factory) : IClassFixture<ApiFactory>
     private const string RegisterEndpoint = "/auth/register";
     private const string LoginEndpoint = "/auth/login";
     private const string UploadEndpoint = "/data/upload";
+    private const string PersonalMarking = "UNCLASSIFIED";
+    private const string UserNotFoundCode = "DataItem.UserNotFound";
+    private const string UserNotFoundMessage = "The authenticated user could not be found.";
 
     private readonly HttpClient _client = factory.CreateClient();
 
@@ -68,7 +74,50 @@ public class AddDataItemTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    [Fact]
+    public async Task UploadFile_PersonalUpload_StoresUnclassifiedRowWithBase64Content()
+    {
+        const string fileText = "personal payload";
+        const string fileName = "personal.txt";
+        var client = await TestUsers.CreateClientAsync(factory, "upload_personal_row@example.com");
+        var bytes = System.Text.Encoding.UTF8.GetBytes(fileText);
+
+        var response = await client.PostAsync(UploadEndpoint, BuildMultipartContent(fileText, fileName, "text/plain"));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var itemId = (await response.Content.ReadFromJsonAsync<AddDataItemResponse>())!.DataItemId;
+        using var scope = factory.Services.CreateScope();
+        var item = await scope.ServiceProvider.GetRequiredService<DContext>().DataItems.SingleAsync(d => d.Id == itemId);
+        Assert.Equal(Convert.ToBase64String(bytes), item.Content);
+        Assert.Equal((fileName, (long)bytes.Length, PersonalMarking), (item.Name, item.Size, item.SecurityMarking));
+        Assert.Null(item.PolicyId);
+        Assert.Null(item.ClassificationPriority);
+        Assert.False(item.IsDeleted);
+    }
+
+    [Fact]
+    public async Task UploadFile_OwnerRemovedAfterLogin_Returns404UserNotFound()
+    {
+        const string email = "upload_ghost@example.com";
+        var client = await TestUsers.CreateClientAsync(factory, email);
+        await RemoveUserAsync(email);
+
+        var response = await client.PostAsync(UploadEndpoint, BuildMultipartContent("data", "ghost.txt", "text/plain"));
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+        Assert.Equal((UserNotFoundCode, UserNotFoundMessage), (error!.Code, error.Description));
+    }
+
     // --- helpers ---
+
+    private async Task RemoveUserAsync(string email)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<DContext>();
+        db.Users.Remove(await db.Users.SingleAsync(u => u.Email == email));
+        await db.SaveChangesAsync();
+    }
 
     private async Task<string> RegisterAndLoginAsync(string email, string password)
     {
@@ -95,4 +144,5 @@ public class AddDataItemTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
     private record AddDataItemResponse(Guid DataItemId);
     private record LoginUserResponse(string Token);
+    private record ErrorResponse(string Code, string Description);
 }

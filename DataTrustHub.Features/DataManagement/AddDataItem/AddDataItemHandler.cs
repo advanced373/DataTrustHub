@@ -1,18 +1,26 @@
+using DataTrustHub.Domain.Abstractions;
+using DataTrustHub.Domain.Clearances;
+using DataTrustHub.Domain.DataItems;
+using DataTrustHub.Domain.Users;
 using DataTrustHub.Features._Shared.Messaging;
-using DataTrustHub.Infrastructure.Persistance;
-using DataTrustHub.Infrastructure.Persistance.Model;
 using DataTrustHub.SharedKernel;
 using Microsoft.AspNetCore.Http;
-using Microsoft.EntityFrameworkCore;
 
 namespace DataTrustHub.Features.DataManagement.AddDataItem;
 
 // PolicyId and LevelPriority are both set for a classified item and both null for a personal one
 public record AddDataItemCommand(IFormFile? File, Guid OwnerUserId, Guid? PolicyId = null, int? LevelPriority = null);
 
-public class AddDataItemHandler(DContext db) : ICommandHandler<AddDataItemCommand, Result<Guid>>
+public class AddDataItemHandler(
+    IUserRepository users,
+    IClearanceRepository clearances,
+    IDataItemRepository dataItems,
+    IUnitOfWork unitOfWork) : ICommandHandler<AddDataItemCommand, Result<Guid>>
 {
-    private readonly DContext _db = db;
+    private readonly IUserRepository _users = users;
+    private readonly IClearanceRepository _clearances = clearances;
+    private readonly IDataItemRepository _dataItems = dataItems;
+    private readonly IUnitOfWork _unitOfWork = unitOfWork;
 
     public async Task<Result<Guid>> Handle(
         AddDataItemCommand command,
@@ -24,56 +32,39 @@ public class AddDataItemHandler(DContext db) : ICommandHandler<AddDataItemComman
         if (command.File.Length > Constants.MaxFileSizeBytes)
             return Result.Failure<Guid>(Errors.FileTooLarge);
 
-        var ownerExists = await CheckUserExists(command.OwnerUserId, cancellationToken);
-        if (!ownerExists) return Result.Failure<Guid>(Errors.UserNotFound);
-
-        var level = command.LevelPriority is int priority ? ClassificationLevels.FindByPriority(priority) : null;
-        if (level is not null && !await HoldsClearance(command, level, cancellationToken))
-            return Result.Failure<Guid>(Errors.NotCleared);
+        if (!await _users.ExistsAsync(command.OwnerUserId, cancellationToken))
+            return Result.Failure<Guid>(Errors.UserNotFound);
 
         var content = await ReadFileContent(command.File, cancellationToken);
-        var itemId = Guid.NewGuid();
-        await PersistDataItem(itemId, command, level, content, cancellationToken);
-        return Result.Success(itemId);
+        var created = await CreateDataItem(command, command.File, content, cancellationToken);
+        if (created.IsFailure) return Result.Failure<Guid>(created.Error);
+
+        _dataItems.Add(created.Value);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        return Result.Success(created.Value.Id);
     }
 
-    private Task<bool> CheckUserExists(Guid userId, CancellationToken ct) =>
-        _db.Users.AnyAsync(u => u.Id == userId, ct);
+    // A personal item when no classification is given; otherwise the owner's clearances decide
+    private async Task<Result<DataItem>> CreateDataItem(
+        AddDataItemCommand command,
+        IFormFile file,
+        string content,
+        CancellationToken ct)
+    {
+        var level = command.LevelPriority is int priority ? ClassificationLevel.FindStandard(priority) : null;
+        if (level is null || command.PolicyId is not Guid policyId)
+            return Result.Success(DataItem.CreatePersonal(file.FileName, file.Length, content, command.OwnerUserId));
 
-    // An owner may classify only under a policy they are cleared on, and at most at their own level
-    private Task<bool> HoldsClearance(AddDataItemCommand command, ClassificationLevel level, CancellationToken ct) =>
-        _db.Clearances.AnyAsync(
-            c => c.UserId == command.OwnerUserId
-                 && c.PolicyId == command.PolicyId
-                 && c.ClassificationLevel.Priority >= level.Priority,
-            ct);
+        var ownerClearances = await _clearances.ListForUserAsync(command.OwnerUserId, ct);
+        return DataItem.CreateClassified(
+            file.FileName, file.Length, content, command.OwnerUserId, policyId, level, ownerClearances);
+    }
 
-    private static async Task<byte[]> ReadFileContent(IFormFile file, CancellationToken ct)
+    // Stored as base64 of the file bytes
+    private static async Task<string> ReadFileContent(IFormFile file, CancellationToken ct)
     {
         using var stream = new MemoryStream();
         await file.CopyToAsync(stream, ct);
-        return stream.ToArray();
-    }
-
-    private async Task PersistDataItem(
-        Guid itemId,
-        AddDataItemCommand command,
-        ClassificationLevel? level,
-        byte[] content,
-        CancellationToken ct)
-    {
-        var dbItem = new DbDataItem
-        {
-            Id = itemId,
-            Name = command.File!.FileName,
-            Size = command.File.Length,
-            Content = Convert.ToBase64String(content),
-            OwnerUserId = command.OwnerUserId,
-            SecurityMarking = level?.Name ?? ClassificationLevels.PersonalMarking,
-            PolicyId = level is null ? null : command.PolicyId,
-            ClassificationPriority = level?.Priority
-        };
-        await _db.DataItems.AddAsync(dbItem, ct);
-        await _db.SaveChangesAsync(ct);
+        return Convert.ToBase64String(stream.ToArray());
     }
 }

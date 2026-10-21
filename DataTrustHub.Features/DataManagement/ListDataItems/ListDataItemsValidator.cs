@@ -6,6 +6,6 @@ internal class ListDataItemsValidator : AbstractValidator<ListDataItemsQuery>
 {
     public ListDataItemsValidator()
     {
-        RuleFor(x => x.OwnerId).NotEmpty();
+        RuleFor(x => x.RequesterId).NotEmpty();
     }
 }

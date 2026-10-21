@@ -17,6 +17,21 @@ internal sealed record UserCreatedResponse(Guid UserId);
 
 internal sealed record DataItemCreatedResponse(Guid DataItemId);
 
+// A data item the user may read; policy fields are null for a personal item
+public sealed record DataItemResponse(
+    Guid Id,
+    string Name,
+    long Size,
+    string SecurityMarking,
+    int? ClassificationPriority,
+    Guid? PolicyId,
+    string? PolicyName,
+    string? OwnerEmail,
+    bool IsOwner);
+
+// One item with its content, base64-encoded by the API
+public sealed record DataItemContentResponse(Guid Id, string Name, string? Content);
+
 internal sealed record PolicyCreatedResponse(Guid PolicyId);
 
 internal sealed record GroupCreatedResponse(Guid GroupId);

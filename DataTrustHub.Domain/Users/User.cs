@@ -4,24 +4,30 @@ namespace DataTrustHub.Domain.Users;
 
 public sealed class User
 {
-    // Used by the persistence mapper; new users are created through Register or CreateAdmin
-    private User() { }
+    // Rebuilds a stored entity; used by the persistence mappers only (internal, visible to Infrastructure)
+    internal User(Guid id, string email, string hashedPassword, string role)
+    {
+        Id = id;
+        Email = email;
+        HashedPassword = hashedPassword;
+        Role = role;
+    }
 
     public Guid Id { get; private set; }
 
-    public string Email { get; private set; } = string.Empty;
+    public string Email { get; private set; }
 
-    public string HashedPassword { get; private set; } = string.Empty;
+    public string HashedPassword { get; private set; }
 
-    public string Role { get; private set; } = UserRoles.User;
+    public string Role { get; private set; }
 
     public bool IsAdmin => Role == UserRoles.Admin;
 
     public static User Register(string email, string hashedPassword) =>
-        new() { Id = Guid.NewGuid(), Email = email, HashedPassword = hashedPassword, Role = UserRoles.User };
+        new(Guid.NewGuid(), email, hashedPassword, UserRoles.User);
 
     public static User CreateAdmin(string email, string hashedPassword) =>
-        new() { Id = Guid.NewGuid(), Email = email, HashedPassword = hashedPassword, Role = UserRoles.Admin };
+        new(Guid.NewGuid(), email, hashedPassword, UserRoles.Admin);
 
     // Returns false when the user already was an admin
     public bool PromoteToAdmin()

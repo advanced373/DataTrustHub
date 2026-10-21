@@ -11,11 +11,32 @@ public sealed class DataItem
 {
     public const string PersonalMarking = "UNCLASSIFIED";
 
-    private DataItem() { }
+    // Rebuilds a stored entity; used by the persistence mappers only (internal, visible to Infrastructure)
+    internal DataItem(
+        Guid id,
+        string name,
+        long size,
+        string? content,
+        Guid ownerUserId,
+        string securityMarking,
+        Guid? policyId,
+        int? classificationPriority,
+        bool isDeleted)
+    {
+        Id = id;
+        Name = name;
+        Size = size;
+        Content = content;
+        OwnerUserId = ownerUserId;
+        SecurityMarking = securityMarking;
+        PolicyId = policyId;
+        ClassificationPriority = classificationPriority;
+        IsDeleted = isDeleted;
+    }
 
     public Guid Id { get; private set; }
 
-    public string Name { get; private set; } = string.Empty;
+    public string Name { get; private set; }
 
     public long Size { get; private set; }
 
@@ -24,7 +45,7 @@ public sealed class DataItem
 
     public Guid OwnerUserId { get; private set; }
 
-    public string SecurityMarking { get; private set; } = PersonalMarking;
+    public string SecurityMarking { get; private set; }
 
     public Guid? PolicyId { get; private set; }
 
@@ -35,7 +56,7 @@ public sealed class DataItem
     public bool IsClassified => PolicyId is not null;
 
     public static DataItem CreatePersonal(string name, long size, string content, Guid ownerUserId) =>
-        new() { Id = Guid.NewGuid(), Name = name, Size = size, Content = content, OwnerUserId = ownerUserId };
+        new(Guid.NewGuid(), name, size, content, ownerUserId, PersonalMarking, null, null, isDeleted: false);
 
     // The owner may classify only under a policy they hold a clearance on, at most at that clearance's level
     public static Result<DataItem> CreateClassified(
@@ -50,11 +71,8 @@ public sealed class DataItem
         if (!ownerClearances.Any(c => c.UserId == ownerUserId && c.Allows(policyId, level.Priority)))
             return Result.Failure<DataItem>(DataItemErrors.NotCleared);
 
-        var item = CreatePersonal(name, size, content, ownerUserId);
-        item.PolicyId = policyId;
-        item.ClassificationPriority = level.Priority;
-        item.SecurityMarking = level.Name;
-        return Result.Success(item);
+        return Result.Success(new DataItem(
+            Guid.NewGuid(), name, size, content, ownerUserId, level.Name, policyId, level.Priority, isDeleted: false));
     }
 
     public bool IsReadableBy(Guid userId, IEnumerable<Clearance> userClearances)

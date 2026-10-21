@@ -3,11 +3,16 @@ namespace DataTrustHub.Domain.Organizations;
 // An organization ("group" in the API and UI) that owns policies
 public sealed class Organization
 {
-    private Organization() { }
+    // Rebuilds a stored entity; used by the persistence mappers only (internal, visible to Infrastructure)
+    internal Organization(Guid id, string name)
+    {
+        Id = id;
+        Name = name;
+    }
 
     public Guid Id { get; private set; }
 
-    public string Name { get; private set; } = string.Empty;
+    public string Name { get; private set; }
 
-    public static Organization Create(string name) => new() { Id = Guid.NewGuid(), Name = name };
+    public static Organization Create(string name) => new(Guid.NewGuid(), name);
 }

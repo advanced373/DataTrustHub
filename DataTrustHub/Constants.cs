@@ -8,6 +8,8 @@ internal static class Constants
     internal const string BearerScheme = "Bearer";
     internal const string AdminRole = "Admin";
     internal const string UploadFormField = "file";
+    internal const string PolicyFormField = "policyId";
+    internal const string LevelFormField = "levelPriority";
     internal const string DefaultContentType = "application/octet-stream";
     internal const long MaxUploadSizeBytes = 104_857_600; // 100 MB, mirrors the API limit
     internal const long MultipartOverheadBytes = 1_048_576; // 1 MB for boundaries and headers
@@ -27,6 +29,7 @@ internal static class ApiRoutes
     internal const string UploadData = "data/upload";
     internal const string DataItems = "data";
     internal const string DataItemById = "data/{0}";
+    internal const string ClassificationOptions = "data/classification-options";
     internal const string AdminAccounts = "admin/accounts";
     internal const string AdminAccountById = "admin/accounts/{0}";
     internal const string AdminPolicies = "admin/policies";
@@ -93,6 +96,8 @@ internal static class Messages
     internal const string FileUploaded = "File \"{0}\" uploaded.";
     internal const string FileDeleted = "File deleted.";
     internal const string DownloadFailed = "The file content could not be read.";
+    internal const string LevelRequiredForPolicy = "Select a classification level for the policy.";
+    internal const string LevelAboveClearance = "You can classify at most at your own clearance level on this policy.";
     internal const string AccountCreated = "Account {0} created.";
     internal const string AccountDeleted = "Account deleted. Its clearances were removed and its data was deleted.";
     internal const string PolicyCreated = "Policy \"{0}\" created.";

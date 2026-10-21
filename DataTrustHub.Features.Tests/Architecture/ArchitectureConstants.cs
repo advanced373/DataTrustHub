@@ -1,6 +1,6 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
-using DataTrustHub.Domain.User;
+using DataTrustHub.Domain.Users;
 using DataTrustHub.Features._Shared.Extensions;
 using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.SharedKernel;
@@ -23,6 +23,7 @@ internal static class ArchitectureConstants
     // Commercially licensed libraries the solution must not depend on (ADR-0012)
     internal const string MediatRNamespace = "MediatR";
     internal const string AutoMapperNamespace = "AutoMapper";
+    internal const string EntityFrameworkNamespace = "Microsoft.EntityFrameworkCore";
 
     internal const string HandlerSuffix = "Handler";
     internal const string ValidatorSuffix = "Validator";

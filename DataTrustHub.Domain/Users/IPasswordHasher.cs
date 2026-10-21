@@ -1,5 +1,4 @@
-﻿
-namespace DataTrustHub.Domain.User
+namespace DataTrustHub.Domain.Users
 {
     public interface IPasswordHasher
     {

@@ -11,12 +11,12 @@ public record LoginUserCommand(string Email, string Password);
 
 public class LoginUserHandler(
     DContext db,
-    DataTrustHub.Domain.User.IPasswordHasher hasher,
+    DataTrustHub.Domain.Users.IPasswordHasher hasher,
     IJwtTokenGenerator jwtGenerator)
     : ICommandHandler<LoginUserCommand, Result<string>>
 {
     private readonly DContext _db = db;
-    private readonly DataTrustHub.Domain.User.IPasswordHasher _hasher = hasher;
+    private readonly DataTrustHub.Domain.Users.IPasswordHasher _hasher = hasher;
     private readonly IJwtTokenGenerator _jwtGenerator = jwtGenerator;
 
     public async Task<Result<string>> Handle(

@@ -8,11 +8,11 @@ namespace DataTrustHub.Features.Administration.CreateAccount;
 
 public record CreateAccountCommand(string Email, string Password);
 
-public class CreateAccountHandler(DContext db, DataTrustHub.Domain.User.IPasswordHasher hasher)
+public class CreateAccountHandler(DContext db, DataTrustHub.Domain.Users.IPasswordHasher hasher)
     : ICommandHandler<CreateAccountCommand, Result<Guid>>
 {
     private readonly DContext _db = db;
-    private readonly DataTrustHub.Domain.User.IPasswordHasher _hasher = hasher;
+    private readonly DataTrustHub.Domain.Users.IPasswordHasher _hasher = hasher;
 
     public async Task<Result<Guid>> Handle(
         CreateAccountCommand command,

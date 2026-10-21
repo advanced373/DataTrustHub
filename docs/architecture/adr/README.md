@@ -28,3 +28,4 @@ Status values: `Proposed`, `Accepted`, `Superseded by ADR-NNNN`, `Deprecated`.
 | [0010](0010-port-legacy-endpoints-and-remove-the-layered-code.md) | Port the legacy endpoints to VSA slices and remove the layered code | Accepted | 2026-10-20 |
 | [0011](0011-data-access-by-policy-and-classification-level.md) | Data access by policy and classification level, need-to-know | Accepted | 2026-10-21 |
 | [0012](0012-clean-architecture-with-vertical-slices.md) | Clean Architecture with vertical slices, repositories for commands, and no MediatR | Accepted | 2026-10-21 |
+| [0013](0013-three-agent-development-process.md) | Three-agent development process: implementer, tester, reviewer | Accepted | 2026-10-21 |

@@ -1,4 +1,4 @@
-﻿using DataTrustHub.Domain.User;
+﻿using DataTrustHub.Domain.Users;
 using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;

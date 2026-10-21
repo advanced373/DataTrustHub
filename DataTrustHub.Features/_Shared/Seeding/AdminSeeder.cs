@@ -1,4 +1,4 @@
-using DataTrustHub.Domain.User;
+using DataTrustHub.Domain.Users;
 using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.Infrastructure.Persistance.Model;
 using DataTrustHub.SharedKernel;

@@ -1,4 +1,4 @@
-﻿using DataTrustHub.Domain.User;
+﻿using DataTrustHub.Domain.Users;
 using System.Security.Cryptography;
 using System.Text;
 

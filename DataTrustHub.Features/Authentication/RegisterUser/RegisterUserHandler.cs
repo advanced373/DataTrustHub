@@ -8,11 +8,11 @@ namespace DataTrustHub.Features.Authentication.RegisterUser;
 
 public record RegisterUserCommand(string Email, string Password);
 
-public class RegisterUserHandler(DContext db, DataTrustHub.Domain.User.IPasswordHasher hasher)
+public class RegisterUserHandler(DContext db, DataTrustHub.Domain.Users.IPasswordHasher hasher)
     : ICommandHandler<RegisterUserCommand, Result<Guid>>
 {
     private readonly DContext _db = db;
-    private readonly DataTrustHub.Domain.User.IPasswordHasher _hasher = hasher;
+    private readonly DataTrustHub.Domain.Users.IPasswordHasher _hasher = hasher;
 
     public async Task<Result<Guid>> Handle(
         RegisterUserCommand command,

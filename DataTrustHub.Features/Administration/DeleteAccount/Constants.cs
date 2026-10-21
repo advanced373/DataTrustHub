@@ -13,8 +13,4 @@ internal static class Errors
     internal static readonly Error AccountNotFound = Error.NotFound(
         "Account.NotFound",
         "The account was not found.");
-
-    internal static readonly Error CannotDeleteOwnAccount = Error.Conflict(
-        "Account.CannotDeleteOwnAccount",
-        "Administrators cannot delete their own account.");
 }

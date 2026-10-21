@@ -1,7 +1,11 @@
 using System.Net;
 using System.Net.Http.Json;
+using DataTrustHub.Features.Tests.Administration.Helpers;
 using DataTrustHub.Features.Tests.Helpers;
+using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.SharedKernel;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 using static DataTrustHub.Features.Tests.Administration.Helpers.AdminSetup;
 
@@ -28,7 +32,9 @@ public class GetAndDeleteClearanceTests(ApiFactory factory) : IClassFixture<ApiF
         var missingRoute = $"{ClearancesEndpoint}/{Guid.NewGuid()}";
 
         Assert.Equal(HttpStatusCode.NotFound, (await admin.GetAsync(missingRoute)).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await admin.DeleteAsync(missingRoute)).StatusCode);
+        await ErrorAssert.HasErrorAsync(
+            await admin.DeleteAsync(missingRoute), HttpStatusCode.NotFound,
+            AdminErrorCodes.ClearanceNotFound, AdminErrorMessages.ClearanceNotFound);
     }
 
     [Fact]
@@ -45,6 +51,33 @@ public class GetAndDeleteClearanceTests(ApiFactory factory) : IClassFixture<ApiF
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await admin.GetAsync($"{ClearancesEndpoint}/{clearanceId}")).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await admin.DeleteAsync($"{PoliciesEndpoint}/{policyId}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteClearance_Existing_KeepsTheClassificationLevel()
+    {
+        const string levelName = "KeptAfterDelete";
+        const int levelPriority = 9;
+        var (admin, userId) = await CreateAdminAndUserAsync("clearance_keep_level");
+        var policyId = await CreatePolicyAsync(admin, "Clearance keep level policy");
+        var created = await PostClearanceAsync(admin, userId, policyId, levelName, levelPriority);
+        var clearanceId = (await created.Content.ReadFromJsonAsync<CreateClearanceResponse>())!.ClearanceId;
+
+        var response = await admin.DeleteAsync($"{ClearancesEndpoint}/{clearanceId}");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<DContext>();
+        Assert.False(await db.Clearances.AnyAsync(c => c.Id == clearanceId));
+        Assert.True(await db.ClassificationLevels.AnyAsync(l => l.Name == levelName && l.Priority == levelPriority));
+    }
+
+    [Fact]
+    public async Task DeleteClearance_Anonymous_Returns401()
+    {
+        var anonymous = factory.CreateClient();
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.DeleteAsync($"{ClearancesEndpoint}/{Guid.NewGuid()}")).StatusCode);
     }
 
     [Fact]
@@ -65,6 +98,8 @@ public class GetAndDeleteClearanceTests(ApiFactory factory) : IClassFixture<ApiF
         await TestUsers.CreateClientAsync(factory, $"{prefix}_user@example.com");
         return (admin, await TestUsers.GetIdAsync(factory, $"{prefix}_user@example.com"));
     }
+
+    private record CreateClearanceResponse(Guid ClearanceId);
 
     private record ClearanceResponse(
         Guid Id, string Name, Guid UserId, Guid PolicyId, string ClassificationLevelName, int ClassificationLevelPriority);

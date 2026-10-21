@@ -48,7 +48,8 @@ public class CreateAndListClearancesTests(ApiFactory factory) : IClassFixture<Ap
 
         var response = await PostClearanceAsync(admin, userId, policyId);
 
-        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        await ErrorAssert.HasErrorAsync(
+            response, HttpStatusCode.Conflict, AdminErrorCodes.ClearanceAlreadyGranted, AdminErrorMessages.ClearanceAlreadyGranted);
     }
 
     [Fact]
@@ -57,8 +58,12 @@ public class CreateAndListClearancesTests(ApiFactory factory) : IClassFixture<Ap
         var (admin, userId) = await CreateAdminAndUserAsync("clearance_unknown");
         var policyId = await CreatePolicyAsync(admin, "Unknown refs policy");
 
-        Assert.Equal(HttpStatusCode.NotFound, (await PostClearanceAsync(admin, Guid.NewGuid(), policyId)).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await PostClearanceAsync(admin, userId, Guid.NewGuid())).StatusCode);
+        await ErrorAssert.HasErrorAsync(
+            await PostClearanceAsync(admin, Guid.NewGuid(), policyId), HttpStatusCode.NotFound,
+            AdminErrorCodes.ClearanceUserNotFound, AdminErrorMessages.ClearanceUserNotFound);
+        await ErrorAssert.HasErrorAsync(
+            await PostClearanceAsync(admin, userId, Guid.NewGuid()), HttpStatusCode.NotFound,
+            AdminErrorCodes.ClearancePolicyNotFound, AdminErrorMessages.ClearancePolicyNotFound);
     }
 
     [Fact]
@@ -79,6 +84,14 @@ public class CreateAndListClearancesTests(ApiFactory factory) : IClassFixture<Ap
 
         Assert.Equal(HttpStatusCode.Forbidden, (await user.GetAsync(ClearancesEndpoint)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await PostClearanceAsync(user, Guid.NewGuid(), Guid.NewGuid())).StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateClearance_Anonymous_Returns401()
+    {
+        var anonymous = factory.CreateClient();
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await PostClearanceAsync(anonymous, Guid.NewGuid(), Guid.NewGuid())).StatusCode);
     }
 
     // --- helpers ---

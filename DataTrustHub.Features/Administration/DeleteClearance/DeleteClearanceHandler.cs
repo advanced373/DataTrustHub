@@ -1,26 +1,30 @@
+using DataTrustHub.Domain.Abstractions;
+using DataTrustHub.Domain.Clearances;
 using DataTrustHub.Features._Shared.Messaging;
-using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.SharedKernel;
-using Microsoft.EntityFrameworkCore;
 
 namespace DataTrustHub.Features.Administration.DeleteClearance;
 
 public record DeleteClearanceCommand(Guid ClearanceId);
 
-public class DeleteClearanceHandler(DContext db) : ICommandHandler<DeleteClearanceCommand, Result<Guid>>
+public class DeleteClearanceHandler(
+    IClearanceRepository clearances,
+    IUnitOfWork unitOfWork)
+    : ICommandHandler<DeleteClearanceCommand, Result<Guid>>
 {
-    private readonly DContext _db = db;
+    private readonly IClearanceRepository _clearances = clearances;
+    private readonly IUnitOfWork _unitOfWork = unitOfWork;
 
     // The classification level stays: other clearances may share it
     public async Task<Result<Guid>> Handle(
         DeleteClearanceCommand command,
         CancellationToken cancellationToken)
     {
-        var clearance = await _db.Clearances.FirstOrDefaultAsync(c => c.Id == command.ClearanceId, cancellationToken);
+        var clearance = await _clearances.GetByIdAsync(command.ClearanceId, cancellationToken);
         if (clearance is null) return Result.Failure<Guid>(Errors.ClearanceNotFound);
 
-        _db.Clearances.Remove(clearance);
-        await _db.SaveChangesAsync(cancellationToken);
+        await _clearances.RemoveAsync(clearance, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success(command.ClearanceId);
     }
 }

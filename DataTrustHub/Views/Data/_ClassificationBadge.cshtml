@@ -1,0 +1,15 @@
+@model DataTrustHub.Services.Api.DataItemResponse
+@* Personal items have no level; classified ones get a colour that darkens with the level *@
+@{
+    var style = Model.ClassificationPriority switch
+    {
+        null => "text-bg-light border",
+        0 => "text-bg-success",
+        1 => "text-bg-info",
+        2 => "text-bg-warning",
+        3 => "text-bg-danger",
+        _ => "text-bg-dark"
+    };
+    var label = Model.ClassificationPriority is null ? "Personal" : Model.SecurityMarking;
+}
+<span class="badge @style">@label</span>

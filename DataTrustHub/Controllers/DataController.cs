@@ -2,18 +2,42 @@ using DataTrustHub.Models;
 using DataTrustHub.Services.Api;
 using DataTrustHub.Services.Session;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.StaticFiles;
 
 namespace DataTrustHub.Controllers;
 
 public class DataController(IDataApiClient dataApi, IUserSessionService userSession)
     : ApiControllerBase(userSession)
 {
-    // Listing data needs GET /data from the API (issue #5); the view shows a placeholder until then
-    [HttpGet]
-    public IActionResult Index() => View();
+    private static readonly FileExtensionContentTypeProvider ContentTypes = new();
 
     [HttpGet]
-    public IActionResult Upload() => View(new UploadDataViewModel());
+    public async Task<IActionResult> Index(CancellationToken cancellationToken) =>
+        await ListViewAsync(await dataApi.ListAsync(cancellationToken));
+
+    [HttpGet]
+    public async Task<IActionResult> Download(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await dataApi.GetContentAsync(id, cancellationToken);
+        if (!result.IsSuccess) return await RedirectWithOutcomeAsync(result, string.Empty, nameof(Index), ControllerNames.Data);
+
+        var bytes = DecodeContent(result.Value!.Content);
+        if (bytes is null) return await RedirectWithOutcomeAsync(
+            ApiResult<bool>.Failure(Messages.DownloadFailed), string.Empty, nameof(Index), ControllerNames.Data);
+
+        return File(bytes, ResolveContentType(result.Value.Name), result.Value.Name);
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await dataApi.DeleteAsync(id, cancellationToken);
+        return await RedirectWithOutcomeAsync(result, Messages.FileDeleted, nameof(Index), ControllerNames.Data);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Upload(CancellationToken cancellationToken) =>
+        await UploadViewAsync(new UploadDataViewModel(), cancellationToken);
 
     [HttpPost]
     // The request limit leaves room for multipart overhead, so a file just over the size limit
@@ -25,12 +49,43 @@ public class DataController(IDataApiClient dataApi, IUserSessionService userSess
         if (model.File?.Length > Constants.MaxUploadSizeBytes)
             ModelState.AddModelError(nameof(model.File), Messages.FileTooLarge);
 
-        if (!ModelState.IsValid) return View(model);
+        if (model.PolicyId is not null && model.LevelPriority is null)
+            ModelState.AddModelError(nameof(model.LevelPriority), Messages.LevelRequiredForPolicy);
 
-        var result = await dataApi.UploadAsync(model.File!, cancellationToken);
-        if (!result.IsSuccess) return await HandleFailureAsync(result, model);
+        if (!ModelState.IsValid) return await UploadViewAsync(model, cancellationToken);
 
-        var message = string.Format(Messages.FileUploaded, result.Value);
+        // Without a policy the level is ignored and the file stays personal
+        var levelPriority = model.PolicyId is null ? null : model.LevelPriority;
+        var result = await dataApi.UploadAsync(model.File!, model.PolicyId, levelPriority, cancellationToken);
+        if (!result.IsSuccess)
+        {
+            model.Options = (await dataApi.GetClassificationOptionsAsync(cancellationToken)).Value ?? model.Options;
+            return await HandleFailureAsync(result, model);
+        }
+
+        var message = string.Format(Messages.FileUploaded, model.File!.FileName);
         return RedirectWithSuccess(message, nameof(Index), ControllerNames.Data);
     }
+
+    private async Task<IActionResult> UploadViewAsync(UploadDataViewModel model, CancellationToken cancellationToken)
+    {
+        var options = await dataApi.GetClassificationOptionsAsync(cancellationToken);
+        if (options.IsUnauthorized) return await SessionExpiredAsync();
+        if (!options.IsSuccess) ModelState.AddModelError(string.Empty, options.ErrorMessage!);
+
+        model.Options = options.Value ?? model.Options;
+        return View(nameof(Upload), model);
+    }
+
+    // The API stores file content base64-encoded
+    private static byte[]? DecodeContent(string? content)
+    {
+        if (content is null) return null;
+
+        var buffer = new byte[content.Length];
+        return Convert.TryFromBase64String(content, buffer, out var length) ? buffer[..length] : null;
+    }
+
+    private static string ResolveContentType(string fileName) =>
+        ContentTypes.TryGetContentType(fileName, out var contentType) ? contentType : Constants.DefaultContentType;
 }

@@ -18,6 +18,43 @@
                         <div class="form-text">Maximum size: 100 MB.</div>
                         <span asp-validation-for="File" class="text-danger"></span>
                     </div>
+
+                    <div class="mb-3">
+                        <label asp-for="PolicyId" class="form-label"></label>
+                        <select asp-for="PolicyId" class="form-select" id="policy-select">
+                            <option value="">Personal: only you can see it</option>
+                            @foreach (var policy in Model.Options.Policies)
+                            {
+                                <option value="@policy.PolicyId" data-max-priority="@policy.MaxPriority">
+                                    @policy.PolicyName (@policy.GroupName)
+                                </option>
+                            }
+                        </select>
+                        <div class="form-text">
+                            @if (Model.Options.Policies.Count == 0)
+                            {
+                                <text>You hold no clearances yet, so files can only be personal.</text>
+                            }
+                            else
+                            {
+                                <text>Users cleared on the policy at or above the level will see the file.</text>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="LevelPriority" class="form-label"></label>
+                        <select asp-for="LevelPriority" class="form-select" id="level-select">
+                            <option value="">Select a level</option>
+                            @foreach (var level in Model.Options.Levels)
+                            {
+                                <option value="@level.Priority">@level.Name (@level.Priority)</option>
+                            }
+                        </select>
+                        <div class="form-text">@DataTrustHub.Messages.LevelAboveClearance</div>
+                        <span asp-validation-for="LevelPriority" class="text-danger"></span>
+                    </div>
+
                     <button type="submit" class="btn btn-primary">Upload</button>
                     <a class="btn btn-link" asp-action="Index">Cancel</a>
                 </form>
@@ -28,4 +65,24 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script>
+        // Offers only the levels the chosen policy allows; the API enforces the same rule
+        (function () {
+            const policy = document.getElementById('policy-select');
+            const level = document.getElementById('level-select');
+
+            function sync() {
+                const selected = policy.options[policy.selectedIndex];
+                const max = selected.dataset.maxPriority === undefined ? -1 : Number(selected.dataset.maxPriority);
+                level.disabled = max < 0;
+                for (const option of level.options) {
+                    if (option.value !== '') option.disabled = Number(option.value) > max;
+                }
+                if (level.disabled || (level.selectedOptions[0] && level.selectedOptions[0].disabled)) level.value = '';
+            }
+
+            policy.addEventListener('change', sync);
+            sync();
+        })();
+    </script>
 }

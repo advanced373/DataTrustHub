@@ -11,15 +11,25 @@ public class GetDataItemHandler(DContext db) : IRequestHandler<GetDataItemQuery,
 {
     private readonly DContext _db = db;
 
-    // Owner-only: another user's item answers 404, so its existence is not revealed
+    // An item the requester may not read answers 404, so its existence is not revealed
     public async Task<Result<GetDataItemResponse>> Handle(
         GetDataItemQuery query,
         CancellationToken cancellationToken)
     {
-        var item = await _db.DataItems
-            .AsNoTracking()
-            .Where(d => d.Id == query.DataItemId && d.OwnerUserId == query.RequesterId && !d.IsDeleted)
-            .Select(d => new GetDataItemResponse(d.Id, d.Name, d.Size, d.SecurityMarking, d.Content))
+        var item = await (
+                from candidate in _db.DataItems.AsNoTracking().VisibleTo(_db, query.RequesterId)
+                where candidate.Id == query.DataItemId
+                join policy in _db.Policies on candidate.PolicyId equals policy.Id into policies
+                from policy in policies.DefaultIfEmpty()
+                select new GetDataItemResponse(
+                    candidate.Id,
+                    candidate.Name,
+                    candidate.Size,
+                    candidate.SecurityMarking,
+                    candidate.Content,
+                    candidate.ClassificationPriority,
+                    policy == null ? null : policy.Name,
+                    candidate.OwnerUserId == query.RequesterId))
             .FirstOrDefaultAsync(cancellationToken);
 
         return item is null

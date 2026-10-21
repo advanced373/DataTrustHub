@@ -17,6 +17,31 @@ internal sealed record UserCreatedResponse(Guid UserId);
 
 internal sealed record DataItemCreatedResponse(Guid DataItemId);
 
+// A data item the user may read; policy fields are null for a personal item
+public sealed record DataItemResponse(
+    Guid Id,
+    string Name,
+    long Size,
+    string SecurityMarking,
+    int? ClassificationPriority,
+    Guid? PolicyId,
+    string? PolicyName,
+    string? OwnerEmail,
+    bool IsOwner);
+
+// What the user may classify an upload as: all levels, and the policies they are cleared on
+public sealed record ClassificationOptionsResponse(
+    IReadOnlyList<ClassificationLevelOption> Levels,
+    IReadOnlyList<ClassificationPolicyOption> Policies);
+
+public sealed record ClassificationLevelOption(string Name, int Priority);
+
+// MaxPriority is the user's highest clearance level on the policy
+public sealed record ClassificationPolicyOption(Guid PolicyId, string PolicyName, string GroupName, int MaxPriority);
+
+// One item with its content, base64-encoded by the API
+public sealed record DataItemContentResponse(Guid Id, string Name, string? Content);
+
 internal sealed record PolicyCreatedResponse(Guid PolicyId);
 
 internal sealed record GroupCreatedResponse(Guid GroupId);

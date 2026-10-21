@@ -1,6 +1,6 @@
 # ADR-0012: Clean Architecture with vertical slices, repositories for commands, and no MediatR
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-10-21; step 1 done in #75 / #77)
 - **Date:** 2026-10-21
 - **Refines:** [ADR-0001](0001-vertical-slice-architecture.md) (slices stay; the layers around them are defined here)
 - **Related:** [ADR-0010](0010-port-legacy-endpoints-and-remove-the-layered-code.md), [ADR-0011](0011-data-access-by-policy-and-classification-level.md), #3, #24

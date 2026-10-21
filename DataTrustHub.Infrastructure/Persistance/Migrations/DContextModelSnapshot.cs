@@ -79,6 +79,9 @@ namespace DataTrustHub.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<int?>("ClassificationPriority")
+                        .HasColumnType("int");
+
                     b.Property<string>("Content")
                         .HasColumnType("nvarchar(max)");
 
@@ -90,6 +93,9 @@ namespace DataTrustHub.Infrastructure.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<Guid>("OwnerUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("PolicyId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("SecurityMarking")

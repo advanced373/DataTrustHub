@@ -21,5 +21,19 @@ internal class AddDataItemValidator : AbstractValidator<AddDataItemCommand>
 
         RuleFor(x => x.OwnerUserId)
             .NotEmpty();
+
+        RuleFor(x => x)
+            .Must(x => x.PolicyId.HasValue == x.LevelPriority.HasValue)
+            .WithName(nameof(AddDataItemCommand.PolicyId))
+            .WithMessage("A classified item needs both a policy and a classification level.");
+
+        RuleFor(x => x.PolicyId)
+            .NotEqual(Guid.Empty)
+            .When(x => x.PolicyId.HasValue);
+
+        RuleFor(x => x.LevelPriority)
+            .Must(priority => ClassificationLevels.FindByPriority(priority!.Value) is not null)
+            .When(x => x.LevelPriority.HasValue)
+            .WithMessage("Unknown classification level.");
     }
 }

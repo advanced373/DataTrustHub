@@ -1,17 +1,16 @@
+using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.Infrastructure.Persistance.Model;
 using DataTrustHub.SharedKernel;
-using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace DataTrustHub.Features.DataManagement.AddDataItem;
 
 // PolicyId and LevelPriority are both set for a classified item and both null for a personal one
-public record AddDataItemCommand(IFormFile? File, Guid OwnerUserId, Guid? PolicyId = null, int? LevelPriority = null)
-    : IRequest<Result<Guid>>;
+public record AddDataItemCommand(IFormFile? File, Guid OwnerUserId, Guid? PolicyId = null, int? LevelPriority = null);
 
-public class AddDataItemHandler(DContext db) : IRequestHandler<AddDataItemCommand, Result<Guid>>
+public class AddDataItemHandler(DContext db) : ICommandHandler<AddDataItemCommand, Result<Guid>>
 {
     private readonly DContext _db = db;
 

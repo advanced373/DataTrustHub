@@ -1,15 +1,15 @@
+using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.Infrastructure.Persistance.Model;
 using DataTrustHub.SharedKernel;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace DataTrustHub.Features.Administration.CreateGroup;
 
-public record CreateGroupCommand(string Name) : IRequest<Result<Guid>>;
+public record CreateGroupCommand(string Name);
 
 public class CreateGroupHandler(DContext db)
-    : IRequestHandler<CreateGroupCommand, Result<Guid>>
+    : ICommandHandler<CreateGroupCommand, Result<Guid>>
 {
     private readonly DContext _db = db;
 

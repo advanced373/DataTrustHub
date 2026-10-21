@@ -1,6 +1,7 @@
 using Carter;
 using DataTrustHub.Features._Shared.Extensions;
-using MediatR;
+using DataTrustHub.Features._Shared.Messaging;
+using DataTrustHub.SharedKernel;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -18,7 +19,7 @@ public class DeleteDataItemEndpoint : ICarterModule
 
     private static async Task<IResult> Handle(
         Guid id,
-        ISender sender,
+        ICommandHandler<DeleteDataItemCommand, Result<Guid>> handler,
         HttpContext httpContext,
         CancellationToken cancellationToken)
     {
@@ -26,7 +27,7 @@ public class DeleteDataItemEndpoint : ICarterModule
         if (userIdResult is null) return Results.Unauthorized();
 
         var command = new DeleteDataItemCommand(id, userIdResult.Value);
-        var result = await sender.Send(command, cancellationToken);
+        var result = await handler.Handle(command, cancellationToken);
         return result.ToHttpResult(_ => Results.NoContent());
     }
 

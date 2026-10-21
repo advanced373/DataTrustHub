@@ -1,6 +1,7 @@
 using Carter;
 using DataTrustHub.Features._Shared.Extensions;
-using MediatR;
+using DataTrustHub.Features._Shared.Messaging;
+using DataTrustHub.SharedKernel;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -19,11 +20,11 @@ public class CreateGroupEndpoint : ICarterModule
 
     private static async Task<IResult> Handle(
         CreateGroupRequest request,
-        ISender sender,
+        ICommandHandler<CreateGroupCommand, Result<Guid>> handler,
         CancellationToken cancellationToken)
     {
         var command = new CreateGroupCommand(request.Name);
-        var result = await sender.Send(command, cancellationToken);
+        var result = await handler.Handle(command, cancellationToken);
         return result.ToHttpResult(groupId => Results.Ok(new CreateGroupResponse(groupId)));
     }
 }

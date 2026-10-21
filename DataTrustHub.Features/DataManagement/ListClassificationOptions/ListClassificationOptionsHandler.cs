@@ -1,14 +1,14 @@
+using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.SharedKernel;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace DataTrustHub.Features.DataManagement.ListClassificationOptions;
 
-public record ListClassificationOptionsQuery(Guid UserId) : IRequest<Result<ClassificationOptionsResponse>>;
+public record ListClassificationOptionsQuery(Guid UserId);
 
 public class ListClassificationOptionsHandler(DContext db)
-    : IRequestHandler<ListClassificationOptionsQuery, Result<ClassificationOptionsResponse>>
+    : IQueryHandler<ListClassificationOptionsQuery, Result<ClassificationOptionsResponse>>
 {
     private readonly DContext _db = db;
 

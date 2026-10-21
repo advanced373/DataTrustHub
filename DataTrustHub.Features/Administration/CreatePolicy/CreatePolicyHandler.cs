@@ -1,15 +1,15 @@
+using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.Infrastructure.Persistance.Model;
 using DataTrustHub.SharedKernel;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace DataTrustHub.Features.Administration.CreatePolicy;
 
-public record CreatePolicyCommand(string Name, Guid OrganizationId) : IRequest<Result<Guid>>;
+public record CreatePolicyCommand(string Name, Guid OrganizationId);
 
 public class CreatePolicyHandler(DContext db)
-    : IRequestHandler<CreatePolicyCommand, Result<Guid>>
+    : ICommandHandler<CreatePolicyCommand, Result<Guid>>
 {
     private readonly DContext _db = db;
 

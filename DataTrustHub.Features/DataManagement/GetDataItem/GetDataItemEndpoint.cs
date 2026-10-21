@@ -1,6 +1,7 @@
 using Carter;
 using DataTrustHub.Features._Shared.Extensions;
-using MediatR;
+using DataTrustHub.Features._Shared.Messaging;
+using DataTrustHub.SharedKernel;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -28,14 +29,14 @@ public class GetDataItemEndpoint : ICarterModule
 
     private static async Task<IResult> Handle(
         Guid id,
-        ISender sender,
+        IQueryHandler<GetDataItemQuery, Result<GetDataItemResponse>> handler,
         HttpContext httpContext,
         CancellationToken cancellationToken)
     {
         var requesterId = ExtractUserId(httpContext.User);
         if (requesterId is null) return Results.Unauthorized();
 
-        var result = await sender.Send(new GetDataItemQuery(id, requesterId.Value), cancellationToken);
+        var result = await handler.Handle(new GetDataItemQuery(id, requesterId.Value), cancellationToken);
         return result.ToHttpResult(Results.Ok);
     }
 

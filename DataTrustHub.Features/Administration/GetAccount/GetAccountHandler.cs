@@ -1,13 +1,13 @@
+using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.SharedKernel;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace DataTrustHub.Features.Administration.GetAccount;
 
-public record GetAccountQuery(Guid AccountId) : IRequest<Result<GetAccountResponse>>;
+public record GetAccountQuery(Guid AccountId);
 
-public class GetAccountHandler(DContext db) : IRequestHandler<GetAccountQuery, Result<GetAccountResponse>>
+public class GetAccountHandler(DContext db) : IQueryHandler<GetAccountQuery, Result<GetAccountResponse>>
 {
     private readonly DContext _db = db;
 

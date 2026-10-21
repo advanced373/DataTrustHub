@@ -1,14 +1,14 @@
+using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.SharedKernel;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace DataTrustHub.Features.Administration.ListGroups;
 
-public record ListGroupsQuery : IRequest<Result<IReadOnlyList<GroupSummary>>>;
+public record ListGroupsQuery;
 
 public class ListGroupsHandler(DContext db)
-    : IRequestHandler<ListGroupsQuery, Result<IReadOnlyList<GroupSummary>>>
+    : IQueryHandler<ListGroupsQuery, Result<IReadOnlyList<GroupSummary>>>
 {
     private readonly DContext _db = db;
 

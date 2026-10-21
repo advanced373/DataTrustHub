@@ -1,6 +1,7 @@
 using Carter;
 using DataTrustHub.Features._Shared.Extensions;
-using MediatR;
+using DataTrustHub.Features._Shared.Messaging;
+using DataTrustHub.SharedKernel;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -24,14 +25,14 @@ public class ListClassificationOptionsEndpoint : ICarterModule
            .RequireAuthorization();
 
     private static async Task<IResult> Handle(
-        ISender sender,
+        IQueryHandler<ListClassificationOptionsQuery, Result<ClassificationOptionsResponse>> handler,
         HttpContext httpContext,
         CancellationToken cancellationToken)
     {
         var userId = ExtractUserId(httpContext.User);
         if (userId is null) return Results.Unauthorized();
 
-        var result = await sender.Send(new ListClassificationOptionsQuery(userId.Value), cancellationToken);
+        var result = await handler.Handle(new ListClassificationOptionsQuery(userId.Value), cancellationToken);
         return result.ToHttpResult(Results.Ok);
     }
 

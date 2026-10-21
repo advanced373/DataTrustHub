@@ -1,6 +1,7 @@
 using Carter;
 using DataTrustHub.Features._Shared.Extensions;
-using MediatR;
+using DataTrustHub.Features._Shared.Messaging;
+using DataTrustHub.SharedKernel;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -19,11 +20,11 @@ public class CreateAccountEndpoint : ICarterModule
 
     private static async Task<IResult> Handle(
         CreateAccountRequest request,
-        ISender sender,
+        ICommandHandler<CreateAccountCommand, Result<Guid>> handler,
         CancellationToken cancellationToken)
     {
         var command = new CreateAccountCommand(request.Email, request.Password);
-        var result = await sender.Send(command, cancellationToken);
+        var result = await handler.Handle(command, cancellationToken);
         return result.ToHttpResult(userId => Results.Ok(new CreateAccountResponse(userId)));
     }
 }

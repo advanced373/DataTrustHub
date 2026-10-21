@@ -1,7 +1,7 @@
+using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.Infrastructure.Persistance.Model;
 using DataTrustHub.SharedKernel;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace DataTrustHub.Features.Administration.CreateClearance;
@@ -11,9 +11,9 @@ public record CreateClearanceCommand(
     Guid PolicyId,
     string Name,
     string ClassificationLevelName,
-    int ClassificationLevelPriority) : IRequest<Result<Guid>>;
+    int ClassificationLevelPriority);
 
-public class CreateClearanceHandler(DContext db) : IRequestHandler<CreateClearanceCommand, Result<Guid>>
+public class CreateClearanceHandler(DContext db) : ICommandHandler<CreateClearanceCommand, Result<Guid>>
 {
     private readonly DContext _db = db;
 

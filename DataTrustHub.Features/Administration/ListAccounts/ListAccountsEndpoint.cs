@@ -1,7 +1,7 @@
 using Carter;
 using DataTrustHub.Features._Shared.Extensions;
+using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.SharedKernel;
-using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -17,9 +17,9 @@ public class ListAccountsEndpoint : ICarterModule
            .WithTags(Constants.EndpointTag)
            .RequireAuthorization(policy => policy.RequireRole(UserRoles.Admin));
 
-    private static async Task<IResult> Handle(ISender sender, CancellationToken cancellationToken)
+    private static async Task<IResult> Handle(IQueryHandler<ListAccountsQuery, Result<IReadOnlyList<AccountSummary>>> handler, CancellationToken cancellationToken)
     {
-        var result = await sender.Send(new ListAccountsQuery(), cancellationToken);
+        var result = await handler.Handle(new ListAccountsQuery(), cancellationToken);
         return result.ToHttpResult(Results.Ok);
     }
 }

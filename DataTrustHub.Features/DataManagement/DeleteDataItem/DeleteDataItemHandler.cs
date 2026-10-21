@@ -1,13 +1,13 @@
+using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.SharedKernel;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace DataTrustHub.Features.DataManagement.DeleteDataItem;
 
-public record DeleteDataItemCommand(Guid DataItemId, Guid RequesterId) : IRequest<Result<Guid>>;
+public record DeleteDataItemCommand(Guid DataItemId, Guid RequesterId);
 
-public class DeleteDataItemHandler(DContext db) : IRequestHandler<DeleteDataItemCommand, Result<Guid>>
+public class DeleteDataItemHandler(DContext db) : ICommandHandler<DeleteDataItemCommand, Result<Guid>>
 {
     private readonly DContext _db = db;
 

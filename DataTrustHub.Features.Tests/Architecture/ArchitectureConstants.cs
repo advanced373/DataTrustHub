@@ -20,6 +20,10 @@ internal static class ArchitectureConstants
     internal const string DomainNamespace = "DataTrustHub.Domain";
     internal const string InfrastructureNamespace = "DataTrustHub.Infrastructure";
 
+    // Commercially licensed libraries the solution must not depend on (ADR-0012)
+    internal const string MediatRNamespace = "MediatR";
+    internal const string AutoMapperNamespace = "AutoMapper";
+
     internal const string HandlerSuffix = "Handler";
     internal const string ValidatorSuffix = "Validator";
     internal const string EndpointSuffix = "Endpoint";

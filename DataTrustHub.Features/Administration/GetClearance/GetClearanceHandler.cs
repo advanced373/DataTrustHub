@@ -1,13 +1,13 @@
+using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.SharedKernel;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace DataTrustHub.Features.Administration.GetClearance;
 
-public record GetClearanceQuery(Guid ClearanceId) : IRequest<Result<GetClearanceResponse>>;
+public record GetClearanceQuery(Guid ClearanceId);
 
-public class GetClearanceHandler(DContext db) : IRequestHandler<GetClearanceQuery, Result<GetClearanceResponse>>
+public class GetClearanceHandler(DContext db) : IQueryHandler<GetClearanceQuery, Result<GetClearanceResponse>>
 {
     private readonly DContext _db = db;
 

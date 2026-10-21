@@ -1,14 +1,14 @@
+using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.SharedKernel;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace DataTrustHub.Features.Administration.ListAccounts;
 
-public record ListAccountsQuery : IRequest<Result<IReadOnlyList<AccountSummary>>>;
+public record ListAccountsQuery;
 
 public class ListAccountsHandler(DContext db)
-    : IRequestHandler<ListAccountsQuery, Result<IReadOnlyList<AccountSummary>>>
+    : IQueryHandler<ListAccountsQuery, Result<IReadOnlyList<AccountSummary>>>
 {
     private readonly DContext _db = db;
 

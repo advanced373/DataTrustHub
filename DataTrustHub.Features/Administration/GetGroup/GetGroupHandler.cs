@@ -1,13 +1,13 @@
+using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.SharedKernel;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace DataTrustHub.Features.Administration.GetGroup;
 
-public record GetGroupQuery(Guid GroupId) : IRequest<Result<GetGroupResponse>>;
+public record GetGroupQuery(Guid GroupId);
 
-public class GetGroupHandler(DContext db) : IRequestHandler<GetGroupQuery, Result<GetGroupResponse>>
+public class GetGroupHandler(DContext db) : IQueryHandler<GetGroupQuery, Result<GetGroupResponse>>
 {
     private readonly DContext _db = db;
 

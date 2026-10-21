@@ -1,13 +1,13 @@
+using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.SharedKernel;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace DataTrustHub.Features.Administration.DeleteAccount;
 
-public record DeleteAccountCommand(Guid AccountId, Guid RequesterId) : IRequest<Result<Guid>>;
+public record DeleteAccountCommand(Guid AccountId, Guid RequesterId);
 
-public class DeleteAccountHandler(DContext db) : IRequestHandler<DeleteAccountCommand, Result<Guid>>
+public class DeleteAccountHandler(DContext db) : ICommandHandler<DeleteAccountCommand, Result<Guid>>
 {
     private readonly DContext _db = db;
 

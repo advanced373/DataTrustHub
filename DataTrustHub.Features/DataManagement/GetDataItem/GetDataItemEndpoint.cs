@@ -9,7 +9,15 @@ using System.Security.Claims;
 
 namespace DataTrustHub.Features.DataManagement.GetDataItem;
 
-public record GetDataItemResponse(Guid Id, string Name, long Size, string SecurityMarking, string? Content);
+public record GetDataItemResponse(
+    Guid Id,
+    string Name,
+    long Size,
+    string SecurityMarking,
+    string? Content,
+    int? ClassificationPriority,
+    string? PolicyName,
+    bool IsOwner);
 
 public class GetDataItemEndpoint : ICarterModule
 {

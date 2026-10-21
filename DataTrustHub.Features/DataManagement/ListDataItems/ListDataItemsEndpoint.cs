@@ -9,7 +9,17 @@ using System.Security.Claims;
 
 namespace DataTrustHub.Features.DataManagement.ListDataItems;
 
-public record DataItemSummary(Guid Id, string Name, long Size, string SecurityMarking);
+// Policy fields are null for a personal item; IsOwner tells the client whether it may delete the item
+public record DataItemSummary(
+    Guid Id,
+    string Name,
+    long Size,
+    string SecurityMarking,
+    int? ClassificationPriority,
+    Guid? PolicyId,
+    string? PolicyName,
+    string? OwnerEmail,
+    bool IsOwner);
 
 public class ListDataItemsEndpoint : ICarterModule
 {
@@ -23,10 +33,10 @@ public class ListDataItemsEndpoint : ICarterModule
         HttpContext httpContext,
         CancellationToken cancellationToken)
     {
-        var ownerId = ExtractUserId(httpContext.User);
-        if (ownerId is null) return Results.Unauthorized();
+        var requesterId = ExtractUserId(httpContext.User);
+        if (requesterId is null) return Results.Unauthorized();
 
-        var result = await sender.Send(new ListDataItemsQuery(ownerId.Value), cancellationToken);
+        var result = await sender.Send(new ListDataItemsQuery(requesterId.Value), cancellationToken);
         return result.ToHttpResult(Results.Ok);
     }
 

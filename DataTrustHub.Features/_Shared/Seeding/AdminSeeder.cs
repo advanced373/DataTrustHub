@@ -1,8 +1,5 @@
+using DataTrustHub.Domain.Abstractions;
 using DataTrustHub.Domain.Users;
-using DataTrustHub.Infrastructure.Persistance;
-using DataTrustHub.Infrastructure.Persistance.Model;
-using DataTrustHub.SharedKernel;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -32,36 +29,38 @@ public sealed class AdminSeeder(
             return;
         }
 
+        // Hosted services are singletons, so the scoped repository and unit of work need their own scope
         using var scope = scopeFactory.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<DContext>();
-        var user = await db.Users.FirstOrDefaultAsync(u => u.Email == _options.Email, cancellationToken);
+        var users = scope.ServiceProvider.GetRequiredService<IUserRepository>();
+        var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+        var user = await users.GetByEmailAsync(_options.Email!, cancellationToken);
 
-        if (user is null) await CreateAdminAsync(db, cancellationToken);
-        else PromoteToAdmin(user);
+        var changed = user is null
+            ? CreateAdmin(users)
+            : await PromoteToAdminAsync(users, user, cancellationToken);
 
-        await db.SaveChangesAsync(cancellationToken);
+        if (changed)
+            await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-    private async Task CreateAdminAsync(DContext db, CancellationToken cancellationToken)
+    private bool CreateAdmin(IUserRepository users)
     {
-        var admin = new DbUser
-        {
-            Id = Guid.NewGuid(),
-            Email = _options.Email!,
-            HashedPassword = hasher.HashPassword(_options.Password!),
-            Role = UserRoles.Admin
-        };
-        await db.Users.AddAsync(admin, cancellationToken);
+        var admin = User.CreateAdmin(_options.Email!, hasher.HashPassword(_options.Password!));
+        users.Add(admin);
         logger.LogInformation(CreatedLog, admin.Email);
+        return true;
     }
 
-    private void PromoteToAdmin(DbUser user)
+    // Returns false when the user already was an admin, so there is nothing to save
+    private async Task<bool> PromoteToAdminAsync(
+        IUserRepository users, User user, CancellationToken cancellationToken)
     {
-        if (user.Role == UserRoles.Admin) return;
+        if (!user.PromoteToAdmin()) return false;
 
-        user.Role = UserRoles.Admin;
+        await users.UpdateAsync(user, cancellationToken);
         logger.LogInformation(PromotedLog, user.Email);
+        return true;
     }
 }

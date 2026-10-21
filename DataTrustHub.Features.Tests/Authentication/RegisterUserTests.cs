@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
+using DataTrustHub.Features.Tests.Administration.Helpers;
+using DataTrustHub.Features.Tests.Authentication.Helpers;
 using DataTrustHub.Features.Tests.Helpers;
 using Xunit;
 
@@ -32,7 +34,8 @@ public class RegisterUserTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
         var response = await _client.PostAsJsonAsync(RegisterEndpoint, body);
 
-        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        await ErrorAssert.HasErrorAsync(
+            response, HttpStatusCode.Conflict, AuthErrorCodes.EmailAlreadyInUse, AuthErrorMessages.EmailAlreadyInUse);
     }
 
     [Fact]

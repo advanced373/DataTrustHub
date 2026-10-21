@@ -131,10 +131,14 @@ internal sealed class FakeUserRepository : IUserRepository
     internal List<User> Stored { get; } = [];
     internal List<User> Added { get; } = [];
     internal List<User> Removed { get; } = [];
+    internal List<User> Updated { get; } = [];
 
-    internal User Seed(string email)
+    internal User Seed(string email) => Store(User.Register(email, FakePasswordHasher.HashPrefix + email));
+
+    internal User SeedAdmin(string email) => Store(User.CreateAdmin(email, FakePasswordHasher.HashPrefix + email));
+
+    private User Store(User user)
     {
-        var user = User.Register(email, FakePasswordHasher.HashPrefix + email);
         Stored.Add(user);
         return user;
     }
@@ -153,8 +157,11 @@ internal sealed class FakeUserRepository : IUserRepository
 
     public void Add(User user) => Added.Add(user);
 
-    public Task UpdateAsync(User user, CancellationToken cancellationToken) =>
-        throw new NotSupportedException();
+    public Task UpdateAsync(User user, CancellationToken cancellationToken)
+    {
+        Updated.Add(user);
+        return Task.CompletedTask;
+    }
 
     public Task RemoveAsync(User user, CancellationToken cancellationToken)
     {

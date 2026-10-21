@@ -1,38 +1,34 @@
+using DataTrustHub.Domain.Users;
 using DataTrustHub.Features._Shared.Jwt;
 using DataTrustHub.Features._Shared.Messaging;
-using DataTrustHub.Infrastructure.Persistance;
-using DataTrustHub.Infrastructure.Persistance.Model;
 using DataTrustHub.SharedKernel;
-using Microsoft.EntityFrameworkCore;
 
 namespace DataTrustHub.Features.Authentication.LoginUser;
 
 public record LoginUserCommand(string Email, string Password);
 
+// Reads only, so it does not commit
 public class LoginUserHandler(
-    DContext db,
-    DataTrustHub.Domain.Users.IPasswordHasher hasher,
+    IUserRepository users,
+    IPasswordHasher hasher,
     IJwtTokenGenerator jwtGenerator)
     : ICommandHandler<LoginUserCommand, Result<string>>
 {
-    private readonly DContext _db = db;
-    private readonly DataTrustHub.Domain.Users.IPasswordHasher _hasher = hasher;
+    private readonly IUserRepository _users = users;
+    private readonly IPasswordHasher _hasher = hasher;
     private readonly IJwtTokenGenerator _jwtGenerator = jwtGenerator;
 
     public async Task<Result<string>> Handle(
         LoginUserCommand command,
         CancellationToken cancellationToken)
     {
-        var dbUser = await FindUserByEmail(command.Email, cancellationToken);
-        if (dbUser is null) return Result.Failure<string>(Errors.InvalidCredentials);
+        var user = await _users.GetByEmailAsync(command.Email, cancellationToken);
+        if (user is null) return Result.Failure<string>(Errors.InvalidCredentials);
 
-        if (!_hasher.VerifyHashedPassword(dbUser.HashedPassword, command.Password))
+        if (!_hasher.VerifyHashedPassword(user.HashedPassword, command.Password))
             return Result.Failure<string>(Errors.InvalidCredentials);
 
-        var token = _jwtGenerator.Generate(dbUser.Id, dbUser.Email, dbUser.Role);
+        var token = _jwtGenerator.Generate(user.Id, user.Email, user.Role);
         return Result.Success(token);
     }
-
-    private Task<DbUser?> FindUserByEmail(string email, CancellationToken ct) =>
-        _db.Users.FirstOrDefaultAsync(u => u.Email == email, ct);
 }

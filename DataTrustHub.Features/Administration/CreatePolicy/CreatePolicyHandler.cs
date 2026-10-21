@@ -1,50 +1,37 @@
+using DataTrustHub.Domain.Abstractions;
+using DataTrustHub.Domain.Organizations;
+using DataTrustHub.Domain.Policies;
 using DataTrustHub.Features._Shared.Messaging;
-using DataTrustHub.Infrastructure.Persistance;
-using DataTrustHub.Infrastructure.Persistance.Model;
 using DataTrustHub.SharedKernel;
-using Microsoft.EntityFrameworkCore;
 
 namespace DataTrustHub.Features.Administration.CreatePolicy;
 
 public record CreatePolicyCommand(string Name, Guid OrganizationId);
 
-public class CreatePolicyHandler(DContext db)
+public class CreatePolicyHandler(
+    IOrganizationRepository organizations,
+    IPolicyRepository policies,
+    IUnitOfWork unitOfWork)
     : ICommandHandler<CreatePolicyCommand, Result<Guid>>
 {
-    private readonly DContext _db = db;
+    private readonly IOrganizationRepository _organizations = organizations;
+    private readonly IPolicyRepository _policies = policies;
+    private readonly IUnitOfWork _unitOfWork = unitOfWork;
 
     public async Task<Result<Guid>> Handle(
         CreatePolicyCommand command,
         CancellationToken cancellationToken)
     {
-        var organizationExists = await CheckOrganizationExists(command.OrganizationId, cancellationToken);
+        var organizationExists = await _organizations.ExistsAsync(command.OrganizationId, cancellationToken);
         if (!organizationExists) return Result.Failure<Guid>(Errors.OrganizationNotFound);
 
-        var nameExists = await CheckPolicyNameExists(command.Name, command.OrganizationId, cancellationToken);
+        var nameExists = await _policies.NameExistsInOrganizationAsync(
+            command.Name, command.OrganizationId, cancellationToken);
         if (nameExists) return Result.Failure<Guid>(Errors.PolicyNameAlreadyInUse);
 
-        var policyId = Guid.NewGuid();
-        await PersistPolicy(policyId, command.Name, command.OrganizationId, cancellationToken);
-        return Result.Success(policyId);
-    }
-
-    private Task<bool> CheckOrganizationExists(Guid organizationId, CancellationToken ct) =>
-        _db.Organizations.AnyAsync(o => o.Id == organizationId, ct);
-
-    private Task<bool> CheckPolicyNameExists(string name, Guid organizationId, CancellationToken ct) =>
-        _db.Policies.AnyAsync(p => p.Name == name && p.OrganizationId == organizationId, ct);
-
-    private async Task PersistPolicy(
-        Guid policyId, string name, Guid organizationId, CancellationToken ct)
-    {
-        var dbPolicy = new DbPolicy
-        {
-            Id = policyId,
-            Name = name,
-            OrganizationId = organizationId,
-            ClassificationLevels = []
-        };
-        await _db.Policies.AddAsync(dbPolicy, ct);
-        await _db.SaveChangesAsync(ct);
+        var policy = Policy.Create(command.Name, command.OrganizationId);
+        _policies.Add(policy);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        return Result.Success(policy.Id);
     }
 }

@@ -28,7 +28,7 @@ public class CreatePolicyTests(AdminApiFactory factory) : IClassFixture<AdminApi
     }
 
     [Fact]
-    public async Task CreatePolicy_WithDuplicateNameInSameOrg_Returns409()
+    public async Task CreatePolicy_WithDuplicateNameInSameOrg_Returns409WithCode()
     {
         var groupId = await CreateGroupAndGetId("PolicyOrg2");
         var body = new { Name = "Duplicate Policy", OrganizationId = groupId };
@@ -36,7 +36,8 @@ public class CreatePolicyTests(AdminApiFactory factory) : IClassFixture<AdminApi
 
         var response = await _client.PostAsJsonAsync(CreatePolicyEndpoint, body);
 
-        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        await ErrorAssert.HasErrorAsync(response, HttpStatusCode.Conflict,
+            AdminErrorCodes.PolicyNameAlreadyInUse, AdminErrorMessages.PolicyNameAlreadyInUse);
     }
 
     [Fact]
@@ -50,13 +51,14 @@ public class CreatePolicyTests(AdminApiFactory factory) : IClassFixture<AdminApi
     }
 
     [Fact]
-    public async Task CreatePolicy_WithNonExistentOrganization_Returns404()
+    public async Task CreatePolicy_WithNonExistentOrganization_Returns404WithCode()
     {
         var response = await _client.PostAsJsonAsync(
             CreatePolicyEndpoint,
             new { Name = "Some Policy", OrganizationId = Guid.NewGuid() });
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        await ErrorAssert.HasErrorAsync(response, HttpStatusCode.NotFound,
+            AdminErrorCodes.PolicyOrganizationNotFound, AdminErrorMessages.PolicyOrganizationNotFound);
     }
 
     private async Task<Guid> CreateGroupAndGetId(string name)

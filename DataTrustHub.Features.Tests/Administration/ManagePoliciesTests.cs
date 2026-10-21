@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using DataTrustHub.Features.Tests.Administration.Helpers;
 using DataTrustHub.Features.Tests.Helpers;
 using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.Infrastructure.Persistance.Model;
@@ -60,7 +61,7 @@ public class ManagePoliciesTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
-    public async Task DeletePolicy_WithClearances_Returns409()
+    public async Task DeletePolicy_WithClearances_Returns409WithCode()
     {
         var admin = await CreateAdminAsync("policies_conflict_admin@example.com");
         var groupId = await CreateGroupAsync(admin, "Policies conflict group");
@@ -69,7 +70,19 @@ public class ManagePoliciesTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
         var response = await admin.DeleteAsync($"{PoliciesEndpoint}/{policyId}");
 
-        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        await ErrorAssert.HasErrorAsync(response, HttpStatusCode.Conflict,
+            AdminErrorCodes.PolicyHasClearances, AdminErrorMessages.PolicyHasClearances);
+    }
+
+    [Fact]
+    public async Task DeletePolicy_Missing_Returns404WithCode()
+    {
+        var admin = await CreateAdminAsync("policies_delete_missing@example.com");
+
+        var response = await admin.DeleteAsync($"{PoliciesEndpoint}/{Guid.NewGuid()}");
+
+        await ErrorAssert.HasErrorAsync(response, HttpStatusCode.NotFound,
+            AdminErrorCodes.PolicyNotFound, AdminErrorMessages.PolicyNotFound);
     }
 
     [Fact]

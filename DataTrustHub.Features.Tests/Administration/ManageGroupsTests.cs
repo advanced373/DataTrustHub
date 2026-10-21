@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using DataTrustHub.Features.Tests.Administration.Helpers;
 using DataTrustHub.Features.Tests.Helpers;
 using DataTrustHub.SharedKernel;
 using Xunit;
@@ -47,7 +48,7 @@ public class ManageGroupsTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
-    public async Task DeleteGroup_WithPolicies_Returns409()
+    public async Task DeleteGroup_WithPolicies_Returns409WithCode()
     {
         var admin = await CreateAdminAsync("groups_conflict_admin@example.com");
         var groupId = await CreateGroupAsync(admin, "Group with policy");
@@ -55,17 +56,19 @@ public class ManageGroupsTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
         var response = await admin.DeleteAsync($"{GroupsEndpoint}/{groupId}");
 
-        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        await ErrorAssert.HasErrorAsync(response, HttpStatusCode.Conflict,
+            AdminErrorCodes.GroupHasPolicies, AdminErrorMessages.GroupHasPolicies);
     }
 
     [Fact]
-    public async Task DeleteGroup_Missing_Returns404()
+    public async Task DeleteGroup_Missing_Returns404WithCode()
     {
         var admin = await CreateAdminAsync("groups_delete_missing@example.com");
 
         var response = await admin.DeleteAsync($"{GroupsEndpoint}/{Guid.NewGuid()}");
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        await ErrorAssert.HasErrorAsync(response, HttpStatusCode.NotFound,
+            AdminErrorCodes.GroupNotFound, AdminErrorMessages.GroupNotFound);
     }
 
     [Fact]

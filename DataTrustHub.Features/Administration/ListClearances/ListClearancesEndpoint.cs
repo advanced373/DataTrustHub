@@ -1,7 +1,7 @@
 using Carter;
 using DataTrustHub.Features._Shared.Extensions;
+using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.SharedKernel;
-using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -27,10 +27,10 @@ public class ListClearancesEndpoint : ICarterModule
     private static async Task<IResult> Handle(
         Guid? userId,
         Guid? policyId,
-        ISender sender,
+        IQueryHandler<ListClearancesQuery, Result<IReadOnlyList<ClearanceSummary>>> handler,
         CancellationToken cancellationToken)
     {
-        var result = await sender.Send(new ListClearancesQuery(userId, policyId), cancellationToken);
+        var result = await handler.Handle(new ListClearancesQuery(userId, policyId), cancellationToken);
         return result.ToHttpResult(Results.Ok);
     }
 }

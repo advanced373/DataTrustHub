@@ -1,19 +1,19 @@
 using DataTrustHub.Features._Shared.Jwt;
+using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.Infrastructure.Persistance.Model;
 using DataTrustHub.SharedKernel;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace DataTrustHub.Features.Authentication.LoginUser;
 
-public record LoginUserCommand(string Email, string Password) : IRequest<Result<string>>;
+public record LoginUserCommand(string Email, string Password);
 
 public class LoginUserHandler(
     DContext db,
     DataTrustHub.Domain.User.IPasswordHasher hasher,
     IJwtTokenGenerator jwtGenerator)
-    : IRequestHandler<LoginUserCommand, Result<string>>
+    : ICommandHandler<LoginUserCommand, Result<string>>
 {
     private readonly DContext _db = db;
     private readonly DataTrustHub.Domain.User.IPasswordHasher _hasher = hasher;

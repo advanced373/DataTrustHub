@@ -1,13 +1,13 @@
+using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.SharedKernel;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace DataTrustHub.Features.Administration.DeletePolicy;
 
-public record DeletePolicyCommand(Guid PolicyId) : IRequest<Result<Guid>>;
+public record DeletePolicyCommand(Guid PolicyId);
 
-public class DeletePolicyHandler(DContext db) : IRequestHandler<DeletePolicyCommand, Result<Guid>>
+public class DeletePolicyHandler(DContext db) : ICommandHandler<DeletePolicyCommand, Result<Guid>>
 {
     private readonly DContext _db = db;
 

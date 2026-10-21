@@ -1,15 +1,15 @@
+using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.Infrastructure.Persistance.Model;
 using DataTrustHub.SharedKernel;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace DataTrustHub.Features.Authentication.RegisterUser;
 
-public record RegisterUserCommand(string Email, string Password) : IRequest<Result<Guid>>;
+public record RegisterUserCommand(string Email, string Password);
 
 public class RegisterUserHandler(DContext db, DataTrustHub.Domain.User.IPasswordHasher hasher)
-    : IRequestHandler<RegisterUserCommand, Result<Guid>>
+    : ICommandHandler<RegisterUserCommand, Result<Guid>>
 {
     private readonly DContext _db = db;
     private readonly DataTrustHub.Domain.User.IPasswordHasher _hasher = hasher;

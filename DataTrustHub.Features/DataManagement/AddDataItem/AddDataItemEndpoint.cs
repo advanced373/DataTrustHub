@@ -1,6 +1,7 @@
 using Carter;
 using DataTrustHub.Features._Shared.Extensions;
-using MediatR;
+using DataTrustHub.Features._Shared.Messaging;
+using DataTrustHub.SharedKernel;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -27,7 +28,7 @@ public class AddDataItemEndpoint : ICarterModule
         IFormFile? file,
         [FromForm] Guid? policyId,
         [FromForm] int? levelPriority,
-        ISender sender,
+        ICommandHandler<AddDataItemCommand, Result<Guid>> handler,
         HttpContext httpContext,
         CancellationToken cancellationToken)
     {
@@ -35,7 +36,7 @@ public class AddDataItemEndpoint : ICarterModule
         if (userIdResult is null) return Results.Unauthorized();
 
         var command = new AddDataItemCommand(file, userIdResult.Value, policyId, levelPriority);
-        var result = await sender.Send(command, cancellationToken);
+        var result = await handler.Handle(command, cancellationToken);
         return result.ToHttpResult(id => Results.Ok(new AddDataItemResponse(id)));
     }
 

@@ -1,6 +1,7 @@
 using Carter;
 using DataTrustHub.Features._Shared.Extensions;
-using MediatR;
+using DataTrustHub.Features._Shared.Messaging;
+using DataTrustHub.SharedKernel;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -29,14 +30,14 @@ public class ListDataItemsEndpoint : ICarterModule
            .RequireAuthorization();
 
     private static async Task<IResult> Handle(
-        ISender sender,
+        IQueryHandler<ListDataItemsQuery, Result<IReadOnlyList<DataItemSummary>>> handler,
         HttpContext httpContext,
         CancellationToken cancellationToken)
     {
         var requesterId = ExtractUserId(httpContext.User);
         if (requesterId is null) return Results.Unauthorized();
 
-        var result = await sender.Send(new ListDataItemsQuery(requesterId.Value), cancellationToken);
+        var result = await handler.Handle(new ListDataItemsQuery(requesterId.Value), cancellationToken);
         return result.ToHttpResult(Results.Ok);
     }
 

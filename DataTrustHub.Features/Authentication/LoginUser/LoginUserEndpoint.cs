@@ -1,6 +1,6 @@
 using Carter;
+using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.SharedKernel;
-using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -19,11 +19,11 @@ public class LoginUserEndpoint : ICarterModule
 
     private static async Task<IResult> Handle(
         LoginUserRequest request,
-        ISender sender,
+        ICommandHandler<LoginUserCommand, Result<string>> handler,
         CancellationToken cancellationToken)
     {
         var command = new LoginUserCommand(request.Email, request.Password);
-        var result = await sender.Send(command, cancellationToken);
+        var result = await handler.Handle(command, cancellationToken);
 
         if (result.IsSuccess) return Results.Ok(new LoginUserResponse(result.Value));
 

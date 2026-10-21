@@ -1,13 +1,13 @@
+using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.SharedKernel;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace DataTrustHub.Features.DataManagement.GetDataItem;
 
-public record GetDataItemQuery(Guid DataItemId, Guid RequesterId) : IRequest<Result<GetDataItemResponse>>;
+public record GetDataItemQuery(Guid DataItemId, Guid RequesterId);
 
-public class GetDataItemHandler(DContext db) : IRequestHandler<GetDataItemQuery, Result<GetDataItemResponse>>
+public class GetDataItemHandler(DContext db) : IQueryHandler<GetDataItemQuery, Result<GetDataItemResponse>>
 {
     private readonly DContext _db = db;
 

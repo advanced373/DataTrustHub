@@ -10,8 +10,10 @@ DataItems are files classified by security level.
 
 - .NET 9, ASP.NET Core Minimal API
 - Carter (endpoint auto-discovery via ICarterModule)
-- MediatR 13 (CQRS within each slice)
-- FluentValidation 12 (validated via ValidationPipelineBehavior)
+- Own handler interfaces, no MediatR (ADR-0012): `ICommandHandler<TCommand, TResult>` for writes and
+  `IQueryHandler<TQuery, TResult>` for reads, in `Features/_Shared/Messaging`; endpoints inject the handler
+  they call. Scrutor registers the handlers and wraps them in decorators (validation; later auditing)
+- FluentValidation 12 (validated by the validation decorators before the handler runs)
 - Entity Framework Core 9 with SQL Server
 - DataTrustHub.SharedKernel: Result<T>, Error, ErrorType, Entity base classes
 
@@ -32,7 +34,7 @@ DataTrustHub.Features/
 Each use case folder contains:
 - `Constants.cs`       — route string, tag, validation thresholds, error definitions
 - `*Endpoint.cs`       — ICarterModule: request/response records + HTTP handler
-- `*Handler.cs`        — IRequestHandler: business logic only
+- `*Handler.cs`        — ICommandHandler or IQueryHandler: business logic only
 - `*Validator.cs`      — AbstractValidator: input rules
 
 ## Rule 1 — Strict isolation

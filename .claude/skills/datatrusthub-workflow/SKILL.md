@@ -8,6 +8,10 @@ description: Use for any DataTrustHub work that touches git or GitHub: starting 
 Repo: `advanced373/DataTrustHub` (public). PRs target `develop`, not `main`.
 If `gh` is not on PATH, use `"/c/Program Files/GitHub CLI/gh.exe"`.
 
+Every code change is built by three agents (implementer, tester, reviewer), orchestrated by the
+main session. See the `three-agent-dev` skill and ADR-0013. This skill covers what happens around
+them: issues, PR size, ADRs and the board.
+
 ## 1. Small PRs
 
 - Keep each PR to roughly 100–350 changed lines, not counting generated EF migration `*.Designer.cs` files.

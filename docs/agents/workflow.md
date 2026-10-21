@@ -1,5 +1,10 @@
 # Multi-Agent Workflow
 
+> **Current process (ADR-0013):** every development task is carried out by three agents: an
+> implementer, a tester and a reviewer, orchestrated by the main Claude Code session. See
+> `.claude/skills/three-agent-dev/SKILL.md` and the agent definitions in `.claude/agents/`. The
+> worktree-per-issue setup below still applies: the three agents share one worktree per task.
+
 ## Principle
 
 One Claude Code agent = One GitHub issue = One git worktree = One feature folder.

@@ -138,7 +138,7 @@ The standard levels are `ClassificationLevel.Standard`, used for data items:
 
 | # | Invariant / rule | Enforced in |
 |---|---|---|
-| D1 | A data item is either personal (no policy, no level) or classified (policy and level together) | Entity: the two factory methods |
+| D1 | A data item is either personal (no policy, no level) or classified (policy and a standard level together). A partial or unknown classification is rejected, never downgraded to personal | Entity: the two factory methods. Use case: `AddDataItem` (`DataItem.IncompleteClassification`, `DataItem.UnknownClassificationLevel`), and Validator |
 | D2 | An owner may classify only under a policy they hold a clearance on, and at most at that clearance's level | Entity: `CreateClassified` → `DataItem.NotCleared` (400) |
 | D3 | **Read rule:** readable by its owner, or by a holder of a clearance on its policy at or above its level. A deleted item is readable by no one | Entity: `IsReadableBy`. Its SQL form is `DataAccess.VisibleTo`, used by list and download |
 | D4 | **Need-to-know:** admins have no bypass. An unreadable item answers 404 (`DataItem.NotFound`), so its existence is not revealed | Entity (D3) and use cases `GetDataItem`, `ListDataItems` |
@@ -154,8 +154,6 @@ These are findings, not decisions. Each one needs an issue before it changes.
   planned in ADR-0012 step 4 (#74).
 - **Clearance levels are free-form** (C4): any name, and any priority from 0 upwards. Data items,
   however, use only the standard levels. Should a clearance accept only `ClassificationLevel.Standard`?
-- **Partial classification on upload:** a policy without a level, or an unknown level, silently
-  creates a personal item (#84).
 - **Deleting a policy ignores its data items** (P3 checks clearances only). Classified items under a
   deleted policy become readable by their owner only.
 - **Two error codes for one rule** (U1): `User.EmailAlreadyInUse` on register and

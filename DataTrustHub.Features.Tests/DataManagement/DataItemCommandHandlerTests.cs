@@ -4,6 +4,7 @@ using DataTrustHub.Domain.DataItems;
 using DataTrustHub.Domain.Users;
 using DataTrustHub.Features.DataManagement.AddDataItem;
 using DataTrustHub.Features.DataManagement.DeleteDataItem;
+using DataTrustHub.SharedKernel;
 using Microsoft.AspNetCore.Http;
 using Xunit;
 
@@ -17,6 +18,12 @@ public class DataItemCommandHandlerTests
     private const string FormFieldName = "file";
     private const int Confidential = 2;
     private const int Secret = 3;
+    private const int NonStandardPriority = 9;
+    private const int NegativePriority = -1;
+    private const string IncompleteClassificationCode = "DataItem.IncompleteClassification";
+    private const string IncompleteClassificationMessage = "A classified item needs both a policy and a classification level.";
+    private const string UnknownClassificationLevelCode = "DataItem.UnknownClassificationLevel";
+    private const string UnknownClassificationLevelMessage = "Unknown classification level.";
     private static readonly byte[] FileBytes = "hello world"u8.ToArray();
 
     private readonly Guid _ownerId = Guid.NewGuid();
@@ -68,6 +75,102 @@ public class DataItemCommandHandlerTests
     }
 
     [Fact]
+    public async Task AddDataItem_NoPolicyAndNoLevel_AddsPersonalItem()
+    {
+        _users.ExistingIds.Add(_ownerId);
+
+        var command = new AddDataItemCommand(CreateFile(), _ownerId, null, null);
+        var result = await CreateAddHandler().Handle(command, default);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(_dataItems.Added);
+        Assert.Equal((false, (Guid?)null, (int?)null, DataItem.PersonalMarking),
+            (item.IsClassified, item.PolicyId, item.ClassificationPriority, item.SecurityMarking));
+        Assert.Equal(1, _unitOfWork.SaveCount);
+    }
+
+    [Fact]
+    public async Task AddDataItem_PolicyWithoutLevel_FailsWithIncompleteClassificationAndCommitsNothing()
+    {
+        _users.ExistingIds.Add(_ownerId);
+        GrantOwner(Secret);
+
+        var command = new AddDataItemCommand(CreateFile(), _ownerId, _policyId, null);
+        var result = await CreateAddHandler().Handle(command, default);
+
+        AssertError(result, IncompleteClassificationCode, IncompleteClassificationMessage);
+        Assert.Equal(DataItemErrors.IncompleteClassification, result.Error);
+        AssertNothingStaged();
+    }
+
+    [Fact]
+    public async Task AddDataItem_LevelWithoutPolicy_FailsWithIncompleteClassificationAndCommitsNothing()
+    {
+        _users.ExistingIds.Add(_ownerId);
+        GrantOwner(Secret);
+
+        var command = new AddDataItemCommand(CreateFile(), _ownerId, null, Confidential);
+        var result = await CreateAddHandler().Handle(command, default);
+
+        AssertError(result, IncompleteClassificationCode, IncompleteClassificationMessage);
+        Assert.Equal(DataItemErrors.IncompleteClassification, result.Error);
+        AssertNothingStaged();
+    }
+
+    [Fact]
+    public async Task AddDataItem_NonStandardLevel_FailsWithUnknownClassificationLevelAndCommitsNothing()
+    {
+        _users.ExistingIds.Add(_ownerId);
+        GrantOwner(Secret);
+
+        var command = new AddDataItemCommand(CreateFile(), _ownerId, _policyId, NonStandardPriority);
+        var result = await CreateAddHandler().Handle(command, default);
+
+        AssertError(result, UnknownClassificationLevelCode, UnknownClassificationLevelMessage);
+        Assert.Equal(DataItemErrors.UnknownClassificationLevel, result.Error);
+        AssertNothingStaged();
+    }
+
+    [Fact]
+    public async Task AddDataItem_NegativeLevel_FailsWithUnknownClassificationLevelAndCommitsNothing()
+    {
+        _users.ExistingIds.Add(_ownerId);
+        GrantOwner(Secret);
+
+        var command = new AddDataItemCommand(CreateFile(), _ownerId, _policyId, NegativePriority);
+        var result = await CreateAddHandler().Handle(command, default);
+
+        Assert.Equal(DataItemErrors.UnknownClassificationLevel, result.Error);
+        AssertNothingStaged();
+    }
+
+    [Fact]
+    public async Task AddDataItem_ClassifiedWithinClearance_StoresPolicyAndLevel()
+    {
+        _users.ExistingIds.Add(_ownerId);
+        GrantOwner(Secret);
+
+        var command = new AddDataItemCommand(CreateFile(), _ownerId, _policyId, Secret);
+        var result = await CreateAddHandler().Handle(command, default);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(_dataItems.Added);
+        Assert.Equal((true, (Guid?)_policyId, (int?)Secret), (item.IsClassified, item.PolicyId, item.ClassificationPriority));
+    }
+
+    [Fact]
+    public async Task AddDataItem_ClassifiedWithoutAnyClearance_FailsWithNotClearedAndCommitsNothing()
+    {
+        _users.ExistingIds.Add(_ownerId);
+
+        var command = new AddDataItemCommand(CreateFile(), _ownerId, _policyId, Confidential);
+        var result = await CreateAddHandler().Handle(command, default);
+
+        Assert.Equal(DataItemErrors.NotCleared, result.Error);
+        AssertNothingStaged();
+    }
+
+    [Fact]
     public async Task AddDataItem_UnknownOwner_FailsAndCommitsNothing()
     {
         var result = await CreateAddHandler().Handle(new AddDataItemCommand(CreateFile(), _ownerId), default);
@@ -113,6 +216,22 @@ public class DataItemCommandHandlerTests
     }
 
     // --- helpers ---
+
+    private void GrantOwner(int priority) =>
+        _clearances.Clearances.Add(Clearance.Grant("c", _ownerId, _policyId, ClassificationLevel.FindStandard(priority)!));
+
+    private void AssertNothingStaged()
+    {
+        Assert.Empty(_dataItems.Added);
+        Assert.Equal(0, _unitOfWork.SaveCount);
+    }
+
+    private static void AssertError<T>(Result<T> result, string expectedCode, string expectedMessage)
+    {
+        Assert.True(result.IsFailure);
+        Assert.Equal((expectedCode, expectedMessage, ErrorType.Validation),
+            (result.Error.Code, result.Error.Description, result.Error.Type));
+    }
 
     private AddDataItemHandler CreateAddHandler() => new(_users, _clearances, _dataItems, _unitOfWork);
 

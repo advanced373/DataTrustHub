@@ -44,16 +44,22 @@ public class AddDataItemHandler(
         return Result.Success(created.Value.Id);
     }
 
-    // A personal item when no classification is given; otherwise the owner's clearances decide
+    // A personal item when no classification is given; a partial or unknown one is rejected;
+    // otherwise the owner's clearances decide
     private async Task<Result<DataItem>> CreateDataItem(
         AddDataItemCommand command,
         IFormFile file,
         string content,
         CancellationToken ct)
     {
-        var level = command.LevelPriority is int priority ? ClassificationLevel.FindStandard(priority) : null;
-        if (level is null || command.PolicyId is not Guid policyId)
+        if (command.PolicyId is null && command.LevelPriority is null)
             return Result.Success(DataItem.CreatePersonal(file.FileName, file.Length, content, command.OwnerUserId));
+
+        if (command.PolicyId is not Guid policyId || command.LevelPriority is not int priority)
+            return Result.Failure<DataItem>(DataItemErrors.IncompleteClassification);
+
+        var level = ClassificationLevel.FindStandard(priority);
+        if (level is null) return Result.Failure<DataItem>(DataItemErrors.UnknownClassificationLevel);
 
         var ownerClearances = await _clearances.ListForUserAsync(command.OwnerUserId, ct);
         return DataItem.CreateClassified(

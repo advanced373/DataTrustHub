@@ -21,6 +21,9 @@ public class ClassifiedUploadTests(ApiFactory factory) : IClassFixture<ApiFactor
     private const string NotClearedCode = "DataItem.NotCleared";
     private const string NotClearedMessage =
         "You can classify data only under a policy you hold a clearance on, and at most at your clearance level.";
+    private const int NonStandardPriority = 9;
+    private const string ValidationCode = "Validation.General";
+    private const string ValidationMessage = "One or more validation errors occurred";
     private const string LevelsProperty = "levels";
     private const string PoliciesProperty = "policies";
     private const string NameProperty = "name";
@@ -97,14 +100,18 @@ public class ClassifiedUploadTests(ApiFactory factory) : IClassFixture<ApiFactor
         Assert.Equal(StandardLevels, actual.ToArray());
     }
 
-    [Fact]
-    public async Task Upload_PolicyWithoutLevelOrUnknownLevel_Returns400()
+    [Theory]
+    [InlineData(true, null)]
+    [InlineData(false, Confidential)]
+    [InlineData(true, NonStandardPriority)]
+    public async Task Upload_PartialOrUnknownClassification_ValidatorAnswers400First(bool withPolicy, int? levelPriority)
     {
-        var (user, policyId) = await CreateClearedUserAsync("classified_partial", Secret);
+        var prefix = $"classified_validator_{withPolicy}_{levelPriority}";
+        var (user, policyId) = await CreateClearedUserAsync(prefix, Secret);
 
-        Assert.Equal(HttpStatusCode.BadRequest, (await UploadAsync(user, policyId, null)).StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, (await UploadAsync(user, null, Confidential)).StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, (await UploadAsync(user, policyId, 9)).StatusCode);
+        var response = await UploadAsync(user, withPolicy ? policyId : null, levelPriority);
+
+        await ErrorAssert.HasErrorAsync(response, HttpStatusCode.BadRequest, ValidationCode, ValidationMessage);
     }
 
     [Fact]

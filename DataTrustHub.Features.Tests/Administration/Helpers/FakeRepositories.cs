@@ -1,7 +1,9 @@
 using DataTrustHub.Domain.Abstractions;
 using DataTrustHub.Domain.Clearances;
+using DataTrustHub.Domain.DataItems;
 using DataTrustHub.Domain.Organizations;
 using DataTrustHub.Domain.Policies;
+using DataTrustHub.Domain.Users;
 
 namespace DataTrustHub.Features.Tests.Administration.Helpers;
 
@@ -84,26 +86,119 @@ internal sealed class FakePolicyRepository : IPolicyRepository
     }
 }
 
-// Only the policy check is used by the handlers under test; the rest is out of scope for these fakes
 internal sealed class FakeClearanceRepository : IClearanceRepository
 {
+    // Marks a policy as having clearances without seeding a full clearance (policy delete checks)
     internal HashSet<Guid> PoliciesWithClearances { get; } = [];
+    internal List<Clearance> Stored { get; } = [];
+    internal List<Clearance> Added { get; } = [];
+    internal List<Clearance> Removed { get; } = [];
+
+    internal Clearance Seed(Guid userId, Guid policyId)
+    {
+        var clearance = Clearance.Grant("Seeded clearance", userId, policyId, new ClassificationLevel("Secret", 2));
+        Stored.Add(clearance);
+        return clearance;
+    }
 
     public Task<bool> AnyForPolicyAsync(Guid policyId, CancellationToken cancellationToken) =>
-        Task.FromResult(PoliciesWithClearances.Contains(policyId));
+        Task.FromResult(PoliciesWithClearances.Contains(policyId) || Stored.Any(c => c.PolicyId == policyId));
 
     public Task<Clearance?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
-        throw new NotSupportedException();
+        Task.FromResult(Stored.SingleOrDefault(c => c.Id == id));
 
     public Task<IReadOnlyList<Clearance>> ListForUserAsync(Guid userId, CancellationToken cancellationToken) =>
-        throw new NotSupportedException();
+        Task.FromResult<IReadOnlyList<Clearance>>(Stored.Where(c => c.UserId == userId).ToList());
 
     public Task<bool> ExistsAsync(Guid userId, Guid policyId, CancellationToken cancellationToken) =>
+        Task.FromResult(Stored.Any(c => c.UserId == userId && c.PolicyId == policyId));
+
+    public Task AddAsync(Clearance clearance, CancellationToken cancellationToken)
+    {
+        Added.Add(clearance);
+        return Task.CompletedTask;
+    }
+
+    public Task RemoveAsync(Clearance clearance, CancellationToken cancellationToken)
+    {
+        Removed.Add(clearance);
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class FakeUserRepository : IUserRepository
+{
+    internal List<User> Stored { get; } = [];
+    internal List<User> Added { get; } = [];
+    internal List<User> Removed { get; } = [];
+
+    internal User Seed(string email)
+    {
+        var user = User.Register(email, FakePasswordHasher.HashPrefix + email);
+        Stored.Add(user);
+        return user;
+    }
+
+    public Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
+        Task.FromResult(Stored.SingleOrDefault(u => u.Id == id));
+
+    public Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken) =>
+        Task.FromResult(Stored.SingleOrDefault(u => u.Email == email));
+
+    public Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken) =>
+        Task.FromResult(Stored.Any(u => u.Id == id));
+
+    public Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken) =>
+        Task.FromResult(Stored.Any(u => u.Email == email));
+
+    public void Add(User user) => Added.Add(user);
+
+    public Task UpdateAsync(User user, CancellationToken cancellationToken) =>
         throw new NotSupportedException();
 
-    public Task AddAsync(Clearance clearance, CancellationToken cancellationToken) =>
-        throw new NotSupportedException();
+    public Task RemoveAsync(User user, CancellationToken cancellationToken)
+    {
+        Removed.Add(user);
+        return Task.CompletedTask;
+    }
+}
 
-    public Task RemoveAsync(Clearance clearance, CancellationToken cancellationToken) =>
-        throw new NotSupportedException();
+internal sealed class FakeDataItemRepository : IDataItemRepository
+{
+    internal List<DataItem> Stored { get; } = [];
+    internal List<DataItem> Updated { get; } = [];
+
+    internal DataItem Seed(Guid ownerUserId, bool isDeleted = false)
+    {
+        var item = DataItem.CreatePersonal("seeded.txt", 1, "AA==", ownerUserId);
+        if (isDeleted) item.MarkDeleted(ownerUserId);
+        Stored.Add(item);
+        return item;
+    }
+
+    public Task<DataItem?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
+        Task.FromResult(Stored.SingleOrDefault(d => d.Id == id));
+
+    public Task<IReadOnlyList<DataItem>> ListActiveOwnedByAsync(Guid ownerUserId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<DataItem>>(
+            Stored.Where(d => d.OwnerUserId == ownerUserId && !d.IsDeleted).ToList());
+
+    public void Add(DataItem dataItem) => throw new NotSupportedException();
+
+    public Task UpdateAsync(DataItem dataItem, CancellationToken cancellationToken)
+    {
+        Updated.Add(dataItem);
+        return Task.CompletedTask;
+    }
+}
+
+// A recognisable, reversible "hash" so tests can tell a hashed password from a plain one
+internal sealed class FakePasswordHasher : IPasswordHasher
+{
+    internal const string HashPrefix = "hashed:";
+
+    public string HashPassword(string password) => HashPrefix + password;
+
+    public bool VerifyHashedPassword(string hashedPassword, string providedPassword) =>
+        hashedPassword == HashPassword(providedPassword);
 }

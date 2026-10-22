@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using DataTrustHub.Features.Tests.Administration.Helpers;
 using DataTrustHub.Features.Tests.Helpers;
 using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.Infrastructure.Persistance.Model;
@@ -15,6 +16,7 @@ public class ManageAccountsTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
     private const string AccountsEndpoint = "/admin/accounts";
     private const string UploadEndpoint = "/data/upload";
+    private static readonly object NewAccountBody = new { Email = "accounts_forbidden_new@example.com", Password = "Password1!" };
 
     [Fact]
     public async Task ListAccounts_Admin_ReturnsAccountsWithoutPasswordHashes()
@@ -72,7 +74,11 @@ public class ManageAccountsTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
         var response = await admin.DeleteAsync($"{AccountsEndpoint}/{adminId}");
 
-        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        await ErrorAssert.HasErrorAsync(
+            response, HttpStatusCode.Conflict,
+            AdminErrorCodes.AccountCannotDeleteOwnAccount, AdminErrorMessages.AccountCannotDeleteOwnAccount);
+        using var scope = factory.Services.CreateScope();
+        Assert.True(await scope.ServiceProvider.GetRequiredService<DContext>().Users.AnyAsync(u => u.Id == adminId));
     }
 
     [Fact]
@@ -82,7 +88,8 @@ public class ManageAccountsTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
         var response = await admin.DeleteAsync($"{AccountsEndpoint}/{Guid.NewGuid()}");
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        await ErrorAssert.HasErrorAsync(
+            response, HttpStatusCode.NotFound, AdminErrorCodes.AccountNotFound, AdminErrorMessages.AccountNotFound);
     }
 
     [Fact]
@@ -94,6 +101,7 @@ public class ManageAccountsTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.Forbidden, (await user.GetAsync(AccountsEndpoint)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await user.GetAsync($"{AccountsEndpoint}/{someId}")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await user.DeleteAsync($"{AccountsEndpoint}/{someId}")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await user.PostAsJsonAsync(AccountsEndpoint, NewAccountBody)).StatusCode);
     }
 
     [Fact]
@@ -103,6 +111,7 @@ public class ManageAccountsTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync(AccountsEndpoint)).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.DeleteAsync($"{AccountsEndpoint}/{Guid.NewGuid()}")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.PostAsJsonAsync(AccountsEndpoint, NewAccountBody)).StatusCode);
     }
 
     // --- helpers ---

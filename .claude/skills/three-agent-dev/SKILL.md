@@ -23,6 +23,8 @@ Everyone uses the vocabulary in [`docs/domain/ubiquitous-language.md`](../../../
 the orchestrator, every agent, the specs, reports, PR bodies, issues, code names and comments. It holds
 the domain terms and the DDD / Clean Architecture building blocks (ADR-0012). Write specs in those
 terms. When an agent reports a missing term or a mismatch, add the term to that page in the same PR.
+A change to an entity, value object, invariant, domain error or bounded context also updates the
+rest of the [domain handbook](../../../docs/domain/README.md) in the same PR.
 
 ## 1. Orchestrator: prepare
 

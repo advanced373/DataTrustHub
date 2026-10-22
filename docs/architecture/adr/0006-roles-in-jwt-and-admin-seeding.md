@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-10-19
-- **Related:** #27, #39, #40
+- **Related:** #27, #39, #40; amended by [ADR-0014](0014-organizations-as-tenants-with-memberships.md)
 
 ## Context
 

@@ -59,7 +59,8 @@ it.
    any organization. Only the owner reads and deletes it, as today.
 9. **Leaving an organization** ends the membership and revokes the user's clearances on that
    organization's policies, in the same transaction. Clearances are **never granted
-   automatically**: every grant is a deliberate act of an organization admin.
+   automatically**: every grant is a deliberate act of an organization admin. That admin is
+   never the grantee: an organization admin cannot grant a clearance to themselves (C8).
 10. **Deleting an account:**
     - it ends all the user's memberships, and so revokes their clearances;
     - it soft-deletes the user's personal data;
@@ -75,6 +76,7 @@ it.
 | C5 | A clearance on a policy of organization X can be granted only to a member or guest of X | Use case: create clearance |
 | C6 | Only an organization admin of X grants or revokes clearances on X's policies, and creates or deletes X's policies | Use case + authorization |
 | C7 | Ending a membership in X revokes every clearance of that user on X's policies | Use case: leave / remove member / delete account |
+| C8 | An organization admin cannot grant a clearance to themselves (four-eyes) | Use case: create clearance |
 | D3′ | A classified item is readable only through a clearance. A personal item is readable only by its owner. A deleted item is readable by no one | Entity: `DataItem.IsReadableBy`, plus the SQL form |
 | D5′ | A classified item is deleted by its owner while a member of its organization, or by an admin of its organization. A personal item is deleted by its owner only | Entity: `DataItem.MarkDeleted` |
 
@@ -146,6 +148,11 @@ it.
 4. the read and delete rules, with the entity/SQL equivalence test;
 5. WebApp pages for members and organization admins.
 
-**Open question:** should an organization admin be allowed to grant a clearance **to
-themselves**? It would let them get around need-to-know. A "no self-grant" (four-eyes) rule is
-proposed and will be decided before step 3.
+**Decided on 2026-10-22: no self-grant (C8).** An organization admin cannot grant a clearance to
+themselves; another organization admin of the same organization must grant it. Otherwise one admin
+could give themselves access to every classified item of the organization and get around
+need-to-know. Consequences:
+- an organization with a single organization admin cannot give that admin a clearance until a
+  second organization admin is appointed;
+- revoking one's own clearance stays allowed, because it only removes access;
+- C8 is enforced in step 3 of #95, with the organization-scoped authorization.

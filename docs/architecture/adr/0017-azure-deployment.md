@@ -18,6 +18,10 @@ files.
    - two **Azure App Service** web apps on Linux, .NET 9: the API and the WebApp;
    - the WebApp calls the API over HTTPS (ADR-0005);
    - one **Azure SQL Database**.
+   - **code deploy, not containers:** CD publishes the `dotnet publish` output to App Service, whose
+     built-in .NET 9 Linux runtime Microsoft keeps patched. The repository has no Dockerfiles (they
+     were unused Visual Studio template files, removed in #106); they come back only with Container
+     Apps.
 2. **Secrets:** they live in **Azure Key Vault**. The SQL connection, the JWT signing key and the
    admin seed are all there.
    - The apps read Key Vault with a **managed identity**. They reach SQL with Microsoft Entra
@@ -43,7 +47,9 @@ files.
 - **AWS or a VPS with Docker.** Rejected: Azure fits .NET and SQL Server natively, and the user
   chose it.
 - **Containers (Azure Container Apps).** Postponed: App Service is simpler for two .NET apps. The
-  apps can move to containers later without code changes.
+  apps can move to containers later without code changes. Deploying containers to App Service
+  (Web App for Containers) was rejected too: it adds a container registry and leaves patching the
+  images to us, with no benefit for two plain .NET apps.
 - **Secrets in GitHub Actions secrets or App Service settings.** Rejected for the application
   secrets. Key Vault with managed identity keeps them out of CI and gives rotation and access
   control.

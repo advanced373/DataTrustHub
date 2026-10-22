@@ -30,3 +30,6 @@ Status values: `Proposed`, `Accepted`, `Superseded by ADR-NNNN`, `Deprecated`.
 | [0012](0012-clean-architecture-with-vertical-slices.md) | Clean Architecture with vertical slices, repositories for commands, and no MediatR | Accepted | 2026-10-21 |
 | [0013](0013-three-agent-development-process.md) | Three-agent development process: implementer, tester, reviewer | Accepted | 2026-10-21 |
 | [0014](0014-organizations-as-tenants-with-memberships.md) | Organizations as tenants, with memberships, organization admins and guests | Accepted | 2026-10-22 |
+| [0015](0015-sharing-data-items.md) | Sharing data items without breaking need-to-know | Accepted | 2026-10-22 |
+| [0016](0016-audit-trail-for-commands-and-data-access.md) | Audit trail for commands and data access | Accepted | 2026-10-22 |
+| [0017](0017-azure-deployment.md) | Deploy the MVP to Azure with GitHub Actions | Accepted | 2026-10-22 |

@@ -46,7 +46,9 @@ one succeeded:
 
 1. **Build:**
    - `dotnet publish` for the API and the WebApp;
-   - `dotnet ef migrations bundle` for linux-x64, which produces `efbundle`;
+   - `dotnet ef migrations bundle` for linux-x64, which produces `efbundle`. The bundle is
+     framework-dependent: a self-contained single-file bundle cannot discover the API's Carter
+     modules, and the runners have .NET 9;
    - `dotnet ef migrations script --idempotent`, kept for review.
 
    All three are built **once**, from the release commit, and the same artifacts are promoted to
@@ -64,8 +66,10 @@ one succeeded:
 
 - `dotnet ef migrations has-pending-model-changes` fails the build when the model has changes that
   no migration covers.
-- All migrations are applied, from an empty database, to SQL Server 2022 running as a service
-  container in the job. SQL Server containers need a Linux runner, which the CI already uses.
+- All migrations are applied, from an empty database, to SQL Server 2022 in a
+  container started by the job with `docker run`, not a `services:` block, so that the SA password
+  is generated at run time and never written in the repository. SQL Server containers need a Linux
+  runner, which the CI already uses.
 - The idempotent SQL script is uploaded as an artifact.
 - `dotnet-ef` is pinned to 9.0.x in a local tool manifest, `.config/dotnet-tools.json`.
 

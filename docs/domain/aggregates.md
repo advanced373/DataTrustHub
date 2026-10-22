@@ -140,7 +140,7 @@ The standard levels are `ClassificationLevel.Standard`, used for data items:
 |---|---|---|
 | D1 | A data item is either personal (no policy, no level) or classified (policy and a standard level together). A partial or unknown classification is rejected, never downgraded to personal | Entity: the two factory methods. Use case: `AddDataItem` (`DataItem.IncompleteClassification`, `DataItem.UnknownClassificationLevel`), and Validator |
 | D2 | An owner may classify only under a policy they hold a clearance on, and at most at that clearance's level | Entity: `CreateClassified` → `DataItem.NotCleared` (400) |
-| D3 | **Read rule:** readable by its owner, or by a holder of a clearance on its policy at or above its level. A deleted item is readable by no one | Entity: `IsReadableBy`. Its SQL form is `DataAccess.VisibleTo`, used by list and download |
+| D3 | **Read rule:** readable by its owner, or by a holder of a clearance on its policy at or above its level. A deleted item is readable by no one | Entity: `IsReadableBy`. Its SQL form is `DataAccess.VisibleTo`, used by list and download. `ReadRuleEquivalenceTests` proves both forms agree (#99) |
 | D4 | **Need-to-know:** admins have no bypass. An unreadable item answers 404 (`DataItem.NotFound`), so its existence is not revealed | Entity (D3) and use cases `GetDataItem`, `ListDataItems` |
 | D5 | Only the owner deletes. Deleting someone else's item, or deleting twice, answers 404 | Entity: `MarkDeleted` |
 | D6 | A file is required and is at most 100 MB. Its name is at most 512 characters | Use case: `AddDataItem` (`DataItem.NoFileProvided`, `DataItem.FileTooLarge`), and Validator |
@@ -150,8 +150,6 @@ The standard levels are `ClassificationLevel.Standard`, used for data items:
 
 These are findings, not decisions. Each one needs an issue before it changes.
 
-- **D3 exists in two forms:** the entity method and the SQL predicate. A test that keeps them equal is
-  planned in ADR-0012 step 4 (#74).
 - **Clearance levels are free-form** (C4): any name, and any priority from 0 upwards. Data items,
   however, use only the standard levels. Should a clearance accept only `ClassificationLevel.Standard`?
 - **Deleting a policy ignores its data items** (P3 checks clearances only). Classified items under a

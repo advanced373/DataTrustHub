@@ -104,8 +104,16 @@ git worktree remove worktrees/agent-<feature-name>
 When agents need schema changes:
 1. Agent writes // NEEDS MIGRATION next to the entity change
 2. Orchestrator designates one agent as "Database Owner" for the sprint
-3. Database Owner runs: dotnet ef migrations add <MigrationName> --project DataTrustHub.Infrastructure
+3. Database Owner runs: dotnet dotnet-ef migrations add <MigrationName> --project DataTrustHub.Infrastructure --startup-project DataTrustHub.API
 4. Database Owner commits the migration files
+
+The `dotnet-ef` version is pinned to 9.0.11 in the local tool manifest `.config/dotnet-tools.json`.
+Run `dotnet tool restore` once per clone or worktree, then call the tool as `dotnet dotnet-ef ...`
+(for example `dotnet dotnet-ef migrations add <MigrationName> --project DataTrustHub.Infrastructure
+--startup-project DataTrustHub.API`), so the pinned version is used and not a global `dotnet-ef`
+of another version. On every pull request and push to develop and main the CI job `migrations`
+fails if the model has changes that no migration covers, and applies all migrations to an empty
+SQL Server 2022 database (ADR-0018).
 
 ## Running multiple agents in parallel
 

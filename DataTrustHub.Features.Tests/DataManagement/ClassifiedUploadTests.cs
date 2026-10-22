@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using DataTrustHub.Features.Tests.Administration.Helpers;
 using DataTrustHub.Features.Tests.Helpers;
 using DataTrustHub.Infrastructure.Persistance;
@@ -17,6 +18,16 @@ public class ClassifiedUploadTests(ApiFactory factory) : IClassFixture<ApiFactor
     private const string OptionsEndpoint = "/data/classification-options";
     private const int Confidential = 2;
     private const int Secret = 3;
+    private const string NotClearedCode = "DataItem.NotCleared";
+    private const string NotClearedMessage =
+        "You can classify data only under a policy you hold a clearance on, and at most at your clearance level.";
+    private const string LevelsProperty = "levels";
+    private const string PoliciesProperty = "policies";
+    private const string NameProperty = "name";
+    private const string PriorityProperty = "priority";
+
+    private static readonly (string Name, int Priority)[] StandardLevels =
+        [("Public", 0), ("Internal", 1), ("Confidential", 2), ("Secret", 3), ("Top Secret", 4)];
 
     [Fact]
     public async Task Upload_UnderClearedPolicyAtOwnLevel_StoresPolicyAndLevel()
@@ -40,6 +51,7 @@ public class ClassifiedUploadTests(ApiFactory factory) : IClassFixture<ApiFactor
         var response = await UploadAsync(user, policyId, Secret);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        await AssertNotClearedAsync(response);
     }
 
     [Fact]
@@ -52,6 +64,35 @@ public class ClassifiedUploadTests(ApiFactory factory) : IClassFixture<ApiFactor
         var response = await UploadAsync(user, otherPolicyId, Confidential);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        await AssertNotClearedAsync(response);
+    }
+
+    [Fact]
+    public async Task Upload_AtOwnLevelUnderClearedPolicy_BoundaryIsAllowed_ButOneAboveIsNot()
+    {
+        var (user, policyId) = await CreateClearedUserAsync("classified_boundary", Secret);
+
+        Assert.Equal(HttpStatusCode.OK, (await UploadAsync(user, policyId, Secret)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await UploadAsync(user, policyId, Confidential)).StatusCode);
+        var above = await UploadAsync(user, policyId, Secret + 1);
+        Assert.Equal(HttpStatusCode.BadRequest, above.StatusCode);
+        await AssertNotClearedAsync(above);
+    }
+
+    [Fact]
+    public async Task ClassificationOptions_LevelsAreExactlyTheStandardFiveAsNameAndPriority()
+    {
+        var (user, _) = await CreateClearedUserAsync("classified_levels", Secret);
+
+        using var json = JsonDocument.Parse(await user.GetStringAsync(OptionsEndpoint));
+
+        var root = json.RootElement;
+        Assert.Equal([LevelsProperty, PoliciesProperty], root.EnumerateObject().Select(p => p.Name).ToArray());
+        var levels = root.GetProperty(LevelsProperty).EnumerateArray().ToList();
+        Assert.All(levels, level =>
+            Assert.Equal([NameProperty, PriorityProperty], level.EnumerateObject().Select(p => p.Name).ToArray()));
+        var actual = levels.Select(l => (l.GetProperty(NameProperty).GetString()!, l.GetProperty(PriorityProperty).GetInt32()));
+        Assert.Equal(StandardLevels, actual.ToArray());
     }
 
     [Fact]
@@ -86,6 +127,12 @@ public class ClassifiedUploadTests(ApiFactory factory) : IClassFixture<ApiFactor
 
     // --- helpers ---
 
+    private static async Task AssertNotClearedAsync(HttpResponseMessage response)
+    {
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+        Assert.Equal((NotClearedCode, NotClearedMessage), (error!.Code, error.Description));
+    }
+
     private async Task<(HttpClient User, Guid PolicyId)> CreateClearedUserAsync(string prefix, int priority)
     {
         var admin = await TestUsers.CreateClientAsync(factory, $"{prefix}_admin@example.com", UserRoles.Admin);
@@ -107,6 +154,7 @@ public class ClassifiedUploadTests(ApiFactory factory) : IClassFixture<ApiFactor
     }
 
     private record AddDataItemResponse(Guid DataItemId);
+    private record ErrorResponse(string Code, string Description);
     private record LevelResponse(string Name, int Priority);
     private record PolicyOptionResponse(Guid PolicyId, string PolicyName, string GroupName, int MaxPriority);
     private record OptionsResponse(List<LevelResponse> Levels, List<PolicyOptionResponse> Policies);

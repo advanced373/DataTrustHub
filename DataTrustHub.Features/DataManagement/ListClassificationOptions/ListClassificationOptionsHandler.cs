@@ -1,3 +1,4 @@
+using DataTrustHub.Domain.Clearances;
 using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.SharedKernel;
@@ -29,6 +30,9 @@ public class ListClassificationOptionsHandler(DContext db)
             .ToListAsync(cancellationToken);
 
         var ordered = policies.OrderBy(p => p.GroupName).ThenBy(p => p.PolicyName).ToList();
-        return Result.Success(new ClassificationOptionsResponse(ClassificationLevels.All, ordered));
+        return Result.Success(new ClassificationOptionsResponse(StandardLevels(), ordered));
     }
+
+    private static IReadOnlyList<ClassificationLevelOption> StandardLevels() =>
+        ClassificationLevel.Standard.Select(level => new ClassificationLevelOption(level.Name, level.Priority)).ToList();
 }

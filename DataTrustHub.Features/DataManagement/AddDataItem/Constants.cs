@@ -25,14 +25,4 @@ internal static class Errors
     internal static readonly Error UserNotFound = Error.NotFound(
         "DataItem.UserNotFound",
         "The authenticated user could not be found.");
-
-    // A validation error, so the client gets 400 with the reason
-    internal static readonly Error NotCleared = new(
-        "DataItem.NotCleared",
-        "You can classify data only under a policy you hold a clearance on, and at most at your clearance level.",
-        ErrorType.Validation);
-
-    internal static readonly Error InvalidUserId = Error.Failure(
-        "DataItem.InvalidUserId",
-        "The user identity claim is missing or invalid.");
 }

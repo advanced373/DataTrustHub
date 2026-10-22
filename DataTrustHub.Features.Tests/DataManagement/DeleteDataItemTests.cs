@@ -14,6 +14,8 @@ public class DeleteDataItemTests(ApiFactory factory) : IClassFixture<ApiFactory>
     private const string RegisterEndpoint = "/auth/register";
     private const string LoginEndpoint = "/auth/login";
     private const string UploadEndpoint = "/data/upload";
+    private const string NotFoundCode = "DataItem.NotFound";
+    private const string NotFoundMessage = "The data item was not found.";
 
     private readonly HttpClient _client = factory.CreateClient();
 
@@ -50,6 +52,7 @@ public class DeleteDataItemTests(ApiFactory factory) : IClassFixture<ApiFactory>
         var response = await _client.DeleteAsync($"/data/{Guid.NewGuid()}");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        await AssertNotFoundAsync(response);
     }
 
     [Fact]
@@ -67,6 +70,8 @@ public class DeleteDataItemTests(ApiFactory factory) : IClassFixture<ApiFactory>
         var response = await intruderClient.DeleteAsync($"/data/{itemId}");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        await AssertNotFoundAsync(response);
+        Assert.False(await IsMarkedDeletedAsync(itemId));
     }
 
     [Fact]
@@ -82,9 +87,16 @@ public class DeleteDataItemTests(ApiFactory factory) : IClassFixture<ApiFactory>
         var secondDelete = await _client.DeleteAsync($"/data/{itemId}");
 
         Assert.Equal(HttpStatusCode.NotFound, secondDelete.StatusCode);
+        await AssertNotFoundAsync(secondDelete);
     }
 
     // --- helpers ---
+
+    private static async Task AssertNotFoundAsync(HttpResponseMessage response)
+    {
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+        Assert.Equal((NotFoundCode, NotFoundMessage), (error!.Code, error.Description));
+    }
 
     private static async Task<string> RegisterAndLoginAsync(HttpClient client, string email, string password)
     {
@@ -121,4 +133,5 @@ public class DeleteDataItemTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
     private record AddDataItemResponse(Guid DataItemId);
     private record LoginUserResponse(string Token);
+    private record ErrorResponse(string Code, string Description);
 }

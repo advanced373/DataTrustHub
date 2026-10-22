@@ -1,0 +1,66 @@
+# Builds the solution and runs the test suite on every pull request and push to develop and main (ADR-0017).
+# The job id "build-and-test" is the check that branch protection requires.
+# No deployment and no secrets here; the tests run on the EF Core InMemory provider.
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+# A new push to a pull request cancels the run it supersedes; pushes to develop/main are never
+# cancelled, so every merge commit gets its own result
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      # No packages.lock.json in the repo, so the cache is keyed on the csproj files
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore DataTrustHub.sln
+
+      - name: Build
+        run: dotnet build DataTrustHub.sln --no-restore -c Release
+
+      - name: Test
+        run: >
+          dotnet test DataTrustHub.Features.Tests/ --no-build -c Release
+          --logger "trx;LogFileName=test-results.trx"
+          --results-directory TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults/*.trx
+          if-no-files-found: warn

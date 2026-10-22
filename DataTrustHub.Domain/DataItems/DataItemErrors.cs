@@ -13,4 +13,16 @@ public static class DataItemErrors
         "DataItem.NotCleared",
         "You can classify data only under a policy you hold a clearance on, and at most at your clearance level.",
         ErrorType.Validation);
+
+    // Invariant D1: a classified item has a policy and a classification level together
+    public static readonly Error IncompleteClassification = new(
+        "DataItem.IncompleteClassification",
+        "A classified item needs both a policy and a classification level.",
+        ErrorType.Validation);
+
+    // The priority does not match any standard classification level
+    public static readonly Error UnknownClassificationLevel = new(
+        "DataItem.UnknownClassificationLevel",
+        "Unknown classification level.",
+        ErrorType.Validation);
 }

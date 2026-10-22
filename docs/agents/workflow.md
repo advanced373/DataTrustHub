@@ -107,6 +107,13 @@ When agents need schema changes:
 3. Database Owner runs: dotnet ef migrations add <MigrationName> --project DataTrustHub.Infrastructure
 4. Database Owner commits the migration files
 
+The `dotnet-ef` version is pinned to 9.0.11 in the local tool manifest `.config/dotnet-tools.json`.
+Run `dotnet tool restore` once per clone or worktree, then call the tool as `dotnet dotnet-ef ...`
+(for example `dotnet dotnet-ef migrations add <MigrationName> --project DataTrustHub.Infrastructure`),
+so the pinned version is used and not a global `dotnet-ef` of another version. On every pull
+request the CI job `migrations` fails if the model has changes that no migration covers, and
+applies all migrations to an empty SQL Server 2022 database (ADR-0018).
+
 ## Running multiple agents in parallel
 
 Sprint 1 — launch two agents simultaneously:

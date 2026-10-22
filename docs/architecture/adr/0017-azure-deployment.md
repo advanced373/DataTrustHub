@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-10-22
-- **Related:** #22, #26; [ADR-0007](0007-local-secrets-in-user-secrets.md),
+- **Related:** #22, #26; amended by [ADR-0018](0018-staging-and-production-with-migrations-in-ci-cd.md); [ADR-0007](0007-local-secrets-in-user-secrets.md),
   [ADR-0009](0009-gitflow-and-small-stacked-prs.md)
 
 ## Context
@@ -35,6 +35,8 @@ files.
      startup.
 6. **Environments:** one environment, `production`, for the MVP. A `staging` environment can be
    added later as an App Service deployment slot.
+   *Amended by ADR-0018: two environments, `staging` and `production`, each with its own
+   database; a release reaches production only after approval on staging.*
 7. **Observability:** **Application Insights** for both apps, for technical logs and failures. The
    business audit trail stays in the database (ADR-0016).
 

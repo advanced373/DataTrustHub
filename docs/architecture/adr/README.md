@@ -33,3 +33,4 @@ Status values: `Proposed`, `Accepted`, `Superseded by ADR-NNNN`, `Deprecated`.
 | [0015](0015-sharing-data-items.md) | Sharing data items without breaking need-to-know | Accepted | 2026-10-22 |
 | [0016](0016-audit-trail-for-commands-and-data-access.md) | Audit trail for commands and data access | Accepted | 2026-10-22 |
 | [0017](0017-azure-deployment.md) | Deploy the MVP to Azure with GitHub Actions | Accepted | 2026-10-22 |
+| [0018](0018-staging-and-production-with-migrations-in-ci-cd.md) | Staging and production environments, and database migrations in CI/CD | Accepted | 2026-10-22 |

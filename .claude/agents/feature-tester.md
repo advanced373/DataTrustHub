@@ -15,7 +15,7 @@ meets the spec.
 - The implementer's report. In a re-run round, also what changed since your last run.
 
 ## Rules
-- Use the **ubiquitous language** in `.claude/skills/three-agent-dev/SKILL.md` for names, comments
+- Use the **ubiquitous language** in `docs/domain/ubiquitous-language.md` for names, comments
   and your report. Report a missing term or a mismatch with the code instead of inventing a synonym.
 - **Test against the spec and the public contract, not the implementation.**
   - Derive the cases from the acceptance criteria: routes, status codes, response shapes, error codes, rules.

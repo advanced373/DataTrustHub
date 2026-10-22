@@ -24,12 +24,12 @@ public class ListClassificationOptionsHandler(DContext db)
                 join policy in _db.Policies on clearance.PolicyId equals policy.Id
                 join organization in _db.Organizations on policy.OrganizationId equals organization.Id
                 group clearance.ClassificationLevel.Priority
-                    by new { policy.Id, policy.Name, GroupName = organization.Name } into byPolicy
+                    by new { policy.Id, policy.Name, OrganizationName = organization.Name } into byPolicy
                 select new ClassificationPolicyOption(
-                    byPolicy.Key.Id, byPolicy.Key.Name, byPolicy.Key.GroupName, byPolicy.Max()))
+                    byPolicy.Key.Id, byPolicy.Key.Name, byPolicy.Key.OrganizationName, byPolicy.Max()))
             .ToListAsync(cancellationToken);
 
-        var ordered = policies.OrderBy(p => p.GroupName).ThenBy(p => p.PolicyName).ToList();
+        var ordered = policies.OrderBy(p => p.OrganizationName).ThenBy(p => p.PolicyName).ToList();
         return Result.Success(new ClassificationOptionsResponse(StandardLevels(), ordered));
     }
 

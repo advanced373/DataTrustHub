@@ -15,7 +15,7 @@ public class UserRoleTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
     private const string RegisterEndpoint = "/auth/register";
     private const string LoginEndpoint = "/auth/login";
-    private const string AdminGroupsEndpoint = "/admin/groups";
+    private const string AdminOrganizationsEndpoint = "/admin/organizations";
     private const string RoleClaim = "role";
     private const string Password = "Password1!";
     private readonly HttpClient _client = factory.CreateClient();
@@ -35,7 +35,7 @@ public class UserRoleTests(ApiFactory factory) : IClassFixture<ApiFactory>
         await PromoteToAdminAsync("role-admin@example.com");
         var token = await LoginAsync("role-admin@example.com");
 
-        var response = await PostAdminGroupAsync(token, "Admins group");
+        var response = await PostAdminOrganizationAsync(token, "Admins organization");
 
         Assert.Equal(UserRoles.Admin, ReadRole(token));
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -46,7 +46,7 @@ public class UserRoleTests(ApiFactory factory) : IClassFixture<ApiFactory>
     {
         var token = await RegisterAndLoginAsync("role-regular@example.com");
 
-        var response = await PostAdminGroupAsync(token, "Regular group");
+        var response = await PostAdminOrganizationAsync(token, "Regular organization");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
@@ -76,9 +76,9 @@ public class UserRoleTests(ApiFactory factory) : IClassFixture<ApiFactory>
         await db.SaveChangesAsync();
     }
 
-    private Task<HttpResponseMessage> PostAdminGroupAsync(string token, string name)
+    private Task<HttpResponseMessage> PostAdminOrganizationAsync(string token, string name)
     {
-        var request = new HttpRequestMessage(HttpMethod.Post, AdminGroupsEndpoint)
+        var request = new HttpRequestMessage(HttpMethod.Post, AdminOrganizationsEndpoint)
         {
             Content = JsonContent.Create(new { Name = name })
         };

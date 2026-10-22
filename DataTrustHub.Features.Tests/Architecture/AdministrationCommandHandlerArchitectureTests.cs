@@ -1,10 +1,10 @@
 using DataTrustHub.Features.Administration.CreateAccount;
 using DataTrustHub.Features.Administration.CreateClearance;
-using DataTrustHub.Features.Administration.CreateGroup;
+using DataTrustHub.Features.Administration.CreateOrganization;
 using DataTrustHub.Features.Administration.CreatePolicy;
 using DataTrustHub.Features.Administration.DeleteAccount;
 using DataTrustHub.Features.Administration.DeleteClearance;
-using DataTrustHub.Features.Administration.DeleteGroup;
+using DataTrustHub.Features.Administration.DeleteOrganization;
 using DataTrustHub.Features.Administration.DeletePolicy;
 using NetArchTest.Rules;
 using Xunit;
@@ -17,9 +17,9 @@ public class AdministrationCommandHandlerArchitectureTests
 {
     private static readonly Type[] Handlers =
     [
-        typeof(CreateGroupHandler),
+        typeof(CreateOrganizationHandler),
         typeof(CreatePolicyHandler),
-        typeof(DeleteGroupHandler),
+        typeof(DeleteOrganizationHandler),
         typeof(DeletePolicyHandler),
         typeof(CreateAccountHandler),
         typeof(DeleteAccountHandler),

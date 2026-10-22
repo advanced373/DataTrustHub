@@ -24,7 +24,7 @@
                     </div>
                     <div class="form-floating mb-3">
                         <select asp-for="OrganizationId" class="form-select"
-                                asp-items="@(new SelectList(Model.Groups, nameof(DataTrustHub.Services.Api.GroupResponse.Id), nameof(DataTrustHub.Services.Api.GroupResponse.Name)))">
+                                asp-items="@(new SelectList(Model.Groups, nameof(DataTrustHub.Services.Api.OrganizationResponse.Id), nameof(DataTrustHub.Services.Api.OrganizationResponse.Name)))">
                             <option value="">Select a group</option>
                         </select>
                         <label asp-for="OrganizationId"></label>

@@ -6,12 +6,12 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
-namespace DataTrustHub.Features.Administration.CreateGroup;
+namespace DataTrustHub.Features.Administration.CreateOrganization;
 
-public record CreateGroupRequest(string Name);
-public record CreateGroupResponse(Guid GroupId);
+public record CreateOrganizationRequest(string Name);
+public record CreateOrganizationResponse(Guid OrganizationId);
 
-public class CreateGroupEndpoint : ICarterModule
+public class CreateOrganizationEndpoint : ICarterModule
 {
     public void AddRoutes(IEndpointRouteBuilder app) =>
         app.MapPost(Constants.EndpointRoute, Handle)
@@ -19,12 +19,12 @@ public class CreateGroupEndpoint : ICarterModule
            .RequireAuthorization(policy => policy.RequireRole("Admin"));
 
     private static async Task<IResult> Handle(
-        CreateGroupRequest request,
-        ICommandHandler<CreateGroupCommand, Result<Guid>> handler,
+        CreateOrganizationRequest request,
+        ICommandHandler<CreateOrganizationCommand, Result<Guid>> handler,
         CancellationToken cancellationToken)
     {
-        var command = new CreateGroupCommand(request.Name);
+        var command = new CreateOrganizationCommand(request.Name);
         var result = await handler.Handle(command, cancellationToken);
-        return result.ToHttpResult(groupId => Results.Ok(new CreateGroupResponse(groupId)));
+        return result.ToHttpResult(organizationId => Results.Ok(new CreateOrganizationResponse(organizationId)));
     }
 }

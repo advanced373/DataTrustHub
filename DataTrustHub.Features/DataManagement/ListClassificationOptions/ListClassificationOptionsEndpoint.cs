@@ -11,7 +11,7 @@ using System.Security.Claims;
 namespace DataTrustHub.Features.DataManagement.ListClassificationOptions;
 
 // A policy the requester may classify under, and the highest level they may use on it
-public record ClassificationPolicyOption(Guid PolicyId, string PolicyName, string GroupName, int MaxPriority);
+public record ClassificationPolicyOption(Guid PolicyId, string PolicyName, string OrganizationName, int MaxPriority);
 
 // A level an item can be classified at
 public record ClassificationLevelOption(string Name, int Priority);

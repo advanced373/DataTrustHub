@@ -13,7 +13,7 @@ public class GroupsController(IAdminApiClient adminApi, IUserSessionService user
 {
     [HttpGet("")]
     public async Task<IActionResult> Index(CancellationToken cancellationToken) =>
-        await ListViewAsync(await adminApi.ListGroupsAsync(cancellationToken));
+        await ListViewAsync(await adminApi.ListOrganizationsAsync(cancellationToken));
 
     [HttpGet(AdminRoutes.Create)]
     public IActionResult Create() => View(new CreateGroupViewModel());
@@ -23,7 +23,7 @@ public class GroupsController(IAdminApiClient adminApi, IUserSessionService user
     {
         if (!ModelState.IsValid) return View(model);
 
-        var result = await adminApi.CreateGroupAsync(model.Name, cancellationToken);
+        var result = await adminApi.CreateOrganizationAsync(model.Name, cancellationToken);
         if (!result.IsSuccess) return await HandleFailureAsync(result, model);
 
         return RedirectWithSuccess(string.Format(Messages.GroupCreated, model.Name), nameof(Index), ControllerNames.Groups);
@@ -32,7 +32,7 @@ public class GroupsController(IAdminApiClient adminApi, IUserSessionService user
     [HttpPost(AdminRoutes.Delete)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
-        var result = await adminApi.DeleteGroupAsync(id, cancellationToken);
+        var result = await adminApi.DeleteOrganizationAsync(id, cancellationToken);
         return await RedirectWithOutcomeAsync(result, Messages.GroupDeleted, nameof(Index), ControllerNames.Groups);
     }
 }

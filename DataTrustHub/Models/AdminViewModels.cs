@@ -27,14 +27,14 @@ public sealed class CreatePolicyViewModel
     public Guid? OrganizationId { get; set; }
 
     // Options for the group dropdown; filled by the controller, not posted back
-    public IReadOnlyList<GroupResponse> Groups { get; set; } = [];
+    public IReadOnlyList<OrganizationResponse> Groups { get; set; } = [];
 }
 
 public sealed record PolicyRow(Guid Id, string Name, Guid GroupId, string GroupName);
 
 public sealed record PolicyListViewModel(
     IReadOnlyList<PolicyRow> Items,
-    IReadOnlyList<GroupResponse> Groups,
+    IReadOnlyList<OrganizationResponse> Groups,
     Guid? SelectedGroupId,
     string? ErrorMessage = null);
 

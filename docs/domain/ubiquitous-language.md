@@ -14,7 +14,9 @@ a document only if the rules say so.
 
 The access rules:
 
-1. People have accounts (**users**) and belong to **organizations**.
+1. People have accounts (**users**). An **organization** is a tenant, i.e. a company on the platform.
+   Today users are linked to organizations only through their clearances; memberships are decided
+   in ADR-0014 and not built yet.
 2. An organization defines **policies**: named areas of access, such as "Project Apollo" or "HR".
 3. A **data item** (an uploaded document) is either **personal** or **classified**.
    - A **personal** data item is private to the user who uploaded it.
@@ -39,7 +41,7 @@ The rules are recorded in ADR-0011. The architecture that implements them is in 
 |---|---|---|
 | **User** | A person with an account. Their role is `User` or `Admin` | `User` |
 | **Admin** | A user who manages organizations, policies, users and clearances. Admins have no automatic access to data (need-to-know) | `User.Role` |
-| **Organization** | The body that users and policies belong to. The word is never *group*. The old *Group* names in the API and the UI are being renamed (#91) | `Organization` |
+| **Organization** | A tenant: the company that policies, clearances and classified data belong to. The word is never *group*. The old *Group* names in the API and the UI are being renamed (#91) | `Organization` |
 | **Policy** | A named area of access inside one organization. Every classified data item belongs to one policy | `Policy` |
 | **Classification level** | A named sensitivity level with a priority: Public (0), Internal, Confidential, Secret, Top Secret (4) | `ClassificationLevel` |
 | **Clearance** | Grants a user access to one policy at one classification level, and to every level below it | `Clearance`, `Clearance.Allows` |

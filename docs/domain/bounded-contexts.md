@@ -4,6 +4,9 @@
 > confirms it, it becomes an ADR. Until then, treat the boundaries as a guide, not as a rule the
 > tests enforce.
 
+> **Coming next:** ADR-0014 adds memberships (Member, Guest, OrgAdmin) to Access Governance, and
+> turns organizations into tenants. This page describes the code as it is today.
+
 DataTrustHub is one deployable application with one database and one `DataTrustHub.Domain` project.
 The contexts below are **logical** boundaries inside that monolith: they are where the model would
 split if the application moved to separate services (ADR-0012).

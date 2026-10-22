@@ -7,21 +7,21 @@
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h1 class="h3 m-0">Policies</h1>
-    <a class="btn btn-primary" asp-action="Create" asp-route-groupId="@Model.SelectedGroupId">
+    <a class="btn btn-primary" asp-action="Create" asp-route-organizationId="@Model.SelectedOrganizationId">
         <i class="bi bi-plus-lg"></i> New policy
     </a>
 </div>
 
 <form method="get" asp-action="Index" class="row g-2 align-items-center mb-3">
     <div class="col-auto">
-        <label for="groupId" class="col-form-label">Group</label>
+        <label for="organizationId" class="col-form-label">Organization</label>
     </div>
     <div class="col-auto">
-        <select id="groupId" name="groupId" class="form-select" onchange="this.form.submit()">
-            <option value="">All groups</option>
-            @foreach (var group in Model.Groups)
+        <select id="organizationId" name="organizationId" class="form-select" onchange="this.form.submit()">
+            <option value="">All organizations</option>
+            @foreach (var organization in Model.Organizations)
             {
-                <option value="@group.Id" selected="@(group.Id == Model.SelectedGroupId)">@group.Name</option>
+                <option value="@organization.Id" selected="@(organization.Id == Model.SelectedOrganizationId)">@organization.Name</option>
             }
         </select>
     </div>
@@ -40,7 +40,7 @@ else if (Model.Items.Count > 0)
             <thead class="table-light">
                 <tr>
                     <th>Name</th>
-                    <th>Group</th>
+                    <th>Organization</th>
                     <th class="text-end">Actions</th>
                 </tr>
             </thead>
@@ -49,7 +49,7 @@ else if (Model.Items.Count > 0)
                 {
                     <tr>
                         <td>@policy.Name</td>
-                        <td>@policy.GroupName</td>
+                        <td>@policy.OrganizationName</td>
                         <td class="text-end">
                             <partial name="_DeleteButton" model="@(new DeleteButtonModel(policy.Id, $"Delete the policy \"{policy.Name}\"?"))" />
                         </td>

@@ -61,24 +61,24 @@ public class ClearancesController(IAdminApiClient adminApi, IUserSessionService 
         return View(nameof(Create), WithOptions(model, lookups));
     }
 
-    // Users and policies (labelled with their group) for the dropdowns and the list's names
+    // Users and policies (labelled with their organization) for the dropdowns and the list's names
     private async Task<Lookups> LoadLookupsAsync(CancellationToken cancellationToken)
     {
         var users = await adminApi.ListAccountsAsync(cancellationToken);
         var policies = await adminApi.ListPoliciesAsync(null, cancellationToken);
-        var groups = await adminApi.ListOrganizationsAsync(cancellationToken);
+        var organizations = await adminApi.ListOrganizationsAsync(cancellationToken);
 
-        var groupNames = (groups.Value ?? []).ToDictionary(g => g.Id, g => g.Name);
+        var organizationNames = (organizations.Value ?? []).ToDictionary(o => o.Id, o => o.Name);
         var policyOptions = (policies.Value ?? [])
-            .Select(p => new PolicyOption(p.Id, $"{p.Name} ({groupNames.GetValueOrDefault(p.OrganizationId, Messages.UnknownGroup)})"))
+            .Select(p => new PolicyOption(p.Id, $"{p.Name} ({organizationNames.GetValueOrDefault(p.OrganizationId, Messages.UnknownOrganization)})"))
             .OrderBy(p => p.Label)
             .ToList();
 
         return new Lookups(
             users.Value ?? [],
             policyOptions,
-            users.IsUnauthorized || policies.IsUnauthorized || groups.IsUnauthorized,
-            users.ErrorMessage ?? policies.ErrorMessage ?? groups.ErrorMessage);
+            users.IsUnauthorized || policies.IsUnauthorized || organizations.IsUnauthorized,
+            users.ErrorMessage ?? policies.ErrorMessage ?? organizations.ErrorMessage);
     }
 
     private static ClearanceGrant BuildGrant(

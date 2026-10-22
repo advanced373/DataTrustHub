@@ -9,10 +9,10 @@
         <div class="card shadow-sm">
             <div class="card-body p-4">
                 <h1 class="h3 mb-4">Create policy</h1>
-                @if (Model.Groups.Count == 0)
+                @if (Model.Organizations.Count == 0)
                 {
                     <div class="alert alert-info">
-                        A policy belongs to a group. <a asp-controller="Groups" asp-action="Create">Create a group</a> first.
+                        A policy belongs to an organization. <a asp-controller="Organizations" asp-action="Create">Create an organization</a> first.
                     </div>
                 }
                 <form asp-action="Create" method="post">
@@ -24,8 +24,8 @@
                     </div>
                     <div class="form-floating mb-3">
                         <select asp-for="OrganizationId" class="form-select"
-                                asp-items="@(new SelectList(Model.Groups, nameof(DataTrustHub.Services.Api.OrganizationResponse.Id), nameof(DataTrustHub.Services.Api.OrganizationResponse.Name)))">
-                            <option value="">Select a group</option>
+                                asp-items="@(new SelectList(Model.Organizations, nameof(DataTrustHub.Services.Api.OrganizationResponse.Id), nameof(DataTrustHub.Services.Api.OrganizationResponse.Name)))">
+                            <option value="">Select an organization</option>
                         </select>
                         <label asp-for="OrganizationId"></label>
                         <span asp-validation-for="OrganizationId" class="text-danger"></span>

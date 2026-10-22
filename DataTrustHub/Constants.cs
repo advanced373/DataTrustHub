@@ -46,7 +46,7 @@ internal static class ApiRoutes
 internal static class AdminRoutes
 {
     internal const string Users = "Admin/Users";
-    internal const string Groups = "Admin/Groups";
+    internal const string Organizations = "Admin/Organizations";
     internal const string Policies = "Admin/Policies";
     internal const string Clearances = "Admin/Clearances";
     internal const string Create = "Create";
@@ -73,7 +73,7 @@ internal static class ControllerNames
     internal const string Data = "Data";
     internal const string Admin = "Admin";
     internal const string Users = "Users";
-    internal const string Groups = "Groups";
+    internal const string Organizations = "Organizations";
     internal const string Policies = "Policies";
     internal const string Clearances = "Clearances";
 }
@@ -102,11 +102,11 @@ internal static class Messages
     internal const string AccountDeleted = "Account deleted. Its clearances were removed and its data was deleted.";
     internal const string PolicyCreated = "Policy \"{0}\" created.";
     internal const string PolicyDeleted = "Policy deleted.";
-    internal const string GroupCreated = "Group \"{0}\" created.";
-    internal const string GroupDeleted = "Group deleted.";
+    internal const string OrganizationCreated = "Organization \"{0}\" created.";
+    internal const string OrganizationDeleted = "Organization deleted.";
     internal const string FileRequired = "Select a file to upload.";
-    internal const string GroupRequired = "Select a group.";
-    internal const string UnknownGroup = "(deleted group)";
+    internal const string OrganizationRequired = "Select an organization.";
+    internal const string UnknownOrganization = "(deleted organization)";
     internal const string UnknownUser = "(deleted user)";
     internal const string UnknownPolicy = "(deleted policy)";
     internal const string UserRequired = "Select a user.";

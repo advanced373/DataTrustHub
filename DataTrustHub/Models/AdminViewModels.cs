@@ -23,28 +23,28 @@ public sealed class CreatePolicyViewModel
     [Required, StringLength(Constants.MaxNameLength)]
     public string Name { get; set; } = string.Empty;
 
-    [Required(ErrorMessage = Messages.GroupRequired), Display(Name = "Group")]
+    [Required(ErrorMessage = Messages.OrganizationRequired), Display(Name = "Organization")]
     public Guid? OrganizationId { get; set; }
 
-    // Options for the group dropdown; filled by the controller, not posted back
-    public IReadOnlyList<OrganizationResponse> Groups { get; set; } = [];
+    // Options for the organization dropdown; filled by the controller, not posted back
+    public IReadOnlyList<OrganizationResponse> Organizations { get; set; } = [];
 }
 
-public sealed record PolicyRow(Guid Id, string Name, Guid GroupId, string GroupName);
+public sealed record PolicyRow(Guid Id, string Name, Guid OrganizationId, string OrganizationName);
 
 public sealed record PolicyListViewModel(
     IReadOnlyList<PolicyRow> Items,
-    IReadOnlyList<OrganizationResponse> Groups,
-    Guid? SelectedGroupId,
+    IReadOnlyList<OrganizationResponse> Organizations,
+    Guid? SelectedOrganizationId,
     string? ErrorMessage = null);
 
-public sealed class CreateGroupViewModel
+public sealed class CreateOrganizationViewModel
 {
     [Required, StringLength(Constants.MaxNameLength)]
     public string Name { get; set; } = string.Empty;
 }
 
-// A policy in a dropdown, labelled with its group so same-named policies can be told apart
+// A policy in a dropdown, labelled with its organization so same-named policies can be told apart
 public sealed record PolicyOption(Guid Id, string Label);
 
 public sealed record ClearanceRow(

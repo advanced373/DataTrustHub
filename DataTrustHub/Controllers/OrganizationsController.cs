@@ -7,8 +7,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace DataTrustHub.Controllers;
 
 [Authorize(Roles = Constants.AdminRole)]
-[Route(AdminRoutes.Groups)]
-public class GroupsController(IAdminApiClient adminApi, IUserSessionService userSession)
+[Route(AdminRoutes.Organizations)]
+public class OrganizationsController(IAdminApiClient adminApi, IUserSessionService userSession)
     : ApiControllerBase(userSession)
 {
     [HttpGet("")]
@@ -16,23 +16,23 @@ public class GroupsController(IAdminApiClient adminApi, IUserSessionService user
         await ListViewAsync(await adminApi.ListOrganizationsAsync(cancellationToken));
 
     [HttpGet(AdminRoutes.Create)]
-    public IActionResult Create() => View(new CreateGroupViewModel());
+    public IActionResult Create() => View(new CreateOrganizationViewModel());
 
     [HttpPost(AdminRoutes.Create)]
-    public async Task<IActionResult> Create(CreateGroupViewModel model, CancellationToken cancellationToken)
+    public async Task<IActionResult> Create(CreateOrganizationViewModel model, CancellationToken cancellationToken)
     {
         if (!ModelState.IsValid) return View(model);
 
         var result = await adminApi.CreateOrganizationAsync(model.Name, cancellationToken);
         if (!result.IsSuccess) return await HandleFailureAsync(result, model);
 
-        return RedirectWithSuccess(string.Format(Messages.GroupCreated, model.Name), nameof(Index), ControllerNames.Groups);
+        return RedirectWithSuccess(string.Format(Messages.OrganizationCreated, model.Name), nameof(Index), ControllerNames.Organizations);
     }
 
     [HttpPost(AdminRoutes.Delete)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
         var result = await adminApi.DeleteOrganizationAsync(id, cancellationToken);
-        return await RedirectWithOutcomeAsync(result, Messages.GroupDeleted, nameof(Index), ControllerNames.Groups);
+        return await RedirectWithOutcomeAsync(result, Messages.OrganizationDeleted, nameof(Index), ControllerNames.Organizations);
     }
 }

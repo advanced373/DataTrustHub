@@ -17,13 +17,23 @@ DataItems are files classified by security level.
 - Entity Framework Core 9 with SQL Server
 - DataTrustHub.SharedKernel: Result<T>, Error, ErrorType, Entity base classes
 
-## Architecture: Vertical Slice Architecture
+## Architecture: Clean Architecture with vertical slices (ADR-0012)
 
-Code is organized by feature, not by layer. Your feature folder contains everything it needs.
+Four layers, dependencies pointing inward: API → Features → Domain ← Infrastructure.
+
+- **Domain layer** (`DataTrustHub.Domain`): entities, value objects, domain errors and the ports
+  (`I*Repository`, `IUnitOfWork`, `IPasswordHasher`). Business rules (invariants) live here, in entity
+  methods. No EF Core.
+- **Application layer** (`DataTrustHub.Features`): one use case per vertical slice, organized by feature.
+- **Infrastructure layer** (`DataTrustHub.Infrastructure`): adapters for the ports: repositories,
+  Mapperly mappers between persistence models (`Db*`) and entities, `DContext` as the unit of work.
+- **Presentation layer** (`DataTrustHub.API`, the WebApp).
+
+Use the terms of the ubiquitous language in `docs/domain/ubiquitous-language.md`.
 
 ```
 DataTrustHub.Features/
-  _Shared/               <- shared infrastructure (behaviors, extensions) — READ ONLY
+  _Shared/               <- shared pieces (messaging, decorators, extensions) — READ ONLY
   Authentication/        <- your model: study this before writing your own slice
   DataManagement/
   Sharing/
@@ -34,8 +44,14 @@ DataTrustHub.Features/
 Each use case folder contains:
 - `Constants.cs`       — route string, tag, validation thresholds, error definitions
 - `*Endpoint.cs`       — ICarterModule: request/response records + HTTP handler
-- `*Handler.cs`        — ICommandHandler or IQueryHandler: business logic only
-- `*Validator.cs`      — AbstractValidator: input rules
+- `*Handler.cs`        — ICommandHandler or IQueryHandler: orchestrates the use case, holds no business rules
+- `*Validator.cs`      — AbstractValidator: input validation (shape of the request), not business rules
+
+How a handler works:
+- **Command** (changes state): load the aggregate through its repository, call the entity's behaviour,
+  save once with `IUnitOfWork.SaveChangesAsync`. Never `DContext`, `Db*` or EF Core.
+- **Query** (reads only): reads `DContext` with `AsNoTracking` for now. ADR-0012 step 4 moves queries to
+  read models behind `I*Queries` ports; after that no handler sees `DContext`.
 
 ## Rule 1 — Strict isolation
 
@@ -56,10 +72,11 @@ Do NOT run Add-Migration without the orchestrator designating you as "Database O
 
 ## What you can import
 
-- DataTrustHub.SharedKernel — Result<T>, Error, ErrorType, Entity, ValidationError
-- DataTrustHub.Infrastructure.Persistance.DContext — inject via DI, use directly
-- DataTrustHub.Infrastructure.Persistance.Model — DB entity models (DbUser, DbOrganization, etc.)
-- DataTrustHub.Domain.User.IPasswordHasher — already registered in DI
+- DataTrustHub.SharedKernel — Result<T>, Error, ErrorType, ValidationError
+- DataTrustHub.Domain — entities, domain errors and ports (`I*Repository`, `IUnitOfWork`, `IPasswordHasher`),
+  all registered in DI
+- DataTrustHub.Infrastructure.Persistance.DContext and the persistence models (`Db*`) — query handlers only,
+  until ADR-0012 step 4
 - NuGet packages already in DataTrustHub.Features.csproj
 
 ## Code style rules (enforced in every PR)

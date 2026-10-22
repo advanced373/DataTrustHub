@@ -17,6 +17,59 @@ skill.
 | Tester | `feature-tester` | tests in `DataTrustHub.Features.Tests` | production code |
 | Reviewer | `code-reviewer` | nothing: it is read-only and reports findings | any file |
 
+## Ubiquitous language
+
+Everyone uses the same words: the user, the orchestrator, every agent, the specs, reports,
+PR bodies, issues, code names and comments. Domain terms are the DDD **ubiquitous language**.
+Structure is described in **Clean Architecture / DDD** terms (ADR-0012). If something has no
+term yet, or the code and the language disagree, report it rather than inventing a synonym.
+New terms are added here.
+
+### Domain terms
+
+| Term | Meaning | In code |
+|---|---|---|
+| **User** | A person with an account. Role is `User` or `Admin` | `User` |
+| **Organization** | The group users and policies belong to. The admin UI calls it *Group*: this naming gap is known | `Organization` |
+| **Policy** | A named access rule inside one organization. Classified data items belong to one policy | `Policy` |
+| **Classification level** | A named sensitivity level with a priority, from Public (0) to Top Secret (4) | `ClassificationLevel` |
+| **Clearance** | Grants a user one policy at one classification level. It allows every level at or below its own | `Clearance`, `Clearance.Allows` |
+| **Data item** | A stored file (today a document) | `DataItem` |
+| **Owner** | The user who uploaded a data item. Never use *uploader* in code | `DataItem.OwnerUserId` |
+| **Personal data item** | A data item with no policy, readable by its owner only. Marking `UNCLASSIFIED` | `DataItem.CreatePersonal` |
+| **Classified data item** | A data item with a policy and a classification level | `DataItem.CreateClassified` |
+| **Security marking** | The label shown on a data item, e.g. `SECRET` | `DataItem.SecurityMarking` |
+| **Read rule** | A user may read a data item if they own it, or hold a clearance on its policy at or above its level (ADR-0011) | `DataItem.IsReadableBy` |
+| **Need-to-know** | Admin has no bypass of the read rule. An unreadable data item answers 404, so its existence is not revealed | — |
+
+### Building blocks (DDD / Clean Architecture)
+
+| Term | In this project |
+|---|---|
+| **Domain layer** | `DataTrustHub.Domain`: entities, value objects, domain errors, ports. No EF Core, no Infrastructure |
+| **Application layer** | `DataTrustHub.Features`: one **use case** per vertical slice, as a command handler or query handler |
+| **Infrastructure layer** | `DataTrustHub.Infrastructure`: adapters (repositories, mappers, `DContext`) |
+| **Presentation layer** | `DataTrustHub.API` (Carter endpoints) and the WebApp |
+| **Entity** | A domain object with identity and behaviour: `User`, `Organization`, `Policy`, `Clearance`, `DataItem` |
+| **Aggregate root** | An entity loaded and saved as a whole through its own repository. Today each entity is its own aggregate root |
+| **Value object** | Defined by its values, immutable: `ClassificationLevel` |
+| **Invariant / business rule** | A rule that must always hold. It lives in entity methods (`IsReadableBy`, `MarkDeleted`, `CheckCanBeDeletedBy`), never in handlers or validators |
+| **Factory method** | The only way to create a new entity, applying its rules: `User.Register`, `Policy.Create`, `Clearance.Grant`, `DataItem.CreateClassified` |
+| **Rehydration** | Rebuilding a stored entity without its creation rules, through an `internal` constructor that only the persistence mappers see |
+| **Domain error** | An expected rule failure returned as `Result`, not thrown: `UserErrors`, `DataItemErrors` |
+| **Port** | An interface the domain or application needs, implemented outside it: `I*Repository`, `IUnitOfWork`, `IPasswordHasher` |
+| **Adapter** | The Infrastructure implementation of a port |
+| **Repository** | Port that loads and stores one aggregate as an entity. Commands only |
+| **Unit of work** | Port that commits a command's changes in one transaction: `IUnitOfWork`, implemented by `DContext` |
+| **Command / command handler** | A use case that changes state: load aggregates, call their behaviour, save once (`ICommandHandler`) |
+| **Query / query handler** | A use case that only reads (`IQueryHandler`). It uses read models, not aggregates (CQRS read side, ADR-0012 step 4) |
+| **Read model** | A flat shape built for display, served by an `I*Queries` port |
+| **Persistence model** | The EF table shape `Db*` (`DbUser`, `DbDataItem`). Infrastructure only; never call it an entity |
+| **Mapper** | Converts persistence model ⇄ entity (Mapperly), in Infrastructure |
+| **Input validation** | Shape checks on a request (required, length, format) in the slice's `*Validator`. Not business rules |
+| **Decorator** | A cross-cutting step wrapped around handlers by Scrutor: validation, later auditing |
+| **Domain service** | A rule that needs several aggregates and belongs to none. None exist yet |
+
 ## 1. Orchestrator: prepare
 
 1. **Find or create the issue** (labels, board status *In progress*), as in the workflow skill.
@@ -26,6 +79,7 @@ skill.
    - **Contract:** routes, request and response shapes, status codes, error codes.
    - **Where:** the feature folders and slices to add or change, and the ADRs that apply.
    - **Out of scope.**
+   - Written in the **ubiquitous language** (section above): the same terms the user and the code use.
    - **Approvals** the user gave: infrastructure, `_Shared`, the Database Owner role for migrations.
 3. **Create the worktree:** `git worktree add ../wt-<slug> -b <branch> origin/develop`. All three agents
    work in this one worktree, **one after another, never in parallel**. Running them together would

@@ -1,6 +1,6 @@
 # Ubiquitous language
 
-This is the shared vocabulary of DataTrustHub, as DDD uses the term *ubiquitous language*. Start here
+Part of the [domain handbook](README.md). This is the shared vocabulary of DataTrustHub, as DDD uses the term *ubiquitous language*. Start here
 if you are new to the project. Everyone uses these words: users of the product, developers, the AI
 agents (`.claude/agents/`), and the issues, PRs, code names and comments.
 
@@ -64,7 +64,7 @@ These are the words for how the code is structured (ADR-0012).
 | **Entity** | A domain object with an identity and behaviour: `User`, `Organization`, `Policy`, `Clearance`, `DataItem` |
 | **Aggregate root** | An entity that is loaded and saved as a whole, through its own repository. Today every entity is its own aggregate root |
 | **Value object** | An immutable object defined by its values: `ClassificationLevel` |
-| **Invariant / business rule** | A rule that must always hold. It lives in entity methods (`IsReadableBy`, `MarkDeleted`, `CheckCanBeDeletedBy`), never in handlers or validators |
+| **Invariant / business rule** | A rule that must always hold. A rule of one aggregate lives in an entity method (`IsReadableBy`, `MarkDeleted`, `CheckCanBeDeletedBy`). A rule that needs other aggregates or the whole set (uniqueness, references, deletion guards) is checked in the use case through repositories. Never in validators. The full list is in [aggregates.md](aggregates.md) |
 | **Factory method** | The only way to create a new entity. It applies the entity's rules: `User.Register`, `Policy.Create`, `Clearance.Grant`, `DataItem.CreateClassified` |
 | **Rehydration** | Rebuilding a stored entity without running its creation rules, through an `internal` constructor that only the persistence mappers can see |
 | **Domain error** | An expected rule failure, returned as a `Result` instead of thrown: `UserErrors`, `DataItemErrors` |
@@ -80,3 +80,4 @@ These are the words for how the code is structured (ADR-0012).
 | **Input validation** | Checks on the shape of a request (required fields, length, format), in the slice's `*Validator`. Business rules do not go here |
 | **Decorator** | A cross-cutting step that Scrutor wraps around handlers: validation now, auditing later |
 | **Domain service** | A rule that needs several aggregates and belongs to none of them. There are none yet |
+| **Bounded context** | A part of the domain with its own model and language. Today there are three: Identity and Access, Access Governance and Data Management ([bounded-contexts.md](bounded-contexts.md)) |

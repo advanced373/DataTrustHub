@@ -1,20 +1,20 @@
 @model ListViewModel<DataTrustHub.Services.Api.OrganizationResponse>
 @{
-    ViewData["Title"] = "Groups";
+    ViewData["Title"] = "Organizations";
 }
 
-<partial name="_AdminNav" model="@ControllerNames.Groups" />
+<partial name="_AdminNav" model="@ControllerNames.Organizations" />
 
 <div class="d-flex justify-content-between align-items-center mb-3">
-    <h1 class="h3 m-0">Groups</h1>
-    <a class="btn btn-primary" asp-action="Create"><i class="bi bi-plus-lg"></i> New group</a>
+    <h1 class="h3 m-0">Organizations</h1>
+    <a class="btn btn-primary" asp-action="Create"><i class="bi bi-plus-lg"></i> New organization</a>
 </div>
 
 <partial name="_ListError" model="Model.ErrorMessage" />
 
 @if (Model.Items.Count == 0 && Model.ErrorMessage is null)
 {
-    <p class="text-muted">No groups yet. Create one to start defining policies.</p>
+    <p class="text-muted">No organizations yet. Create one to start defining policies.</p>
 }
 else if (Model.Items.Count > 0)
 {
@@ -27,15 +27,15 @@ else if (Model.Items.Count > 0)
                 </tr>
             </thead>
             <tbody>
-                @foreach (var group in Model.Items)
+                @foreach (var organization in Model.Items)
                 {
                     <tr>
-                        <td>@group.Name</td>
+                        <td>@organization.Name</td>
                         <td class="text-end">
-                            <a class="btn btn-sm btn-outline-secondary" asp-controller="Policies" asp-action="Index" asp-route-groupId="@group.Id">
+                            <a class="btn btn-sm btn-outline-secondary" asp-controller="Policies" asp-action="Index" asp-route-organizationId="@organization.Id">
                                 <i class="bi bi-file-earmark-lock"></i> Policies
                             </a>
-                            <partial name="_DeleteButton" model="@(new DeleteButtonModel(group.Id, $"Delete the group \"{group.Name}\"?"))" />
+                            <partial name="_DeleteButton" model="@(new DeleteButtonModel(organization.Id, $"Delete the organization \"{organization.Name}\"?"))" />
                         </td>
                     </tr>
                 }

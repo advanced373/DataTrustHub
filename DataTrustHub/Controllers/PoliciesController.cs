@@ -11,24 +11,24 @@ namespace DataTrustHub.Controllers;
 public class PoliciesController(IAdminApiClient adminApi, IUserSessionService userSession)
     : ApiControllerBase(userSession)
 {
-    // groupId optionally narrows the list to one group's policies
+    // organizationId optionally narrows the list to one organization's policies
     [HttpGet("")]
-    public async Task<IActionResult> Index(Guid? groupId, CancellationToken cancellationToken)
+    public async Task<IActionResult> Index(Guid? organizationId, CancellationToken cancellationToken)
     {
-        var groups = await adminApi.ListOrganizationsAsync(cancellationToken);
-        var policies = await adminApi.ListPoliciesAsync(groupId, cancellationToken);
-        if (groups.IsUnauthorized || policies.IsUnauthorized) return await SessionExpiredAsync();
+        var organizations = await adminApi.ListOrganizationsAsync(cancellationToken);
+        var policies = await adminApi.ListPoliciesAsync(organizationId, cancellationToken);
+        if (organizations.IsUnauthorized || policies.IsUnauthorized) return await SessionExpiredAsync();
 
-        var error = groups.ErrorMessage ?? policies.ErrorMessage;
-        var groupList = groups.Value ?? [];
-        var rows = error is null ? ToRows(policies.Value!, groupList) : [];
-        return View(new PolicyListViewModel(rows, groupList, groupId, error));
+        var error = organizations.ErrorMessage ?? policies.ErrorMessage;
+        var organizationList = organizations.Value ?? [];
+        var rows = error is null ? ToRows(policies.Value!, organizationList) : [];
+        return View(new PolicyListViewModel(rows, organizationList, organizationId, error));
     }
 
     [HttpGet(AdminRoutes.Create)]
-    public async Task<IActionResult> Create(Guid? groupId, CancellationToken cancellationToken)
+    public async Task<IActionResult> Create(Guid? organizationId, CancellationToken cancellationToken)
     {
-        var model = new CreatePolicyViewModel { OrganizationId = groupId };
+        var model = new CreatePolicyViewModel { OrganizationId = organizationId };
         return await CreateViewAsync(model, cancellationToken);
     }
 
@@ -40,7 +40,7 @@ public class PoliciesController(IAdminApiClient adminApi, IUserSessionService us
         var result = await adminApi.CreatePolicyAsync(model.Name, model.OrganizationId!.Value, cancellationToken);
         if (!result.IsSuccess)
         {
-            model.Groups = (await adminApi.ListOrganizationsAsync(cancellationToken)).Value ?? [];
+            model.Organizations = (await adminApi.ListOrganizationsAsync(cancellationToken)).Value ?? [];
             return await HandleFailureAsync(result, model);
         }
 
@@ -56,23 +56,23 @@ public class PoliciesController(IAdminApiClient adminApi, IUserSessionService us
 
     private async Task<IActionResult> CreateViewAsync(CreatePolicyViewModel model, CancellationToken cancellationToken)
     {
-        var groups = await adminApi.ListOrganizationsAsync(cancellationToken);
-        if (groups.IsUnauthorized) return await SessionExpiredAsync();
-        if (!groups.IsSuccess) ModelState.AddModelError(string.Empty, groups.ErrorMessage!);
+        var organizations = await adminApi.ListOrganizationsAsync(cancellationToken);
+        if (organizations.IsUnauthorized) return await SessionExpiredAsync();
+        if (!organizations.IsSuccess) ModelState.AddModelError(string.Empty, organizations.ErrorMessage!);
 
-        model.Groups = groups.Value ?? [];
+        model.Organizations = organizations.Value ?? [];
         return View(nameof(Create), model);
     }
 
-    private static List<PolicyRow> ToRows(IReadOnlyList<PolicyResponse> policies, IReadOnlyList<OrganizationResponse> groups)
+    private static List<PolicyRow> ToRows(IReadOnlyList<PolicyResponse> policies, IReadOnlyList<OrganizationResponse> organizations)
     {
-        var groupNames = groups.ToDictionary(group => group.Id, group => group.Name);
+        var organizationNames = organizations.ToDictionary(organization => organization.Id, organization => organization.Name);
         return policies
             .Select(policy => new PolicyRow(
                 policy.Id,
                 policy.Name,
                 policy.OrganizationId,
-                groupNames.GetValueOrDefault(policy.OrganizationId, Messages.UnknownGroup)))
+                organizationNames.GetValueOrDefault(policy.OrganizationId, Messages.UnknownOrganization)))
             .ToList();
     }
 }

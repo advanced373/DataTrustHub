@@ -1,6 +1,6 @@
 namespace DataTrustHub.Domain.Organizations;
 
-// An organization ("group" in the API and UI) that owns policies
+// An organization that owns policies
 public sealed class Organization
 {
     // Rebuilds a stored entity; used by the persistence mappers only (internal, visible to Infrastructure)

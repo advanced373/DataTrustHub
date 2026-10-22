@@ -42,14 +42,14 @@ public class RepositoryTests(ApiFactory factory) : IClassFixture<ApiFactory>
     [Fact]
     public async Task OrganizationAndPolicy_RoundTripWithExistenceChecks()
     {
-        var organization = Organization.Create("Repo group");
+        var organization = Organization.Create("Repo organization");
         var policy = Policy.Create("Repo policy", organization.Id);
         await InScopeAsync<IOrganizationRepository>(async (repo, uow) => { repo.Add(organization); await uow.SaveChangesAsync(default); });
         await InScopeAsync<IPolicyRepository>(async (repo, uow) => { repo.Add(policy); await uow.SaveChangesAsync(default); });
 
         var loaded = await InScopeAsync<IPolicyRepository, Policy?>(repo => repo.GetByIdAsync(policy.Id, default));
         Assert.Equal((policy.Name, organization.Id), (loaded!.Name, loaded.OrganizationId));
-        Assert.True(await InScopeAsync<IOrganizationRepository, bool>(repo => repo.NameExistsAsync("Repo group", default)));
+        Assert.True(await InScopeAsync<IOrganizationRepository, bool>(repo => repo.NameExistsAsync("Repo organization", default)));
         Assert.True(await InScopeAsync<IPolicyRepository, bool>(repo => repo.AnyInOrganizationAsync(organization.Id, default)));
         Assert.True(await InScopeAsync<IPolicyRepository, bool>(repo => repo.NameExistsInOrganizationAsync("Repo policy", organization.Id, default)));
     }
@@ -101,7 +101,7 @@ public class RepositoryTests(ApiFactory factory) : IClassFixture<ApiFactory>
     [Fact]
     public async Task UnitOfWork_NothingIsStoredBeforeSaveChanges()
     {
-        var organization = Organization.Create("Unsaved group");
+        var organization = Organization.Create("Unsaved organization");
         await InScopeAsync<IOrganizationRepository>((repo, _) => { repo.Add(organization); return Task.CompletedTask; });
 
         Assert.False(await InScopeAsync<IOrganizationRepository, bool>(repo => repo.ExistsAsync(organization.Id, default)));

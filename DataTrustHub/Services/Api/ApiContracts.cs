@@ -6,7 +6,7 @@ internal sealed record CredentialsRequest(string Email, string Password);
 
 internal sealed record CreatePolicyRequest(string Name, Guid OrganizationId);
 
-internal sealed record CreateGroupRequest(string Name);
+internal sealed record CreateOrganizationRequest(string Name);
 
 internal sealed record CreateClearanceRequest(
     Guid UserId, Guid PolicyId, string Name, string ClassificationLevelName, int ClassificationLevelPriority);
@@ -37,20 +37,20 @@ public sealed record ClassificationOptionsResponse(
 public sealed record ClassificationLevelOption(string Name, int Priority);
 
 // MaxPriority is the user's highest clearance level on the policy
-public sealed record ClassificationPolicyOption(Guid PolicyId, string PolicyName, string GroupName, int MaxPriority);
+public sealed record ClassificationPolicyOption(Guid PolicyId, string PolicyName, string OrganizationName, int MaxPriority);
 
 // One item with its content, base64-encoded by the API
 public sealed record DataItemContentResponse(Guid Id, string Name, string? Content);
 
 internal sealed record PolicyCreatedResponse(Guid PolicyId);
 
-internal sealed record GroupCreatedResponse(Guid GroupId);
+internal sealed record OrganizationCreatedResponse(Guid OrganizationId);
 
 internal sealed record ClearanceCreatedResponse(Guid ClearanceId);
 
 public sealed record AccountResponse(Guid Id, string Email, string Role);
 
-public sealed record GroupResponse(Guid Id, string Name);
+public sealed record OrganizationResponse(Guid Id, string Name);
 
 public sealed record PolicyResponse(Guid Id, string Name, Guid OrganizationId);
 

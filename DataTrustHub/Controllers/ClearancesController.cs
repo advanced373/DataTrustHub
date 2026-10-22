@@ -66,7 +66,7 @@ public class ClearancesController(IAdminApiClient adminApi, IUserSessionService 
     {
         var users = await adminApi.ListAccountsAsync(cancellationToken);
         var policies = await adminApi.ListPoliciesAsync(null, cancellationToken);
-        var groups = await adminApi.ListGroupsAsync(cancellationToken);
+        var groups = await adminApi.ListOrganizationsAsync(cancellationToken);
 
         var groupNames = (groups.Value ?? []).ToDictionary(g => g.Id, g => g.Name);
         var policyOptions = (policies.Value ?? [])

@@ -10,14 +10,14 @@ public interface IAdminApiClient
 
     Task<ApiResult<Guid>> CreatePolicyAsync(string name, Guid organizationId, CancellationToken cancellationToken);
 
-    Task<ApiResult<Guid>> CreateGroupAsync(string name, CancellationToken cancellationToken);
+    Task<ApiResult<Guid>> CreateOrganizationAsync(string name, CancellationToken cancellationToken);
 
-    Task<ApiResult<IReadOnlyList<GroupResponse>>> ListGroupsAsync(CancellationToken cancellationToken);
+    Task<ApiResult<IReadOnlyList<OrganizationResponse>>> ListOrganizationsAsync(CancellationToken cancellationToken);
 
-    Task<ApiResult<bool>> DeleteGroupAsync(Guid groupId, CancellationToken cancellationToken);
+    Task<ApiResult<bool>> DeleteOrganizationAsync(Guid organizationId, CancellationToken cancellationToken);
 
-    // Without a group id every policy is listed
-    Task<ApiResult<IReadOnlyList<PolicyResponse>>> ListPoliciesAsync(Guid? groupId, CancellationToken cancellationToken);
+    // Without an organization id every policy is listed
+    Task<ApiResult<IReadOnlyList<PolicyResponse>>> ListPoliciesAsync(Guid? organizationId, CancellationToken cancellationToken);
 
     Task<ApiResult<bool>> DeletePolicyAsync(Guid policyId, CancellationToken cancellationToken);
 
@@ -49,12 +49,12 @@ internal sealed class AdminApiClient(HttpClient httpClient) : IAdminApiClient
         return result.Map(response => response.PolicyId);
     }
 
-    public async Task<ApiResult<Guid>> CreateGroupAsync(string name, CancellationToken cancellationToken)
+    public async Task<ApiResult<Guid>> CreateOrganizationAsync(string name, CancellationToken cancellationToken)
     {
-        var result = await PostAsync<CreateGroupRequest, GroupCreatedResponse>(
-            ApiRoutes.AdminGroups, new CreateGroupRequest(name), cancellationToken);
+        var result = await PostAsync<CreateOrganizationRequest, OrganizationCreatedResponse>(
+            ApiRoutes.AdminOrganizations, new CreateOrganizationRequest(name), cancellationToken);
 
-        return result.Map(response => response.GroupId);
+        return result.Map(response => response.OrganizationId);
     }
 
     public Task<ApiResult<IReadOnlyList<AccountResponse>>> ListAccountsAsync(CancellationToken cancellationToken) =>
@@ -63,18 +63,18 @@ internal sealed class AdminApiClient(HttpClient httpClient) : IAdminApiClient
     public Task<ApiResult<bool>> DeleteAccountAsync(Guid accountId, CancellationToken cancellationToken) =>
         DeleteAsync(string.Format(ApiRoutes.AdminAccountById, accountId), cancellationToken);
 
-    public Task<ApiResult<IReadOnlyList<GroupResponse>>> ListGroupsAsync(CancellationToken cancellationToken) =>
-        GetAsync<IReadOnlyList<GroupResponse>>(ApiRoutes.AdminGroups, cancellationToken);
+    public Task<ApiResult<IReadOnlyList<OrganizationResponse>>> ListOrganizationsAsync(CancellationToken cancellationToken) =>
+        GetAsync<IReadOnlyList<OrganizationResponse>>(ApiRoutes.AdminOrganizations, cancellationToken);
 
-    public Task<ApiResult<bool>> DeleteGroupAsync(Guid groupId, CancellationToken cancellationToken) =>
-        DeleteAsync(string.Format(ApiRoutes.AdminGroupById, groupId), cancellationToken);
+    public Task<ApiResult<bool>> DeleteOrganizationAsync(Guid organizationId, CancellationToken cancellationToken) =>
+        DeleteAsync(string.Format(ApiRoutes.AdminOrganizationById, organizationId), cancellationToken);
 
     public Task<ApiResult<IReadOnlyList<PolicyResponse>>> ListPoliciesAsync(
-        Guid? groupId, CancellationToken cancellationToken)
+        Guid? organizationId, CancellationToken cancellationToken)
     {
-        var route = groupId is null
+        var route = organizationId is null
             ? ApiRoutes.AdminPolicies
-            : string.Format(ApiRoutes.AdminPoliciesByGroup, groupId);
+            : string.Format(ApiRoutes.AdminPoliciesByOrganization, organizationId);
         return GetAsync<IReadOnlyList<PolicyResponse>>(route, cancellationToken);
     }
 

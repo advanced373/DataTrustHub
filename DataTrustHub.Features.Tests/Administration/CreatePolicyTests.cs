@@ -7,18 +7,18 @@ namespace DataTrustHub.Features.Tests.Administration;
 
 public class CreatePolicyTests(AdminApiFactory factory) : IClassFixture<AdminApiFactory>
 {
-    private const string CreateGroupEndpoint = "/admin/groups";
+    private const string CreateOrganizationEndpoint = "/admin/organizations";
     private const string CreatePolicyEndpoint = "/admin/policies";
     private readonly HttpClient _client = factory.CreateClient();
 
     [Fact]
     public async Task CreatePolicy_WithValidData_Returns200WithPolicyId()
     {
-        var groupId = await CreateGroupAndGetId("PolicyOrg1");
+        var organizationId = await CreateOrganizationAndGetId("PolicyOrg1");
 
         var response = await _client.PostAsJsonAsync(
             CreatePolicyEndpoint,
-            new { Name = "Confidential Access", OrganizationId = groupId });
+            new { Name = "Confidential Access", OrganizationId = organizationId });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
@@ -30,8 +30,8 @@ public class CreatePolicyTests(AdminApiFactory factory) : IClassFixture<AdminApi
     [Fact]
     public async Task CreatePolicy_WithDuplicateNameInSameOrg_Returns409WithCode()
     {
-        var groupId = await CreateGroupAndGetId("PolicyOrg2");
-        var body = new { Name = "Duplicate Policy", OrganizationId = groupId };
+        var organizationId = await CreateOrganizationAndGetId("PolicyOrg2");
+        var body = new { Name = "Duplicate Policy", OrganizationId = organizationId };
         await _client.PostAsJsonAsync(CreatePolicyEndpoint, body);
 
         var response = await _client.PostAsJsonAsync(CreatePolicyEndpoint, body);
@@ -61,13 +61,13 @@ public class CreatePolicyTests(AdminApiFactory factory) : IClassFixture<AdminApi
             AdminErrorCodes.PolicyOrganizationNotFound, AdminErrorMessages.PolicyOrganizationNotFound);
     }
 
-    private async Task<Guid> CreateGroupAndGetId(string name)
+    private async Task<Guid> CreateOrganizationAndGetId(string name)
     {
-        var response = await _client.PostAsJsonAsync(CreateGroupEndpoint, new { Name = name });
-        var result = await response.Content.ReadFromJsonAsync<CreateGroupResponse>();
-        return result!.GroupId;
+        var response = await _client.PostAsJsonAsync(CreateOrganizationEndpoint, new { Name = name });
+        var result = await response.Content.ReadFromJsonAsync<CreateOrganizationResponse>();
+        return result!.OrganizationId;
     }
 
-    private record CreateGroupResponse(Guid GroupId);
+    private record CreateOrganizationResponse(Guid OrganizationId);
     private record CreatePolicyResponse(Guid PolicyId);
 }

@@ -25,6 +25,8 @@ public class ClassifiedUploadTests(ApiFactory factory) : IClassFixture<ApiFactor
     private const string PoliciesProperty = "policies";
     private const string NameProperty = "name";
     private const string PriorityProperty = "priority";
+    private const string OrganizationNameProperty = "organizationName";
+    private static readonly string[] PolicyOptionProperties = ["policyId", "policyName", OrganizationNameProperty, "maxPriority"];
 
     private static readonly (string Name, int Priority)[] StandardLevels =
         [("Public", 0), ("Internal", 1), ("Confidential", 2), ("Secret", 3), ("Top Secret", 4)];
@@ -118,6 +120,44 @@ public class ClassifiedUploadTests(ApiFactory factory) : IClassFixture<ApiFactor
     }
 
     [Fact]
+    public async Task ClassificationOptions_PolicyOption_HasOrganizationNameField()
+    {
+        var (user, _) = await CreateClearedUserAsync("classified_shape", Secret);
+
+        using var json = JsonDocument.Parse(await user.GetStringAsync(OptionsEndpoint));
+
+        var policy = Assert.Single(json.RootElement.GetProperty(PoliciesProperty).EnumerateArray().ToList());
+        Assert.Equal(PolicyOptionProperties, policy.EnumerateObject().Select(p => p.Name).ToArray());
+        Assert.Equal("classified_shape policy organization", policy.GetProperty(OrganizationNameProperty).GetString());
+    }
+
+    // Organization name sorts first, the policy name only breaks ties
+    [Fact]
+    public async Task ClassificationOptions_Policies_OrderedByOrganizationNameThenPolicyName()
+    {
+        const string prefix = "classified_order";
+        var admin = await TestUsers.CreateClientAsync(factory, $"{prefix}_admin@example.com", UserRoles.Admin);
+        var user = await TestUsers.CreateClientAsync(factory, $"{prefix}_user@example.com");
+        var userId = await TestUsers.GetIdAsync(factory, $"{prefix}_user@example.com");
+        var laterOrganization = await AdminSetup.CreateOrganizationAsync(admin, "Z order organization");
+        var firstOrganization = await AdminSetup.CreateOrganizationAsync(admin, "M order organization");
+        var policyIds = new[]
+        {
+            await AdminSetup.CreatePolicyAsync(admin, "A order policy", laterOrganization),
+            await AdminSetup.CreatePolicyAsync(admin, "B order policy", firstOrganization),
+            await AdminSetup.CreatePolicyAsync(admin, "A order policy", firstOrganization)
+        };
+        foreach (var policyId in policyIds)
+            await AdminSetup.PostClearanceAsync(admin, userId, policyId, "Secret", Secret);
+
+        var options = await user.GetFromJsonAsync<OptionsResponse>(OptionsEndpoint);
+
+        Assert.Equal(
+            [("M order organization", "A order policy"), ("M order organization", "B order policy"), ("Z order organization", "A order policy")],
+            options!.Policies.Select(p => (p.OrganizationName, p.PolicyName)).ToArray());
+    }
+
+    [Fact]
     public async Task ClassificationOptions_Anonymous_Returns401()
     {
         var response = await factory.CreateClient().GetAsync(OptionsEndpoint);
@@ -156,6 +196,6 @@ public class ClassifiedUploadTests(ApiFactory factory) : IClassFixture<ApiFactor
     private record AddDataItemResponse(Guid DataItemId);
     private record ErrorResponse(string Code, string Description);
     private record LevelResponse(string Name, int Priority);
-    private record PolicyOptionResponse(Guid PolicyId, string PolicyName, string GroupName, int MaxPriority);
+    private record PolicyOptionResponse(Guid PolicyId, string PolicyName, string OrganizationName, int MaxPriority);
     private record OptionsResponse(List<LevelResponse> Levels, List<PolicyOptionResponse> Policies);
 }

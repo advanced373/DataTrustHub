@@ -7,37 +7,37 @@ using static DataTrustHub.Features.Tests.Administration.Helpers.AdminSetup;
 
 namespace DataTrustHub.Features.Tests.Administration;
 
-// ADR-0012 step 3b-1: group and policy command behaviour not covered by the per-slice tests
-// (state kept on a conflict, per-group name uniqueness, authorization of all four routes)
-public class GroupPolicyCommandContractTests(ApiFactory factory) : IClassFixture<ApiFactory>
+// ADR-0012 step 3b-1: organization and policy command behaviour not covered by the per-slice tests
+// (state kept on a conflict, per-organization name uniqueness, authorization of all four routes)
+public class OrganizationPolicyCommandContractTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
     [Fact]
-    public async Task CreatePolicy_SameNameInOtherGroup_Returns200AndStoresPolicy()
+    public async Task CreatePolicy_SameNameInOtherOrganization_Returns200AndStoresPolicy()
     {
-        var admin = await CreateAdminAsync("contract_policy_othergroup@example.com");
-        var groupA = await CreateGroupAsync(admin, "Contract shared name group A");
-        var groupB = await CreateGroupAsync(admin, "Contract shared name group B");
-        await PostPolicyAsync(admin, "Contract shared policy", groupA);
+        var admin = await CreateAdminAsync("contract_policy_otherorganization@example.com");
+        var organizationA = await CreateOrganizationAsync(admin, "Contract shared name organization A");
+        var organizationB = await CreateOrganizationAsync(admin, "Contract shared name organization B");
+        await PostPolicyAsync(admin, "Contract shared policy", organizationA);
 
-        var response = await PostPolicyAsync(admin, "Contract shared policy", groupB);
+        var response = await PostPolicyAsync(admin, "Contract shared policy", organizationB);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var policyId = (await response.Content.ReadFromJsonAsync<CreatePolicyResponse>())!.PolicyId;
         var policy = await admin.GetFromJsonAsync<PolicyResponse>($"{PoliciesEndpoint}/{policyId}");
-        Assert.Equal(new PolicyResponse(policyId, "Contract shared policy", groupB), policy);
+        Assert.Equal(new PolicyResponse(policyId, "Contract shared policy", organizationB), policy);
     }
 
     [Fact]
-    public async Task DeleteGroup_WithPolicies_KeepsGroup()
+    public async Task DeleteOrganization_WithPolicies_KeepsOrganization()
     {
-        var admin = await CreateAdminAsync("contract_group_delete_blocked@example.com");
-        var groupId = await CreateGroupAsync(admin, "Contract blocked group");
-        await PostPolicyAsync(admin, "Contract blocking policy", groupId);
+        var admin = await CreateAdminAsync("contract_organization_delete_blocked@example.com");
+        var organizationId = await CreateOrganizationAsync(admin, "Contract blocked organization");
+        await PostPolicyAsync(admin, "Contract blocking policy", organizationId);
 
-        var response = await admin.DeleteAsync($"{GroupsEndpoint}/{groupId}");
+        var response = await admin.DeleteAsync($"{OrganizationsEndpoint}/{organizationId}");
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync($"{GroupsEndpoint}/{groupId}")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync($"{OrganizationsEndpoint}/{organizationId}")).StatusCode);
     }
 
     [Fact]
@@ -55,13 +55,13 @@ public class GroupPolicyCommandContractTests(ApiFactory factory) : IClassFixture
         Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync($"{PoliciesEndpoint}/{policyId}")).StatusCode);
     }
 
-    // The delete routes' 403 is covered in ManageGroupsTests and ManagePoliciesTests
+    // The delete routes' 403 is covered in ManageOrganizationsTests and ManagePoliciesTests
     [Fact]
     public async Task CreateCommands_RegularUser_Return403()
     {
         var user = await TestUsers.CreateClientAsync(factory, "contract_regular@example.com");
 
-        Assert.Equal(HttpStatusCode.Forbidden, (await PostGroupAsync(user)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await PostOrganizationAsync(user)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await PostPolicyAsync(user, "Forbidden policy", Guid.NewGuid())).StatusCode);
     }
 
@@ -71,9 +71,9 @@ public class GroupPolicyCommandContractTests(ApiFactory factory) : IClassFixture
         var anonymous = factory.CreateClient();
         var someId = Guid.NewGuid();
 
-        Assert.Equal(HttpStatusCode.Unauthorized, (await PostGroupAsync(anonymous)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await PostOrganizationAsync(anonymous)).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await PostPolicyAsync(anonymous, "Anonymous policy", someId)).StatusCode);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.DeleteAsync($"{GroupsEndpoint}/{someId}")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.DeleteAsync($"{OrganizationsEndpoint}/{someId}")).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.DeleteAsync($"{PoliciesEndpoint}/{someId}")).StatusCode);
     }
 
@@ -82,20 +82,20 @@ public class GroupPolicyCommandContractTests(ApiFactory factory) : IClassFixture
     private Task<HttpClient> CreateAdminAsync(string email) =>
         TestUsers.CreateClientAsync(factory, email, UserRoles.Admin);
 
-    private static async Task<Guid> CreateGroupAsync(HttpClient admin, string name)
+    private static async Task<Guid> CreateOrganizationAsync(HttpClient admin, string name)
     {
-        var response = await admin.PostAsJsonAsync(GroupsEndpoint, new { Name = name });
-        return (await response.Content.ReadFromJsonAsync<CreateGroupResponse>())!.GroupId;
+        var response = await admin.PostAsJsonAsync(OrganizationsEndpoint, new { Name = name });
+        return (await response.Content.ReadFromJsonAsync<CreateOrganizationResponse>())!.OrganizationId;
     }
 
     // Valid body, so only authorization can reject the request
-    private static Task<HttpResponseMessage> PostGroupAsync(HttpClient client) =>
-        client.PostAsJsonAsync(GroupsEndpoint, new { Name = "Unauthorized group" });
+    private static Task<HttpResponseMessage> PostOrganizationAsync(HttpClient client) =>
+        client.PostAsJsonAsync(OrganizationsEndpoint, new { Name = "Unauthorized organization" });
 
     private static Task<HttpResponseMessage> PostPolicyAsync(HttpClient client, string name, Guid organizationId) =>
         client.PostAsJsonAsync(PoliciesEndpoint, new { Name = name, OrganizationId = organizationId });
 
     private record PolicyResponse(Guid Id, string Name, Guid OrganizationId);
-    private record CreateGroupResponse(Guid GroupId);
+    private record CreateOrganizationResponse(Guid OrganizationId);
     private record CreatePolicyResponse(Guid PolicyId);
 }

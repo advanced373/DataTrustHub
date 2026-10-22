@@ -26,7 +26,7 @@
                             @foreach (var policy in Model.Options.Policies)
                             {
                                 <option value="@policy.PolicyId" data-max-priority="@policy.MaxPriority">
-                                    @policy.PolicyName (@policy.GroupName)
+                                    @policy.PolicyName (@policy.OrganizationName)
                                 </option>
                             }
                         </select>

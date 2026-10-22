@@ -6,20 +6,20 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
-namespace DataTrustHub.Features.Administration.ListGroups;
+namespace DataTrustHub.Features.Administration.GetOrganization;
 
-public record GroupSummary(Guid Id, string Name);
+public record GetOrganizationResponse(Guid Id, string Name);
 
-public class ListGroupsEndpoint : ICarterModule
+public class GetOrganizationEndpoint : ICarterModule
 {
     public void AddRoutes(IEndpointRouteBuilder app) =>
         app.MapGet(Constants.EndpointRoute, Handle)
            .WithTags(Constants.EndpointTag)
            .RequireAuthorization(policy => policy.RequireRole(UserRoles.Admin));
 
-    private static async Task<IResult> Handle(IQueryHandler<ListGroupsQuery, Result<IReadOnlyList<GroupSummary>>> handler, CancellationToken cancellationToken)
+    private static async Task<IResult> Handle(Guid id, IQueryHandler<GetOrganizationQuery, Result<GetOrganizationResponse>> handler, CancellationToken cancellationToken)
     {
-        var result = await handler.Handle(new ListGroupsQuery(), cancellationToken);
+        var result = await handler.Handle(new GetOrganizationQuery(id), cancellationToken);
         return result.ToHttpResult(Results.Ok);
     }
 }

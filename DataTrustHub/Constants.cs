@@ -33,10 +33,10 @@ internal static class ApiRoutes
     internal const string AdminAccounts = "admin/accounts";
     internal const string AdminAccountById = "admin/accounts/{0}";
     internal const string AdminPolicies = "admin/policies";
-    internal const string AdminGroups = "admin/groups";
-    internal const string AdminGroupById = "admin/groups/{0}";
+    internal const string AdminOrganizations = "admin/organizations";
+    internal const string AdminOrganizationById = "admin/organizations/{0}";
     internal const string AdminPolicyById = "admin/policies/{0}";
-    internal const string AdminPoliciesByGroup = "admin/policies?organizationId={0}";
+    internal const string AdminPoliciesByOrganization = "admin/policies?organizationId={0}";
     internal const string AdminClearances = "admin/clearances";
     internal const string AdminClearanceById = "admin/clearances/{0}";
     internal const string AdminClearancesByUser = "admin/clearances?userId={0}";

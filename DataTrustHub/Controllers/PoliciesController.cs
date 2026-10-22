@@ -15,7 +15,7 @@ public class PoliciesController(IAdminApiClient adminApi, IUserSessionService us
     [HttpGet("")]
     public async Task<IActionResult> Index(Guid? groupId, CancellationToken cancellationToken)
     {
-        var groups = await adminApi.ListGroupsAsync(cancellationToken);
+        var groups = await adminApi.ListOrganizationsAsync(cancellationToken);
         var policies = await adminApi.ListPoliciesAsync(groupId, cancellationToken);
         if (groups.IsUnauthorized || policies.IsUnauthorized) return await SessionExpiredAsync();
 
@@ -40,7 +40,7 @@ public class PoliciesController(IAdminApiClient adminApi, IUserSessionService us
         var result = await adminApi.CreatePolicyAsync(model.Name, model.OrganizationId!.Value, cancellationToken);
         if (!result.IsSuccess)
         {
-            model.Groups = (await adminApi.ListGroupsAsync(cancellationToken)).Value ?? [];
+            model.Groups = (await adminApi.ListOrganizationsAsync(cancellationToken)).Value ?? [];
             return await HandleFailureAsync(result, model);
         }
 
@@ -56,7 +56,7 @@ public class PoliciesController(IAdminApiClient adminApi, IUserSessionService us
 
     private async Task<IActionResult> CreateViewAsync(CreatePolicyViewModel model, CancellationToken cancellationToken)
     {
-        var groups = await adminApi.ListGroupsAsync(cancellationToken);
+        var groups = await adminApi.ListOrganizationsAsync(cancellationToken);
         if (groups.IsUnauthorized) return await SessionExpiredAsync();
         if (!groups.IsSuccess) ModelState.AddModelError(string.Empty, groups.ErrorMessage!);
 
@@ -64,7 +64,7 @@ public class PoliciesController(IAdminApiClient adminApi, IUserSessionService us
         return View(nameof(Create), model);
     }
 
-    private static List<PolicyRow> ToRows(IReadOnlyList<PolicyResponse> policies, IReadOnlyList<GroupResponse> groups)
+    private static List<PolicyRow> ToRows(IReadOnlyList<PolicyResponse> policies, IReadOnlyList<OrganizationResponse> groups)
     {
         var groupNames = groups.ToDictionary(group => group.Id, group => group.Name);
         return policies

@@ -146,15 +146,16 @@ jobs:
       - name: Build migration bundle
         run: dotnet dotnet-ef migrations bundle $EF_PROJECTS -r linux-x64 -o efbundle
 
-      # Bounded retry: about two minutes, then the job fails. sqlcmd reads the password from
-      # SQLCMDPASSWORD, passed from the environment, so it is not on any command line.
+      # Bounded retry: 24 x (5 s login timeout + 5 s pause), about four minutes, then the job fails.
+      # sqlcmd reads the password from SQLCMDPASSWORD, passed from the environment, so it is not on
+      # any command line.
       - name: Wait for SQL Server
         env:
           SQLCMDPASSWORD: ${{ env.MSSQL_SA_PASSWORD }}
         run: |
           for attempt in $(seq 1 24); do
             if docker exec -e SQLCMDPASSWORD "$SQL_CONTAINER_NAME" \
-              /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -Q "SELECT 1" > /dev/null 2>&1; then
+              /opt/mssql-tools18/bin/sqlcmd -C -l 5 -S localhost -U sa -Q "SELECT 1" > /dev/null 2>&1; then
               echo "SQL Server is ready after $attempt attempt(s)"
               exit 0
             fi

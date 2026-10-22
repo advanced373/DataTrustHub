@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-06-16
-- **Related:** [Delete design spec](../../superpowers/specs/2026-06-16-delete-data-item-design.md), #7, #20
+- **Related:** [Delete design spec](../../superpowers/specs/2026-06-16-delete-data-item-design.md), #7, #20; amended by [ADR-0014](0014-organizations-as-tenants-with-memberships.md)
 
 ## Context
 

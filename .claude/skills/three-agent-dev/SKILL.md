@@ -17,6 +17,13 @@ skill.
 | Tester | `feature-tester` | tests in `DataTrustHub.Features.Tests` | production code |
 | Reviewer | `code-reviewer` | nothing: it is read-only and reports findings | any file |
 
+## Ubiquitous language
+
+Everyone uses the vocabulary in [`docs/domain/ubiquitous-language.md`](../../../docs/domain/ubiquitous-language.md):
+the orchestrator, every agent, the specs, reports, PR bodies, issues, code names and comments. It holds
+the domain terms and the DDD / Clean Architecture building blocks (ADR-0012). Write specs in those
+terms. When an agent reports a missing term or a mismatch, add the term to that page in the same PR.
+
 ## 1. Orchestrator: prepare
 
 1. **Find or create the issue** (labels, board status *In progress*), as in the workflow skill.
@@ -26,6 +33,7 @@ skill.
    - **Contract:** routes, request and response shapes, status codes, error codes.
    - **Where:** the feature folders and slices to add or change, and the ADRs that apply.
    - **Out of scope.**
+   - Written in the **ubiquitous language** (`docs/domain/ubiquitous-language.md`): the same terms the user and the code use.
    - **Approvals** the user gave: infrastructure, `_Shared`, the Database Owner role for migrations.
 3. **Create the worktree:** `git worktree add ../wt-<slug> -b <branch> origin/develop`. All three agents
    work in this one worktree, **one after another, never in parallel**. Running them together would

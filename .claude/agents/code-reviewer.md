@@ -14,6 +14,8 @@ the tester have finished. You **do not edit anything**: you read, run checks and
 - The implementer's and the tester's reports. In a re-review round, also your previous findings.
 
 ## What to do
+- Use the **ubiquitous language** in `docs/domain/ubiquitous-language.md` for your findings. Flag code
+  that breaks it: wrong terms, or business rules outside the entities.
 1. **See the change:** run `git -C <worktree> diff origin/develop --stat`, then the full diff, and
    `git status` for untracked files. Read the changed files in context, not just the diff lines.
 2. **Run the checks:** `dotnet build DataTrustHub.sln` and `dotnet test DataTrustHub.Features.Tests/`.

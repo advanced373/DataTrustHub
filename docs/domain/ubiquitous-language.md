@@ -1,0 +1,82 @@
+# Ubiquitous language
+
+This is the shared vocabulary of DataTrustHub, as DDD uses the term *ubiquitous language*. Start here
+if you are new to the project. Everyone uses these words: users of the product, developers, the AI
+agents (`.claude/agents/`), and the issues, PRs, code names and comments.
+
+- If a term is missing, or the code and this page disagree, raise it. Don't invent a synonym.
+- Add every new term here, in the same PR that introduces it.
+
+## The business in one page
+
+DataTrustHub is a **data lake with access control**. Today it holds documents only. A user can open
+a document only if the rules say so.
+
+The access rules:
+
+1. People have accounts (**users**) and belong to **organizations**.
+2. An organization defines **policies**: named areas of access, such as "Project Apollo" or "HR".
+3. A **data item** (an uploaded document) is either **personal** or **classified**.
+   - A **personal** data item is private to the user who uploaded it.
+   - A **classified** data item is placed under one policy, at one **classification level**, from
+     *Public* up to *Top Secret*.
+4. An admin gives a user a **clearance**: access to one policy, up to one classification level.
+5. A user may read a classified data item only if they hold a clearance on its policy at that level or
+   higher. The owner can always read their own data item.
+6. **Need-to-know:** being an admin does not give access to data. If you may not read a data item,
+   the system answers as if it did not exist.
+
+Example: Ana has a *Secret* clearance on "Project Apollo".
+- She can read Apollo documents marked *Confidential* and *Secret*, but not *Top Secret*.
+- She cannot read HR documents at any level.
+
+The rules are recorded in ADR-0011. The architecture that implements them is in ADR-0012 and
+[the architecture overview](../architecture/overview.md).
+
+## Domain terms
+
+| Term | Meaning | In code |
+|---|---|---|
+| **User** | A person with an account. Their role is `User` or `Admin` | `User` |
+| **Admin** | A user who manages organizations, policies, users and clearances. Admins have no automatic access to data (need-to-know) | `User.Role` |
+| **Organization** | The body that users and policies belong to. The word is never *group*. The old *Group* names in the API and the UI are being renamed (#91) | `Organization` |
+| **Policy** | A named area of access inside one organization. Every classified data item belongs to one policy | `Policy` |
+| **Classification level** | A named sensitivity level with a priority: Public (0), Internal, Confidential, Secret, Top Secret (4) | `ClassificationLevel` |
+| **Clearance** | Grants a user access to one policy at one classification level, and to every level below it | `Clearance`, `Clearance.Allows` |
+| **Data item** | A stored file. Today it is always a document | `DataItem` |
+| **Owner** | The user who uploaded a data item. Don't use *uploader* in code | `DataItem.OwnerUserId` |
+| **Personal data item** | A data item with no policy, readable by its owner only. Its marking is `UNCLASSIFIED` | `DataItem.CreatePersonal` |
+| **Classified data item** | A data item with a policy and a classification level | `DataItem.CreateClassified` |
+| **Security marking** | The label shown on a data item, e.g. `SECRET` | `DataItem.SecurityMarking` |
+| **Read rule** | A user may read a data item if they are its owner, or if they hold a clearance on its policy at or above its level | `DataItem.IsReadableBy` |
+| **Need-to-know** | An admin cannot bypass the read rule. A data item the user may not read answers 404, so its existence is not revealed | — |
+
+## Building blocks (DDD / Clean Architecture)
+
+These are the words for how the code is structured (ADR-0012).
+
+| Term | In this project |
+|---|---|
+| **Domain layer** | `DataTrustHub.Domain`: entities, value objects, domain errors and ports. It has no EF Core and does not reference Infrastructure |
+| **Application layer** | `DataTrustHub.Features`: one **use case** per vertical slice, as a command handler or a query handler |
+| **Infrastructure layer** | `DataTrustHub.Infrastructure`: the adapters (repositories, mappers, `DContext`) |
+| **Presentation layer** | `DataTrustHub.API` (Carter endpoints) and the WebApp |
+| **Entity** | A domain object with an identity and behaviour: `User`, `Organization`, `Policy`, `Clearance`, `DataItem` |
+| **Aggregate root** | An entity that is loaded and saved as a whole, through its own repository. Today every entity is its own aggregate root |
+| **Value object** | An immutable object defined by its values: `ClassificationLevel` |
+| **Invariant / business rule** | A rule that must always hold. It lives in entity methods (`IsReadableBy`, `MarkDeleted`, `CheckCanBeDeletedBy`), never in handlers or validators |
+| **Factory method** | The only way to create a new entity. It applies the entity's rules: `User.Register`, `Policy.Create`, `Clearance.Grant`, `DataItem.CreateClassified` |
+| **Rehydration** | Rebuilding a stored entity without running its creation rules, through an `internal` constructor that only the persistence mappers can see |
+| **Domain error** | An expected rule failure, returned as a `Result` instead of thrown: `UserErrors`, `DataItemErrors` |
+| **Port** | An interface the domain or application layer needs, implemented outside it: `I*Repository`, `IUnitOfWork`, `IPasswordHasher` |
+| **Adapter** | The Infrastructure implementation of a port |
+| **Repository** | A port that loads and stores one aggregate as an entity. Only commands use repositories |
+| **Unit of work** | A port that commits all changes of one command in a single transaction: `IUnitOfWork`, implemented by `DContext` |
+| **Command / command handler** | A use case that changes state. It loads aggregates, calls their behaviour and saves once (`ICommandHandler`) |
+| **Query / query handler** | A use case that only reads (`IQueryHandler`). It uses read models, not aggregates (the CQRS read side, ADR-0012 step 4) |
+| **Read model** | A flat shape built for display, served by an `I*Queries` port |
+| **Persistence model** | The shape of an EF table, `Db*` (`DbUser`, `DbDataItem`). It exists only in Infrastructure. Never call it an entity |
+| **Mapper** | Converts between a persistence model and an entity (Mapperly). It lives in Infrastructure |
+| **Input validation** | Checks on the shape of a request (required fields, length, format), in the slice's `*Validator`. Business rules do not go here |
+| **Decorator** | A cross-cutting step that Scrutor wraps around handlers: validation now, auditing later |
+| **Domain service** | A rule that needs several aggregates and belongs to none of them. There are none yet |

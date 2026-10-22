@@ -14,6 +14,8 @@ reviewer come after you. Your only job is the production code.
 - In a fix round, the failing tests with their output, or the reviewer's findings for you.
 
 ## Rules
+- Use the **ubiquitous language** in `docs/domain/ubiquitous-language.md` for names, comments
+  and your report. Report a missing term or a mismatch with the code instead of inventing a synonym.
 - Read `CLAUDE.md` and the ADRs the spec names before writing code. Follow them exactly:
   - Vertical Slice folders with `Constants`, `Endpoint`, `Handler` and `Validator`;
   - no cross-feature imports;

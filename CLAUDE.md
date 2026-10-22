@@ -29,7 +29,7 @@ Four layers, dependencies pointing inward: API → Features → Domain ← Infra
   Mapperly mappers between persistence models (`Db*`) and entities, `DContext` as the unit of work.
 - **Presentation layer** (`DataTrustHub.API`, the WebApp).
 
-Use the terms of the ubiquitous language in `.claude/skills/three-agent-dev/SKILL.md`.
+Use the terms of the ubiquitous language in `docs/domain/ubiquitous-language.md`.
 
 ```
 DataTrustHub.Features/

@@ -30,7 +30,7 @@ New terms are added here.
 | Term | Meaning | In code |
 |---|---|---|
 | **User** | A person with an account. Role is `User` or `Admin` | `User` |
-| **Organization** | The group users and policies belong to. The admin UI calls it *Group*: this naming gap is known | `Organization` |
+| **Organization** | The body users and policies belong to. Never *group*: the old *Group* names in the API and the UI are being renamed | `Organization` |
 | **Policy** | A named access rule inside one organization. Classified data items belong to one policy | `Policy` |
 | **Classification level** | A named sensitivity level with a priority, from Public (0) to Top Secret (4) | `ClassificationLevel` |
 | **Clearance** | Grants a user one policy at one classification level. It allows every level at or below its own | `Clearance`, `Clearance.Allows` |

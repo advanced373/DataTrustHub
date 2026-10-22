@@ -25,14 +25,15 @@ public class CreateGroupTests(AdminApiFactory factory) : IClassFixture<AdminApiF
     }
 
     [Fact]
-    public async Task CreateGroup_WithDuplicateName_Returns409()
+    public async Task CreateGroup_WithDuplicateName_Returns409WithCode()
     {
         var body = new { Name = "Duplicate Group" };
         await _client.PostAsJsonAsync(CreateGroupEndpoint, body);
 
         var response = await _client.PostAsJsonAsync(CreateGroupEndpoint, body);
 
-        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        await ErrorAssert.HasErrorAsync(response, HttpStatusCode.Conflict,
+            AdminErrorCodes.GroupNameAlreadyInUse, AdminErrorMessages.GroupNameAlreadyInUse);
     }
 
     [Fact]

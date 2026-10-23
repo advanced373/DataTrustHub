@@ -22,6 +22,9 @@ internal static class AdminErrorCodes
     internal const string MembershipGuestRoleIsFixed = "Membership.GuestRoleIsFixed";
     internal const string MembershipCannotAppointSelf = "Membership.CannotAppointSelf";
     internal const string OrganizationAlreadyHasOrgAdmin = "Organization.AlreadyHasOrgAdmin";
+    internal const string MembershipNotFound = "Membership.NotFound";
+    internal const string MembershipLastOrgAdmin = "Membership.LastOrgAdmin";
+    internal const string MembershipUnknownRole = "Membership.UnknownRole";
 }
 
 internal static class AdminErrorMessages
@@ -45,4 +48,6 @@ internal static class AdminErrorMessages
     internal const string MembershipCannotAppointSelf = "You cannot appoint yourself as organization admin.";
     internal const string OrganizationAlreadyHasOrgAdmin = "The organization already has an organization admin.";
     internal const string MembershipGuestRoleIsFixed = "A guest stays a guest. End the membership and add the person again to change it.";
+    internal const string MembershipNotFound = "The user is not a member of this organization.";
+    internal const string MembershipLastOrgAdmin = "The organization must keep at least one organization admin. Appoint another one first.";
 }

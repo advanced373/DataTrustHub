@@ -1,3 +1,4 @@
+using DataTrustHub.Domain.Memberships;
 using DataTrustHub.Features.Administration.CreateOrganization;
 using DataTrustHub.Features.Administration.CreatePolicy;
 using DataTrustHub.Features.Administration.DeleteOrganization;
@@ -17,6 +18,7 @@ public class OrganizationPolicyCommandHandlerTests
     private readonly FakeOrganizationRepository _organizations = new();
     private readonly FakePolicyRepository _policies = new();
     private readonly FakeClearanceRepository _clearances = new();
+    private readonly FakeMembershipRepository _memberships = new();
     private readonly CountingUnitOfWork _unitOfWork = new();
 
     // --- CreateOrganization ---
@@ -122,6 +124,40 @@ public class OrganizationPolicyCommandHandlerTests
         Assert.Equal(1, _unitOfWork.SaveChangesCalls);
     }
 
+    // AC6 of #95 step 2b: the organization's memberships end with it, in the same save; others stay
+    [Fact]
+    public async Task DeleteOrganization_WithMemberships_RemovesThemInTheSameCommit()
+    {
+        var organization = _organizations.Seed(OrganizationName);
+        var orgAdmin = _memberships.Seed(Membership.AppointOrgAdmin(Guid.NewGuid(), organization.Id));
+        var member = _memberships.Seed(Membership.AddMember(Guid.NewGuid(), organization.Id));
+        var guest = _memberships.Seed(Membership.AddGuest(Guid.NewGuid(), organization.Id));
+        var otherOrganizationMembership = _memberships.Seed(Membership.AddMember(member.UserId, Guid.NewGuid()));
+
+        var result = await DeleteOrganizationHandler().Handle(new DeleteOrganizationCommand(organization.Id), default);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(
+            new HashSet<Guid> { orgAdmin.Id, member.Id, guest.Id },
+            _memberships.Removed.Select(m => m.Id).ToHashSet());
+        Assert.DoesNotContain(otherOrganizationMembership, _memberships.Removed);
+        Assert.Equal(1, _unitOfWork.SaveChangesCalls);
+    }
+
+    [Fact]
+    public async Task DeleteOrganization_WithPoliciesAndMemberships_KeepsMembershipsWithoutCommit()
+    {
+        var organization = _organizations.Seed(OrganizationName);
+        _policies.Seed(PolicyName, organization.Id);
+        _memberships.Seed(Membership.AppointOrgAdmin(Guid.NewGuid(), organization.Id));
+
+        var result = await DeleteOrganizationHandler().Handle(new DeleteOrganizationCommand(organization.Id), default);
+
+        Assert.Equal(AdminErrorCodes.OrganizationHasPolicies, result.Error.Code);
+        Assert.Empty(_memberships.Removed);
+        Assert.Equal(0, _unitOfWork.SaveChangesCalls);
+    }
+
     [Fact]
     public async Task DeleteOrganization_Unknown_FailsWithoutCommit()
     {
@@ -201,7 +237,7 @@ public class OrganizationPolicyCommandHandlerTests
 
     private CreatePolicyHandler CreatePolicyHandler() => new(_organizations, _policies, _unitOfWork);
 
-    private DeleteOrganizationHandler DeleteOrganizationHandler() => new(_organizations, _policies, _unitOfWork);
+    private DeleteOrganizationHandler DeleteOrganizationHandler() => new(_organizations, _policies, _memberships, _unitOfWork);
 
     private DeletePolicyHandler DeletePolicyHandler() => new(_policies, _clearances, _unitOfWork);
 }

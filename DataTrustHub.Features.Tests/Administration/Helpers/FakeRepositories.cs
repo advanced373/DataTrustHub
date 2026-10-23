@@ -40,6 +40,7 @@ internal sealed class FakeMembershipRepository : IMembershipRepository
     internal List<Membership> Stored { get; } = [];
     internal List<Membership> Added { get; } = [];
     internal List<Membership> Updated { get; } = [];
+    internal List<Membership> Removed { get; } = [];
 
     internal Membership Seed(Membership membership)
     {
@@ -73,7 +74,11 @@ internal sealed class FakeMembershipRepository : IMembershipRepository
         return Task.CompletedTask;
     }
 
-    public Task RemoveAsync(Membership membership, CancellationToken cancellationToken) => throw new NotSupportedException();
+    public Task RemoveAsync(Membership membership, CancellationToken cancellationToken)
+    {
+        Removed.Add(membership);
+        return Task.CompletedTask;
+    }
 }
 
 internal sealed class FakeOrganizationRepository : IOrganizationRepository
@@ -131,6 +136,9 @@ internal sealed class FakePolicyRepository : IPolicyRepository
 
     public Task<bool> AnyInOrganizationAsync(Guid organizationId, CancellationToken cancellationToken) =>
         Task.FromResult(Stored.Any(p => p.OrganizationId == organizationId));
+
+    public Task<IReadOnlyList<Guid>> ListIdsInOrganizationAsync(Guid organizationId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<Guid>>(Stored.Where(p => p.OrganizationId == organizationId).Select(p => p.Id).ToList());
 
     public void Add(Policy policy) => Added.Add(policy);
 

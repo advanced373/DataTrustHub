@@ -1,5 +1,6 @@
 using DataTrustHub.Features.Administration.AddMember;
 using DataTrustHub.Features.Administration.AppointOrganizationAdmin;
+using DataTrustHub.Features.Administration.ChangeMemberRole;
 using DataTrustHub.Features.Administration.CreateAccount;
 using DataTrustHub.Features.Administration.CreateClearance;
 using DataTrustHub.Features.Administration.CreateOrganization;
@@ -8,6 +9,8 @@ using DataTrustHub.Features.Administration.DeleteAccount;
 using DataTrustHub.Features.Administration.DeleteClearance;
 using DataTrustHub.Features.Administration.DeleteOrganization;
 using DataTrustHub.Features.Administration.DeletePolicy;
+using DataTrustHub.Features.Administration.LeaveOrganization;
+using DataTrustHub.Features.Administration.RemoveMember;
 using NetArchTest.Rules;
 using Xunit;
 using static DataTrustHub.Features.Tests.Architecture.ArchitectureConstants;
@@ -28,7 +31,10 @@ public class AdministrationCommandHandlerArchitectureTests
         typeof(CreateClearanceHandler),
         typeof(DeleteClearanceHandler),
         typeof(AppointOrganizationAdminHandler),
-        typeof(AddMemberHandler)
+        typeof(AddMemberHandler),
+        typeof(ChangeMemberRoleHandler),
+        typeof(RemoveMemberHandler),
+        typeof(LeaveOrganizationHandler)
     ];
 
     [Fact]

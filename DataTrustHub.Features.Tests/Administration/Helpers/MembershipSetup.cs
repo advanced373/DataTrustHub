@@ -12,6 +12,10 @@ namespace DataTrustHub.Features.Tests.Administration.Helpers;
 // An organization with a platform admin who created it and an organization admin appointed by them
 internal sealed record OrganizationScenario(HttpClient PlatformAdmin, Guid OrganizationId, HttpClient OrgAdmin, Guid OrgAdminId);
 
+// For C7: a user's clearance on a policy of the scenario's organization, their clearance on a policy of another
+// organization, and another user's clearance on the scenario's policy
+internal sealed record ClearanceScenario(Guid UserClearanceHere, Guid UserClearanceElsewhere, Guid OtherUserId, Guid OtherUserClearanceHere);
+
 /// <summary>
 /// Creates organizations, users and memberships through the API (ADR-0014), and reads the stored memberships.
 /// </summary>
@@ -59,7 +63,7 @@ internal static class MembershipSetup
         return membership.Id;
     }
 
-    // Removes a membership row directly (removing a member is step 2b, not yet a use case)
+    // Removes a membership row directly, without the use cases (and so without M2 and C7)
     internal static async Task RemoveMembershipAsync(ApiFactory factory, Guid membershipId)
     {
         using var scope = factory.Services.CreateScope();
@@ -73,6 +77,34 @@ internal static class MembershipSetup
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DContext>();
         return await db.Memberships.AsNoTracking().Where(m => m.OrganizationId == organizationId).ToListAsync();
+    }
+
+    internal static async Task<List<DbMembership>> StoredMembershipsOfUserAsync(ApiFactory factory, Guid userId)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<DContext>();
+        return await db.Memberships.AsNoTracking().Where(m => m.UserId == userId).ToListAsync();
+    }
+
+    internal static async Task<List<Guid>> StoredClearanceIdsOfUserAsync(ApiFactory factory, Guid userId)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<DContext>();
+        return await db.Clearances.AsNoTracking().Where(c => c.UserId == userId).Select(c => c.Id).ToListAsync();
+    }
+
+    internal static async Task<ClearanceScenario> CreateClearancesAsync(
+        ApiFactory factory, OrganizationScenario scenario, Guid userId, string prefix)
+    {
+        var admin = scenario.PlatformAdmin;
+        var policyHere = await AdminSetup.CreatePolicyAsync(admin, $"{prefix} policy", scenario.OrganizationId);
+        var policyElsewhere = await AdminSetup.CreatePolicyAsync(admin, $"{prefix} elsewhere policy");
+        var (_, otherUserId) = await CreateUserAsync(factory, $"{prefix}_other_cleared");
+        return new ClearanceScenario(
+            await AdminSetup.CreateClearanceAsync(admin, userId, policyHere),
+            await AdminSetup.CreateClearanceAsync(admin, userId, policyElsewhere),
+            otherUserId,
+            await AdminSetup.CreateClearanceAsync(admin, otherUserId, policyHere));
     }
 
     private static string PlatformAdminEmail(string prefix) => $"{prefix}_platform{EmailDomain}";

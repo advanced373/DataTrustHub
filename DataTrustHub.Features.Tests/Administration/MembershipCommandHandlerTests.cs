@@ -78,7 +78,7 @@ public class MembershipCommandHandlerTests
         AssertAppointFailedWithoutCommit(result, AdminErrorCodes.OrganizationAlreadyHasOrgAdmin, ErrorType.Conflict);
     }
 
-    // Further organization admins are appointed by the organization's own admins (step 2b)
+    // Further organization admins are appointed by the organization's own admins (ChangeMemberRole)
     [Fact]
     public async Task AppointOrganizationAdmin_OrganizationHasAnotherOrgAdmin_FailsWithAlreadyHasOrgAdmin()
     {

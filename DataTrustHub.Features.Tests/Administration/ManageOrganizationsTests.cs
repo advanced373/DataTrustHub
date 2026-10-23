@@ -10,7 +10,6 @@ namespace DataTrustHub.Features.Tests.Administration;
 public class ManageOrganizationsTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
     private const string OrganizationsEndpoint = "/admin/organizations";
-    private const string PoliciesEndpoint = "/admin/policies";
     // Pre-rename route, kept only to prove it no longer exists (issue #91)
     private const string LegacyGroupsEndpoint = "/admin/groups";
 
@@ -80,8 +79,9 @@ public class ManageOrganizationsTests(ApiFactory factory) : IClassFixture<ApiFac
     public async Task DeleteOrganization_WithPolicies_Returns409WithCode()
     {
         var admin = await CreateAdminAsync("organizations_conflict_admin@example.com");
-        var organizationId = await CreateOrganizationAsync(admin, "Organization with policy");
-        await admin.PostAsJsonAsync(PoliciesEndpoint, new { Name = "Blocking policy", OrganizationId = organizationId });
+        var (organizationId, orgAdmin) =
+            await AdminSetup.CreateOrganizationWithOrgAdminAsync(factory, admin, "Organization with policy");
+        await AdminSetup.CreatePolicyAsync(orgAdmin, "Blocking policy", organizationId);
 
         var response = await admin.DeleteAsync($"{OrganizationsEndpoint}/{organizationId}");
 

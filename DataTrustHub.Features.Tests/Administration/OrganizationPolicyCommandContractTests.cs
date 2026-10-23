@@ -4,26 +4,32 @@ using DataTrustHub.Features.Tests.Helpers;
 using DataTrustHub.SharedKernel;
 using Xunit;
 using static DataTrustHub.Features.Tests.Administration.Helpers.AdminSetup;
+using static DataTrustHub.Features.Tests.Administration.Helpers.MembershipSetup;
 
 namespace DataTrustHub.Features.Tests.Administration;
 
 // ADR-0012 step 3b-1: organization and policy command behaviour not covered by the per-slice tests
-// (state kept on a conflict, per-organization name uniqueness, authorization of all four routes)
+// (state kept on a conflict, per-organization name uniqueness, authorization of the routes).
+// Since #95 step 3a the policy commands are called by an organization admin of the policy's organization.
 public class OrganizationPolicyCommandContractTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
+    // The same user is organization admin of both organizations, so only the organization differs (P2 is per organization)
     [Fact]
     public async Task CreatePolicy_SameNameInOtherOrganization_Returns200AndStoresPolicy()
     {
         var admin = await CreateAdminAsync("contract_policy_otherorganization@example.com");
+        var (orgAdmin, orgAdminId) = await CreateUserAsync(factory, "contract_policy_otherorganization_orgadmin");
         var organizationA = await CreateOrganizationAsync(admin, "Contract shared name organization A");
         var organizationB = await CreateOrganizationAsync(admin, "Contract shared name organization B");
-        await PostPolicyAsync(admin, "Contract shared policy", organizationA);
+        await AppointOrganizationAdminAsync(admin, organizationA, orgAdminId);
+        await AppointOrganizationAdminAsync(admin, organizationB, orgAdminId);
+        await PostPolicyAsync(orgAdmin, organizationA, "Contract shared policy");
 
-        var response = await PostPolicyAsync(admin, "Contract shared policy", organizationB);
+        var response = await PostPolicyAsync(orgAdmin, organizationB, "Contract shared policy");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var policyId = (await response.Content.ReadFromJsonAsync<CreatePolicyResponse>())!.PolicyId;
-        var policy = await admin.GetFromJsonAsync<PolicyResponse>($"{PoliciesEndpoint}/{policyId}");
+        var policy = await orgAdmin.GetFromJsonAsync<PolicyResponse>(PolicyEndpoint(organizationB, policyId));
         Assert.Equal(new PolicyResponse(policyId, "Contract shared policy", organizationB), policy);
     }
 
@@ -31,8 +37,8 @@ public class OrganizationPolicyCommandContractTests(ApiFactory factory) : IClass
     public async Task DeleteOrganization_WithPolicies_KeepsOrganization()
     {
         var admin = await CreateAdminAsync("contract_organization_delete_blocked@example.com");
-        var organizationId = await CreateOrganizationAsync(admin, "Contract blocked organization");
-        await PostPolicyAsync(admin, "Contract blocking policy", organizationId);
+        var (organizationId, orgAdmin) = await CreateOrganizationWithOrgAdminAsync(factory, admin, "Contract blocked organization");
+        await PostPolicyAsync(orgAdmin, organizationId, "Contract blocking policy");
 
         var response = await admin.DeleteAsync($"{OrganizationsEndpoint}/{organizationId}");
 
@@ -46,23 +52,24 @@ public class OrganizationPolicyCommandContractTests(ApiFactory factory) : IClass
         const string holderEmail = "contract_policy_holder@example.com";
         var admin = await CreateAdminAsync("contract_policy_delete_blocked@example.com");
         await TestUsers.CreateClientAsync(factory, holderEmail);
-        var policyId = await CreatePolicyAsync(admin, "Contract cleared policy");
+        var (organizationId, orgAdmin) = await CreateOrganizationWithOrgAdminAsync(factory, admin, "Contract cleared organization");
+        var policyId = await CreatePolicyAsync(orgAdmin, "Contract cleared policy", organizationId);
         await CreateClearanceAsync(admin, await TestUsers.GetIdAsync(factory, holderEmail), policyId);
 
-        var response = await admin.DeleteAsync($"{PoliciesEndpoint}/{policyId}");
+        var response = await orgAdmin.DeleteAsync(PolicyEndpoint(organizationId, policyId));
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync($"{PoliciesEndpoint}/{policyId}")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await orgAdmin.GetAsync(PolicyEndpoint(organizationId, policyId))).StatusCode);
     }
 
-    // The delete routes' 403 is covered in ManageOrganizationsTests and ManagePoliciesTests
+    // The delete route's 403 is covered in ManageOrganizationsTests. A regular user on the policy routes gets
+    // 404 Organization.NotFound since #95 step 3a (PolicyAccessTests)
     [Fact]
-    public async Task CreateCommands_RegularUser_Return403()
+    public async Task CreateOrganization_RegularUser_Returns403()
     {
         var user = await TestUsers.CreateClientAsync(factory, "contract_regular@example.com");
 
         Assert.Equal(HttpStatusCode.Forbidden, (await PostOrganizationAsync(user)).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await PostPolicyAsync(user, "Forbidden policy", Guid.NewGuid())).StatusCode);
     }
 
     [Fact]
@@ -72,9 +79,9 @@ public class OrganizationPolicyCommandContractTests(ApiFactory factory) : IClass
         var someId = Guid.NewGuid();
 
         Assert.Equal(HttpStatusCode.Unauthorized, (await PostOrganizationAsync(anonymous)).StatusCode);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await PostPolicyAsync(anonymous, "Anonymous policy", someId)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await PostPolicyAsync(anonymous, someId, "Anonymous policy")).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.DeleteAsync($"{OrganizationsEndpoint}/{someId}")).StatusCode);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.DeleteAsync($"{PoliciesEndpoint}/{someId}")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.DeleteAsync(PolicyEndpoint(someId, someId))).StatusCode);
     }
 
     // --- helpers ---
@@ -82,20 +89,10 @@ public class OrganizationPolicyCommandContractTests(ApiFactory factory) : IClass
     private Task<HttpClient> CreateAdminAsync(string email) =>
         TestUsers.CreateClientAsync(factory, email, UserRoles.Admin);
 
-    private static async Task<Guid> CreateOrganizationAsync(HttpClient admin, string name)
-    {
-        var response = await admin.PostAsJsonAsync(OrganizationsEndpoint, new { Name = name });
-        return (await response.Content.ReadFromJsonAsync<CreateOrganizationResponse>())!.OrganizationId;
-    }
-
     // Valid body, so only authorization can reject the request
     private static Task<HttpResponseMessage> PostOrganizationAsync(HttpClient client) =>
         client.PostAsJsonAsync(OrganizationsEndpoint, new { Name = "Unauthorized organization" });
 
-    private static Task<HttpResponseMessage> PostPolicyAsync(HttpClient client, string name, Guid organizationId) =>
-        client.PostAsJsonAsync(PoliciesEndpoint, new { Name = name, OrganizationId = organizationId });
-
     private record PolicyResponse(Guid Id, string Name, Guid OrganizationId);
-    private record CreateOrganizationResponse(Guid OrganizationId);
     private record CreatePolicyResponse(Guid PolicyId);
 }

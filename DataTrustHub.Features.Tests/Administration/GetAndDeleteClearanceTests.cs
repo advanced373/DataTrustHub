@@ -17,7 +17,7 @@ public class GetAndDeleteClearanceTests(ApiFactory factory) : IClassFixture<ApiF
     public async Task GetClearance_Existing_ReturnsIt()
     {
         var (admin, userId) = await CreateAdminAndUserAsync("clearance_get");
-        var policyId = await CreatePolicyAsync(admin, "Clearance get policy");
+        var policyId = await CreatePolicyAsync(factory, admin, "Clearance get policy");
         var clearanceId = await CreateClearanceAsync(admin, userId, policyId);
 
         var clearance = await admin.GetFromJsonAsync<ClearanceResponse>($"{ClearancesEndpoint}/{clearanceId}");
@@ -41,16 +41,17 @@ public class GetAndDeleteClearanceTests(ApiFactory factory) : IClassFixture<ApiF
     public async Task DeleteClearance_Existing_Returns204_AndUnblocksPolicyDeletion()
     {
         var (admin, userId) = await CreateAdminAndUserAsync("clearance_delete");
-        var policyId = await CreatePolicyAsync(admin, "Clearance delete policy");
+        var (organizationId, orgAdmin) = await CreateOrganizationWithOrgAdminAsync(factory, admin, "Clearance delete organization");
+        var policyId = await CreatePolicyAsync(orgAdmin, "Clearance delete policy", organizationId);
         var clearanceId = await CreateClearanceAsync(admin, userId, policyId);
-        var blocked = await admin.DeleteAsync($"{PoliciesEndpoint}/{policyId}");
+        var blocked = await orgAdmin.DeleteAsync(PolicyEndpoint(organizationId, policyId));
 
         var response = await admin.DeleteAsync($"{ClearancesEndpoint}/{clearanceId}");
 
         Assert.Equal(HttpStatusCode.Conflict, blocked.StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await admin.GetAsync($"{ClearancesEndpoint}/{clearanceId}")).StatusCode);
-        Assert.Equal(HttpStatusCode.NoContent, (await admin.DeleteAsync($"{PoliciesEndpoint}/{policyId}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await orgAdmin.DeleteAsync(PolicyEndpoint(organizationId, policyId))).StatusCode);
     }
 
     [Fact]
@@ -59,7 +60,7 @@ public class GetAndDeleteClearanceTests(ApiFactory factory) : IClassFixture<ApiF
         const string levelName = "KeptAfterDelete";
         const int levelPriority = 9;
         var (admin, userId) = await CreateAdminAndUserAsync("clearance_keep_level");
-        var policyId = await CreatePolicyAsync(admin, "Clearance keep level policy");
+        var policyId = await CreatePolicyAsync(factory, admin, "Clearance keep level policy");
         var created = await PostClearanceAsync(admin, userId, policyId, levelName, levelPriority);
         var clearanceId = (await created.Content.ReadFromJsonAsync<CreateClearanceResponse>())!.ClearanceId;
 

@@ -1,18 +1,25 @@
 using System.Net.Http.Json;
+using DataTrustHub.Features.Tests.Helpers;
+using DataTrustHub.Infrastructure.Persistance;
+using DataTrustHub.Infrastructure.Persistance.Model;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace DataTrustHub.Features.Tests.Administration.Helpers;
 
 /// <summary>
-/// Creates the organization, policy and clearance prerequisites through the admin API.
+/// Creates the organization, policy and clearance prerequisites through the API.
 /// </summary>
 internal static class AdminSetup
 {
     internal const string OrganizationsEndpoint = "/admin/organizations";
-    internal const string PoliciesEndpoint = "/admin/policies";
     internal const string ClearancesEndpoint = "/admin/clearances";
 
-    internal static async Task<Guid> CreatePolicyAsync(HttpClient admin, string name) =>
-        await CreatePolicyAsync(admin, name, await CreateOrganizationAsync(admin, $"{name} organization"));
+    // The platform admin's policy routes before #95 step 3a, kept only to prove they no longer exist
+    internal const string LegacyPoliciesEndpoint = "/admin/policies";
+
+    private const string OrgAdminEmailPrefix = "policy_orgadmin_";
+    private const string OrgAdminEmailDomain = "@example.com";
 
     internal static async Task<Guid> CreateOrganizationAsync(HttpClient admin, string name)
     {
@@ -20,10 +27,37 @@ internal static class AdminSetup
         return (await organization.Content.ReadFromJsonAsync<CreateOrganizationResponse>())!.OrganizationId;
     }
 
-    internal static async Task<Guid> CreatePolicyAsync(HttpClient admin, string name, Guid organizationId)
+    // --- policies (ADR-0014, C6): managed by an organization admin of the policy's organization ---
+
+    internal static string PoliciesEndpoint(Guid organizationId) => $"/organizations/{organizationId}/policies";
+
+    internal static string PolicyEndpoint(Guid organizationId, Guid policyId) => $"{PoliciesEndpoint(organizationId)}/{policyId}";
+
+    internal static Task<HttpResponseMessage> PostPolicyAsync(HttpClient caller, Guid organizationId, string name) =>
+        caller.PostAsJsonAsync(PoliciesEndpoint(organizationId), new { Name = name });
+
+    internal static async Task<Guid> CreatePolicyAsync(HttpClient orgAdmin, string name, Guid organizationId)
     {
-        var policy = await admin.PostAsJsonAsync(PoliciesEndpoint, new { Name = name, OrganizationId = organizationId });
+        var policy = await PostPolicyAsync(orgAdmin, organizationId, name);
         return (await policy.Content.ReadFromJsonAsync<CreatePolicyResponse>())!.PolicyId;
+    }
+
+    // A policy in a new organization "{name} organization", created by a new organization admin of it
+    internal static async Task<Guid> CreatePolicyAsync(ApiFactory factory, HttpClient platformAdmin, string name)
+    {
+        var (organizationId, orgAdmin) = await CreateOrganizationWithOrgAdminAsync(factory, platformAdmin, $"{name} organization");
+        return await CreatePolicyAsync(orgAdmin, name, organizationId);
+    }
+
+    // The platform admin creates the organization and appoints a new user as its first organization admin
+    internal static async Task<(Guid OrganizationId, HttpClient OrgAdmin)> CreateOrganizationWithOrgAdminAsync(
+        ApiFactory factory, HttpClient platformAdmin, string organizationName)
+    {
+        var organizationId = await CreateOrganizationAsync(platformAdmin, organizationName);
+        var email = $"{OrgAdminEmailPrefix}{Guid.NewGuid():N}{OrgAdminEmailDomain}";
+        var orgAdmin = await TestUsers.CreateClientAsync(factory, email);
+        await AppointOrganizationAdminAsync(platformAdmin, organizationId, await TestUsers.GetIdAsync(factory, email));
+        return (organizationId, orgAdmin);
     }
 
     internal static Task<HttpResponseMessage> PostClearanceAsync(
@@ -41,6 +75,13 @@ internal static class AdminSetup
     {
         var response = await PostClearanceAsync(admin, userId, policyId);
         return (await response.Content.ReadFromJsonAsync<CreateClearanceResponse>())!.ClearanceId;
+    }
+
+    // Every stored policy, read directly, so a test can prove what a request did or did not change
+    internal static async Task<List<DbPolicy>> StoredPoliciesAsync(ApiFactory factory)
+    {
+        using var scope = factory.Services.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<DContext>().Policies.AsNoTracking().ToListAsync();
     }
 
     // --- memberships (ADR-0014) ---

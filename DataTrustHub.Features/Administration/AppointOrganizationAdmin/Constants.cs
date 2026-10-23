@@ -23,8 +23,8 @@ internal static class Errors
         "Membership.CannotAppointSelf",
         "You cannot appoint yourself as organization admin.");
 
-    // The platform admin appoints only the first organization admin; the others will be appointed by the
-    // organization's own admins, by changing a member's role (step 2b of #95)
+    // The platform admin appoints only the first organization admin; the others are appointed by the
+    // organization's own admins, by changing a member's role (ChangeMemberRole)
     internal static readonly Error AlreadyHasOrgAdmin = Error.Conflict(
         "Organization.AlreadyHasOrgAdmin",
         "The organization already has an organization admin.");

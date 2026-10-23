@@ -6,9 +6,9 @@
 
 > **In progress:** ADR-0014 turns organizations into tenants. The `Membership` aggregate (Member,
 > Guest, OrgAdmin) exists in Access Governance. Appointing an organization admin, adding a member or
-> guest and listing the members are implemented; changing a role, removing a member and leaving come
-> next, and then the organization-scoped authorization of policies and clearances (#95). This page
-> describes the code as it is today.
+> guest, listing the members, changing a member's role, removing a member and leaving an organization
+> are implemented; the organization-scoped authorization of policies and clearances comes next (#95).
+> This page describes the code as it is today.
 
 DataTrustHub is one deployable application with one database and one `DataTrustHub.Domain` project.
 The contexts below are **logical** boundaries inside that monolith: they are where the model would
@@ -34,8 +34,8 @@ It is about who may see what: the structure of access.
 | | |
 |---|---|
 | **Owns** | `Organization`, `Policy`, `Clearance`, `Membership`, the value objects `ClassificationLevel` and `MembershipRole` |
-| **Use cases** | create, list, get and delete organizations, policies and clearances; appoint an organization admin, add a member or guest, list the members |
-| **Code today** | `Features/Administration` (`*Organization*` / `*Group*`, `*Policy*`, `*Clearance*`, `AddMember`, `ListMembers`, and `Authorization` for the organization admin check) |
+| **Use cases** | create, list, get and delete organizations, policies and clearances; appoint an organization admin, add a member or guest, list the members, change a member's role, remove a member, leave an organization |
+| **Code today** | `Features/Administration` (`*Organization*` / `*Group*`, `*Policy*`, `*Clearance*`, `AddMember`, `ListMembers`, `ChangeMemberRole`, `RemoveMember`, `LeaveOrganization`, `Authorization` for the organization admin check, and `MembershipRules` for M2 and C7) |
 | **Publishes** | a user's clearances, read by Data Management |
 
 ### 3. Data Management
@@ -78,8 +78,10 @@ Identity and Access ──(user id)──────────────▶
 
 - **Reference by id only.** An aggregate never holds another aggregate as an object. For example,
   `Clearance.UserId` and `DataItem.PolicyId` are ids.
-- **One aggregate per command,** as far as possible. Today *delete account* changes three
-  aggregates (`User`, its `Clearance`s and its `DataItem`s) in one transaction. That is accepted
+- **One aggregate per command,** as far as possible. Today *delete account* changes four
+  aggregates (`User`, its `Clearance`s, its `Membership`s and its `DataItem`s) in one transaction, and
+  *remove a member* and *leave an organization* end a `Membership` and revoke `Clearance`s together (C7);
+  *delete organization* removes the `Organization` and its `Membership`s together (O3). That is accepted
   inside the monolith. Across services it would become a domain event.
 - **Feature folders are not the contexts.** The account slices live in `Administration`, but they
   belong to Identity and Access. Rule 2 of `CLAUDE.md` (no cross-feature imports) still applies.

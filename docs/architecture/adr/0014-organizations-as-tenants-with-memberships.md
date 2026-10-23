@@ -1,7 +1,7 @@
 # ADR-0014: Organizations as tenants, with memberships, organization admins and guests
 
 - **Status:** Accepted
-- **Date:** 2026-10-22; amended 2026-10-22 (C8) and 2026-10-23 (M3)
+- **Date:** 2026-10-22; amended 2026-10-22 (C8) and 2026-10-23 (M3, platform admin limits, 404 outside an organization)
 - **Related:** #95 (implementation); [ADR-0004](0004-owner-only-soft-delete.md),
   [ADR-0006](0006-roles-in-jwt-and-admin-seeding.md),
   [ADR-0011](0011-data-access-by-policy-and-classification-level.md); `docs/domain/`
@@ -44,7 +44,9 @@ it.
    added to that organization as a guest, and then given a clearance there. A clearance never
    crosses the tenant boundary on its own.
 5. **The platform admin manages tenants only.** This is today's `Admin` role.
-   - It creates and deletes organizations and appoints their first organization admin.
+   - It creates and deletes organizations and appoints their first organization admin. It appoints
+     only the **first** one (while the organization has no organization admin), and never itself;
+     further organization admins are appointed by the organization's own admins.
    - It does not manage policies, members or clearances inside an organization, and has no
      access to data.
 6. **Need-to-know is kept (ADR-0011).** No admin role grants read access: platform admins,
@@ -92,6 +94,9 @@ it.
 - **`MembershipRole`** (`Member`, `Guest`, `OrgAdmin`) is a value object.
 - **The platform role stays on `User`:** `UserRoles.Admin` means platform admin. Roles inside an
   organization live on the membership.
+- **A caller who is not an organization admin of X gets 404 on X's organization-scoped routes,**
+  not 403, so that no one outside an organization learns that it exists. This includes a platform
+  admin. It follows the need-to-know style of data items, where an unreadable item is also 404.
 - **Authorization inside an organization** is decided per request from the memberships, not from
   the JWT. A user can belong to many organizations, and their membership can change while a token
   is still valid.
@@ -164,3 +169,13 @@ Guest → OrgAdmin, which could be bypassed in two steps (Guest → Member → O
 membership never changes role, and a member or organization admin never becomes a guest. An
 external person who becomes internal goes through ending the membership, which revokes their
 clearances (C7), and being added again as a member, so their access is granted again from scratch.
+
+**Decided on 2026-10-23: limits of the platform admin.** Review of #95 step 2a found that the
+appoint route let a platform admin appoint themselves, or appoint more organization admins, in any
+organization, and so reach member and later clearance management. Now the platform admin appoints
+only the first organization admin of an organization (`Organization.AlreadyHasOrgAdmin`
+otherwise) and never themselves (`Membership.CannotAppointSelf`). If an organization loses all its
+organization admins, for example when an account is deleted, the platform admin can appoint one
+again. The migration made every existing admin an organization admin of every organization (see
+*Migration of existing data*), so that no organization starts without one; once each organization
+has its own organization admins, the platform admins leave those organizations.

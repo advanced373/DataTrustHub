@@ -116,6 +116,48 @@ The standard levels are `ClassificationLevel.Standard`, used for data items:
 | 3 | Secret |
 | 4 | Top Secret |
 
+## Membership
+
+*Context: Access Governance.* A user's membership in one organization, with a role there
+(ADR-0014). Source: `Domain/Memberships/Membership.cs`.
+
+It is its own aggregate, not part of `Organization`: loading every member to change one would make
+each command heavy, and concurrent edits would conflict. So M1 and M2 are checked in the use case.
+
+| Attribute | Notes |
+|---|---|
+| `Id` | |
+| `UserId` | The member (by id) |
+| `OrganizationId` | The organization (by id) |
+| `Role` | A `MembershipRole`: `Member`, `Guest` or `OrgAdmin` |
+
+**Factory methods:**
+- `AddMember(userId, organizationId)`
+- `AddGuest(userId, organizationId)`
+- `AppointOrgAdmin(userId, organizationId)`
+
+**Behaviour:** `ChangeRole(newRole)` returns a `Result`. Changing to the same role succeeds and
+changes nothing. A member and an organization admin can swap roles; the guest role never changes
+(M3).
+
+| # | Invariant / rule | Enforced in |
+|---|---|---|
+| M1 | A user has at most one membership per organization | Database: unique index on (`UserId`, `OrganizationId`). Use case: add member (`ExistsAsync`), from step 2 of #95 |
+| M2 | An organization always has at least one organization admin, so the last one cannot be removed or demoted | Use case: remove member / change role (`CountOrgAdminsAsync`), from step 2 of #95. The migration appoints every platform admin as organization admin of every existing organization |
+| M3 | The guest role is fixed: a guest cannot change to another role, and a member or organization admin cannot become a guest. To change it, the membership is ended and the person is added again, so their access is granted again from scratch | Entity: `ChangeRole` → `Membership.GuestRoleIsFixed` (409) |
+
+### Value object: MembershipRole
+
+Source: `Domain/Memberships/MembershipRole.cs`. It is an immutable `record (Name)`, stored by name.
+The standard roles are `MembershipRole.Standard`; `FindStandard(name)` returns null for an unknown
+name.
+
+| Name | Meaning |
+|---|---|
+| `Member` | Holds clearances, reads and uploads data |
+| `Guest` | An external person, added explicitly; works like a member, but never manages the organization. The role is fixed (M3) |
+| `OrgAdmin` | Manages the organization: its members, policies and clearances |
+
 ## DataItem
 
 *Context: Data Management.* A stored file. Source: `Domain/DataItems/DataItem.cs`.

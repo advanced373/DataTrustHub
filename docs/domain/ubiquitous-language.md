@@ -45,7 +45,7 @@ The rules are recorded in ADR-0011. The architecture that implements them is in 
 | **Membership** | A user's membership in one organization, with a role there. A user can be a member of several organizations, with at most one membership in each | `Membership` |
 | **Membership role** | The role of a membership: member, guest or organization admin | `MembershipRole` |
 | **Member** | A membership role: holds clearances, reads and uploads data in the organization | `MembershipRole.Member` |
-| **Guest** | A membership role for an external person, added explicitly. Works like a member, but can never become an organization admin | `MembershipRole.Guest` |
+| **Guest** | A membership role for an external person, added explicitly. Works like a member, but never manages the organization. The guest role is fixed: a guest never changes role, and no member or organization admin becomes a guest; the membership is ended and the person added again instead | `MembershipRole.Guest` |
 | **Organization admin** | A membership role that manages one organization: its members, policies and clearances. Write *OrgAdmin* in code only | `MembershipRole.OrgAdmin` |
 | **Organization** | A tenant: the company that policies, clearances and classified data belong to. The word is never *group*. The old *Group* names in the API and the UI are being renamed (#91) | `Organization` |
 | **Policy** | A named area of access inside one organization. Every classified data item belongs to one policy | `Policy` |

@@ -31,11 +31,13 @@ public sealed class Membership
     public static Membership AppointOrgAdmin(Guid userId, Guid organizationId) =>
         new(Guid.NewGuid(), userId, organizationId, MembershipRole.OrgAdmin);
 
-    // Invariant M3: a guest cannot become an organization admin. The last organization admin (M2)
-    // needs the other memberships, so the use case checks it
+    // Invariant M3: the guest role is fixed, in both directions; for a guest who becomes internal the
+    // membership is ended and the person added again, so their access starts from scratch. The last
+    // organization admin (M2) needs the other memberships, so the use case checks it
     public Result ChangeRole(MembershipRole newRole)
     {
-        if (Role.IsGuest && newRole.IsOrgAdmin) return Result.Failure(MembershipErrors.GuestCannotBeOrgAdmin);
+        if (newRole == Role) return Result.Success();
+        if (Role.IsGuest || newRole.IsGuest) return Result.Failure(MembershipErrors.GuestRoleIsFixed);
 
         Role = newRole;
         return Result.Success();

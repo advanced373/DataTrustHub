@@ -11,7 +11,7 @@ public class MembershipTests
     private const string GuestName = "Guest";
     private const string OrgAdminName = "OrgAdmin";
     private const string UnknownRoleName = "Owner";
-    private const string GuestCannotBeOrgAdminCode = "Membership.GuestCannotBeOrgAdmin";
+    private const string GuestRoleIsFixedCode = "Membership.GuestRoleIsFixed";
 
     private static readonly Guid UserId = Guid.NewGuid();
     private static readonly Guid OrganizationId = Guid.NewGuid();
@@ -106,30 +106,54 @@ public class MembershipTests
         Assert.DoesNotContain(Guid.Empty, ids);
     }
 
-    [Fact]
-    public void ChangeRole_GuestToOrgAdmin_FailsWithGuestCannotBeOrgAdmin()
+    // Invariant M3 (revised): the guest role is fixed, in both directions
+    [Theory]
+    [InlineData(GuestName, MemberName)]
+    [InlineData(GuestName, OrgAdminName)]
+    [InlineData(MemberName, GuestName)]
+    [InlineData(OrgAdminName, GuestName)]
+    public void ChangeRole_IntoOrOutOfGuest_FailsWithGuestRoleIsFixed(string from, string to)
     {
-        var result = Membership.AddGuest(UserId, OrganizationId).ChangeRole(MembershipRole.OrgAdmin);
+        var result = Create(MembershipRole.FindStandard(from)!).ChangeRole(MembershipRole.FindStandard(to)!);
 
         Assert.True(result.IsFailure);
-        Assert.Equal(MembershipErrors.GuestCannotBeOrgAdmin, result.Error);
-        Assert.Equal(GuestCannotBeOrgAdminCode, result.Error.Code);
+        Assert.Equal(MembershipErrors.GuestRoleIsFixed, result.Error);
+        Assert.Equal(GuestRoleIsFixedCode, result.Error.Code);
     }
 
+    [Theory]
+    [InlineData(GuestName, MemberName)]
+    [InlineData(GuestName, OrgAdminName)]
+    [InlineData(MemberName, GuestName)]
+    [InlineData(OrgAdminName, GuestName)]
+    public void ChangeRole_IntoOrOutOfGuest_LeavesTheRoleUnchanged(string from, string to)
+    {
+        var original = MembershipRole.FindStandard(from)!;
+        var membership = Create(original);
+
+        membership.ChangeRole(MembershipRole.FindStandard(to)!);
+
+        Assert.Equal(original, membership.Role);
+    }
+
+    // Regression: the round 1 rule only blocked Guest -> OrgAdmin, so a guest could get there via Member
     [Fact]
-    public void ChangeRole_GuestToOrgAdmin_LeavesTheRoleUnchanged()
+    public void ChangeRole_GuestViaMemberToOrgAdmin_FailsAtTheFirstStepAndStaysGuest()
     {
         var guest = Membership.AddGuest(UserId, OrganizationId);
 
-        guest.ChangeRole(MembershipRole.OrgAdmin);
+        var toMember = guest.ChangeRole(MembershipRole.Member);
+        var toOrgAdmin = guest.ChangeRole(MembershipRole.OrgAdmin);
 
+        Assert.Equal(MembershipErrors.GuestRoleIsFixed, toMember.Error);
+        Assert.Equal(MembershipErrors.GuestRoleIsFixed, toOrgAdmin.Error);
         Assert.Equal(MembershipRole.Guest, guest.Role);
     }
 
     [Fact]
-    public void GuestCannotBeOrgAdmin_IsAConflict()
+    public void GuestRoleIsFixed_IsAConflict()
     {
-        Assert.Equal(ErrorType.Conflict, MembershipErrors.GuestCannotBeOrgAdmin.Type);
+        Assert.Equal(ErrorType.Conflict, MembershipErrors.GuestRoleIsFixed.Type);
     }
 
     [Theory]
@@ -152,10 +176,7 @@ public class MembershipTests
     [Theory]
     [InlineData(MemberName, OrgAdminName)]
     [InlineData(OrgAdminName, MemberName)]
-    [InlineData(MemberName, GuestName)]
-    [InlineData(GuestName, MemberName)]
-    [InlineData(OrgAdminName, GuestName)]
-    public void ChangeRole_AllowedChange_SucceedsAndSetsTheNewRole(string from, string to)
+    public void ChangeRole_BetweenMemberAndOrgAdmin_SucceedsAndSetsTheNewRole(string from, string to)
     {
         var membership = Create(MembershipRole.FindStandard(from)!);
         var newRole = MembershipRole.FindStandard(to)!;

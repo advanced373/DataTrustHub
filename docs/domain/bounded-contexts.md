@@ -7,7 +7,9 @@
 > **In progress:** ADR-0014 turns organizations into tenants. The `Membership` aggregate (Member,
 > Guest, OrgAdmin) exists in Access Governance. Appointing an organization admin, adding a member or
 > guest, listing the members, changing a member's role, removing a member and leaving an organization
-> are implemented; the organization-scoped authorization of policies and clearances comes next (#95).
+> are implemented. Policies are managed by the organization's own admins, on organization-scoped
+> routes, and no longer by the platform admin (C6 for policies). The organization-scoped authorization
+> of clearances comes next (#95); until then the platform admin still manages clearances.
 > This page describes the code as it is today.
 
 DataTrustHub is one deployable application with one database and one `DataTrustHub.Domain` project.
@@ -34,7 +36,7 @@ It is about who may see what: the structure of access.
 | | |
 |---|---|
 | **Owns** | `Organization`, `Policy`, `Clearance`, `Membership`, the value objects `ClassificationLevel` and `MembershipRole` |
-| **Use cases** | create, list, get and delete organizations, policies and clearances; appoint an organization admin, add a member or guest, list the members, change a member's role, remove a member, leave an organization |
+| **Use cases** | platform admin: create, list, get and delete organizations and clearances, appoint an organization's first organization admin; organization admin: create, list, get and delete the organization's policies, add a member or guest, list the members, change a member's role, remove a member; any member or guest: leave an organization |
 | **Code today** | `Features/Administration` (`*Organization*` / `*Group*`, `*Policy*`, `*Clearance*`, `AddMember`, `ListMembers`, `ChangeMemberRole`, `RemoveMember`, `LeaveOrganization`, `Authorization` for the organization admin check, and `MembershipRules` for M2 and C7) |
 | **Publishes** | a user's clearances, read by Data Management |
 

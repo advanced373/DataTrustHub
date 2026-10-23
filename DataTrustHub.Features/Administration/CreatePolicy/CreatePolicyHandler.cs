@@ -1,20 +1,22 @@
 using DataTrustHub.Domain.Abstractions;
-using DataTrustHub.Domain.Organizations;
+using DataTrustHub.Domain.Memberships;
 using DataTrustHub.Domain.Policies;
 using DataTrustHub.Features._Shared.Messaging;
+using DataTrustHub.Features.Administration.Authorization;
 using DataTrustHub.SharedKernel;
 
 namespace DataTrustHub.Features.Administration.CreatePolicy;
 
-public record CreatePolicyCommand(string Name, Guid OrganizationId);
+public record CreatePolicyCommand(Guid OrganizationId, Guid CallerId, string Name);
 
+// An organization admin creates a policy of their organization (C6)
 public class CreatePolicyHandler(
-    IOrganizationRepository organizations,
+    IMembershipRepository memberships,
     IPolicyRepository policies,
     IUnitOfWork unitOfWork)
     : ICommandHandler<CreatePolicyCommand, Result<Guid>>
 {
-    private readonly IOrganizationRepository _organizations = organizations;
+    private readonly IMembershipRepository _memberships = memberships;
     private readonly IPolicyRepository _policies = policies;
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
 
@@ -22,9 +24,11 @@ public class CreatePolicyHandler(
         CreatePolicyCommand command,
         CancellationToken cancellationToken)
     {
-        var organizationExists = await _organizations.ExistsAsync(command.OrganizationId, cancellationToken);
-        if (!organizationExists) return Result.Failure<Guid>(Errors.OrganizationNotFound);
+        // Also P1: an organization admin's membership exists only in an existing organization (O3)
+        if (!await _memberships.IsOrgAdminAsync(command.CallerId, command.OrganizationId, cancellationToken))
+            return Result.Failure<Guid>(Errors.OrganizationNotFound);
 
+        // Invariant P2
         var nameExists = await _policies.NameExistsInOrganizationAsync(
             command.Name, command.OrganizationId, cancellationToken);
         if (nameExists) return Result.Failure<Guid>(Errors.PolicyNameAlreadyInUse);

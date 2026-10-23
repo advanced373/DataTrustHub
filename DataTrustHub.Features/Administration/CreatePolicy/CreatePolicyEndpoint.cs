@@ -5,26 +5,42 @@ using DataTrustHub.SharedKernel;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 
 namespace DataTrustHub.Features.Administration.CreatePolicy;
 
-public record CreatePolicyRequest(string Name, Guid OrganizationId);
+public record CreatePolicyRequest(string Name);
 public record CreatePolicyResponse(Guid PolicyId);
 
+// Any authenticated user may call; the handler checks that the caller is an organization admin there
 public class CreatePolicyEndpoint : ICarterModule
 {
     public void AddRoutes(IEndpointRouteBuilder app) =>
         app.MapPost(Constants.EndpointRoute, Handle)
            .WithTags(Constants.EndpointTag)
-           .RequireAuthorization(policy => policy.RequireRole("Admin"));
+           .RequireAuthorization();
 
     private static async Task<IResult> Handle(
+        Guid organizationId,
         CreatePolicyRequest request,
         ICommandHandler<CreatePolicyCommand, Result<Guid>> handler,
+        HttpContext httpContext,
         CancellationToken cancellationToken)
     {
-        var command = new CreatePolicyCommand(request.Name, request.OrganizationId);
+        var callerId = ExtractUserId(httpContext.User);
+        if (callerId is null) return Results.Unauthorized();
+
+        var command = new CreatePolicyCommand(organizationId, callerId.Value, request.Name);
         var result = await handler.Handle(command, cancellationToken);
         return result.ToHttpResult(policyId => Results.Ok(new CreatePolicyResponse(policyId)));
+    }
+
+    private static Guid? ExtractUserId(ClaimsPrincipal user)
+    {
+        var sub = user.FindFirstValue(JwtRegisteredClaimNames.Sub)
+               ?? user.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        return Guid.TryParse(sub, out var id) ? id : null;
     }
 }

@@ -1,6 +1,7 @@
 using DataTrustHub.Domain.Abstractions;
 using DataTrustHub.Domain.Clearances;
 using DataTrustHub.Domain.DataItems;
+using DataTrustHub.Domain.Memberships;
 using DataTrustHub.Domain.Organizations;
 using DataTrustHub.Domain.Policies;
 using DataTrustHub.Domain.Users;
@@ -19,6 +20,60 @@ internal sealed class CountingUnitOfWork : IUnitOfWork
         SaveChangesCalls++;
         return Task.FromResult(0);
     }
+}
+
+// Simulates M1 under concurrency: another request saved the same membership first, so the unique
+// index rejects this save, as DContext reports it
+internal sealed class UniqueViolationUnitOfWork : IUnitOfWork
+{
+    internal int SaveChangesCalls { get; private set; }
+
+    public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        SaveChangesCalls++;
+        throw new UniqueConstraintViolationException(new InvalidOperationException());
+    }
+}
+
+internal sealed class FakeMembershipRepository : IMembershipRepository
+{
+    internal List<Membership> Stored { get; } = [];
+    internal List<Membership> Added { get; } = [];
+    internal List<Membership> Updated { get; } = [];
+
+    internal Membership Seed(Membership membership)
+    {
+        Stored.Add(membership);
+        return membership;
+    }
+
+    public Task<Membership?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
+        Task.FromResult(Stored.SingleOrDefault(m => m.Id == id));
+
+    public Task<Membership?> GetAsync(Guid userId, Guid organizationId, CancellationToken cancellationToken) =>
+        Task.FromResult(Stored.SingleOrDefault(m => m.UserId == userId && m.OrganizationId == organizationId));
+
+    public Task<bool> ExistsAsync(Guid userId, Guid organizationId, CancellationToken cancellationToken) =>
+        Task.FromResult(Stored.Any(m => m.UserId == userId && m.OrganizationId == organizationId));
+
+    public Task<int> CountOrgAdminsAsync(Guid organizationId, CancellationToken cancellationToken) =>
+        Task.FromResult(Stored.Count(m => m.OrganizationId == organizationId && m.Role.IsOrgAdmin));
+
+    public Task<IReadOnlyList<Membership>> ListForOrganizationAsync(Guid organizationId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<Membership>>(Stored.Where(m => m.OrganizationId == organizationId).ToList());
+
+    public Task<IReadOnlyList<Membership>> ListForUserAsync(Guid userId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<Membership>>(Stored.Where(m => m.UserId == userId).ToList());
+
+    public void Add(Membership membership) => Added.Add(membership);
+
+    public Task UpdateAsync(Membership membership, CancellationToken cancellationToken)
+    {
+        Updated.Add(membership);
+        return Task.CompletedTask;
+    }
+
+    public Task RemoveAsync(Membership membership, CancellationToken cancellationToken) => throw new NotSupportedException();
 }
 
 internal sealed class FakeOrganizationRepository : IOrganizationRepository

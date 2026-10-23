@@ -5,8 +5,10 @@
 > tests enforce.
 
 > **In progress:** ADR-0014 turns organizations into tenants. The `Membership` aggregate (Member,
-> Guest, OrgAdmin) exists in Access Governance; its use cases and the organization-scoped
-> authorization come next (#95). This page describes the code as it is today.
+> Guest, OrgAdmin) exists in Access Governance. Appointing an organization admin, adding a member or
+> guest and listing the members are implemented; changing a role, removing a member and leaving come
+> next, and then the organization-scoped authorization of policies and clearances (#95). This page
+> describes the code as it is today.
 
 DataTrustHub is one deployable application with one database and one `DataTrustHub.Domain` project.
 The contexts below are **logical** boundaries inside that monolith: they are where the model would
@@ -32,8 +34,8 @@ It is about who may see what: the structure of access.
 | | |
 |---|---|
 | **Owns** | `Organization`, `Policy`, `Clearance`, `Membership`, the value objects `ClassificationLevel` and `MembershipRole` |
-| **Use cases** | create, list, get and delete organizations, policies and clearances |
-| **Code today** | `Features/Administration` (`*Organization*` / `*Group*`, `*Policy*`, `*Clearance*`) |
+| **Use cases** | create, list, get and delete organizations, policies and clearances; appoint an organization admin, add a member or guest, list the members |
+| **Code today** | `Features/Administration` (`*Organization*` / `*Group*`, `*Policy*`, `*Clearance*`, `AddMember`, `ListMembers`, and `Authorization` for the organization admin check) |
 | **Publishes** | a user's clearances, read by Data Management |
 
 ### 3. Data Management

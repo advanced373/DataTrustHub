@@ -43,6 +43,33 @@ internal static class AdminSetup
         return (await response.Content.ReadFromJsonAsync<CreateClearanceResponse>())!.ClearanceId;
     }
 
+    // --- memberships (ADR-0014) ---
+
+    internal static string AdminsEndpoint(Guid organizationId) => $"{OrganizationsEndpoint}/{organizationId}/admins";
+
+    internal static string MembersEndpoint(Guid organizationId) => $"/organizations/{organizationId}/members";
+
+    internal static Task<HttpResponseMessage> PostAppointOrganizationAdminAsync(
+        HttpClient platformAdmin, Guid organizationId, Guid userId) =>
+        platformAdmin.PostAsJsonAsync(AdminsEndpoint(organizationId), new { UserId = userId });
+
+    internal static async Task<Guid> AppointOrganizationAdminAsync(HttpClient platformAdmin, Guid organizationId, Guid userId)
+    {
+        var response = await PostAppointOrganizationAdminAsync(platformAdmin, organizationId, userId);
+        return (await response.Content.ReadFromJsonAsync<MembershipResponse>())!.MembershipId;
+    }
+
+    internal static Task<HttpResponseMessage> PostMemberAsync(HttpClient caller, Guid organizationId, Guid userId, string? role) =>
+        caller.PostAsJsonAsync(MembersEndpoint(organizationId), new { UserId = userId, Role = role });
+
+    internal static async Task<Guid> AddMemberAsync(HttpClient orgAdmin, Guid organizationId, Guid userId, string role)
+    {
+        var response = await PostMemberAsync(orgAdmin, organizationId, userId, role);
+        return (await response.Content.ReadFromJsonAsync<MembershipResponse>())!.MembershipId;
+    }
+
+    internal record MembershipResponse(Guid MembershipId);
+
     private record CreateOrganizationResponse(Guid OrganizationId);
     private record CreatePolicyResponse(Guid PolicyId);
     private record CreateClearanceResponse(Guid ClearanceId);

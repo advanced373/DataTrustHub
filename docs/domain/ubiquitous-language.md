@@ -16,7 +16,9 @@ The access rules:
 
 1. People have accounts (**users**). An **organization** is a tenant, i.e. a company on the platform.
    A user belongs to an organization through a **membership**, as a member, a guest or an
-   organization admin (ADR-0014). Memberships are stored, but no use case manages them yet (#95).
+   organization admin (ADR-0014). The platform admin appoints an organization's first organization
+   admin; an organization admin adds members and guests and lists them. Changing roles, removing
+   members and leaving come later (#95).
 2. An organization defines **policies**: named areas of access, such as "Project Apollo" or "HR".
 3. A **data item** (an uploaded document) is either **personal** or **classified**.
    - A **personal** data item is private to the user who uploaded it.
@@ -47,6 +49,8 @@ The rules are recorded in ADR-0011. The architecture that implements them is in 
 | **Member** | A membership role: holds clearances, reads and uploads data in the organization | `MembershipRole.Member` |
 | **Guest** | A membership role for an external person, added explicitly. Works like a member, but never manages the organization. The guest role is fixed: a guest never changes role, and no member or organization admin becomes a guest; the membership is ended and the person added again instead | `MembershipRole.Guest` |
 | **Organization admin** | A membership role that manages one organization: its members, policies and clearances. Write *OrgAdmin* in code only | `MembershipRole.OrgAdmin` |
+| **Appoint an organization admin** | The platform admin makes a user the first organization admin of one organization: a new membership, or a member's role changed. Only the first one: when the organization already has an organization admin, its own admins will appoint the others, by changing a member's role (step 2b of #95). The platform admin never appoints themselves, and a guest cannot be appointed (the guest role is fixed). It gives the platform admin no access to the organization | `AppointOrganizationAdmin`, `Membership.AppointOrgAdmin` |
+| **Add a member** | An organization admin adds a user to their organization as a member or a guest. A user already in the organization cannot be added again | `AddMember`, `Membership.AddMember`, `Membership.AddGuest` |
 | **Organization** | A tenant: the company that policies, clearances and classified data belong to. The word is never *group*. The old *Group* names in the API and the UI are being renamed (#91) | `Organization` |
 | **Policy** | A named area of access inside one organization. Every classified data item belongs to one policy | `Policy` |
 | **Classification level** | A named sensitivity level with a priority: Public (0), Internal, Confidential, Secret, Top Secret (4) | `ClassificationLevel` |

@@ -17,6 +17,11 @@ internal static class AdminErrorCodes
     internal const string ClearancePolicyNotFound = "Clearance.PolicyNotFound";
     internal const string ClearanceAlreadyGranted = "Clearance.AlreadyGranted";
     internal const string ClearanceNotFound = "Clearance.NotFound";
+    internal const string MembershipUserNotFound = "Membership.UserNotFound";
+    internal const string MembershipAlreadyMember = "Membership.AlreadyMember";
+    internal const string MembershipGuestRoleIsFixed = "Membership.GuestRoleIsFixed";
+    internal const string MembershipCannotAppointSelf = "Membership.CannotAppointSelf";
+    internal const string OrganizationAlreadyHasOrgAdmin = "Organization.AlreadyHasOrgAdmin";
 }
 
 internal static class AdminErrorMessages
@@ -35,4 +40,9 @@ internal static class AdminErrorMessages
     internal const string ClearancePolicyNotFound = "The specified policy does not exist.";
     internal const string ClearanceAlreadyGranted = "The user already has a clearance for this policy.";
     internal const string ClearanceNotFound = "The clearance was not found.";
+    internal const string MembershipUserNotFound = "The specified user does not exist.";
+    internal const string MembershipAlreadyMember = "The user is already a member of this organization.";
+    internal const string MembershipCannotAppointSelf = "You cannot appoint yourself as organization admin.";
+    internal const string OrganizationAlreadyHasOrgAdmin = "The organization already has an organization admin.";
+    internal const string MembershipGuestRoleIsFixed = "A guest stays a guest. End the membership and add the person again to change it.";
 }

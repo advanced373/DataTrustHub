@@ -1,7 +1,7 @@
 # ADR-0014: Organizations as tenants, with memberships, organization admins and guests
 
 - **Status:** Accepted
-- **Date:** 2026-10-22
+- **Date:** 2026-10-22; amended 2026-10-22 (C8) and 2026-10-23 (M3)
 - **Related:** #95 (implementation); [ADR-0004](0004-owner-only-soft-delete.md),
   [ADR-0006](0006-roles-in-jwt-and-admin-seeding.md),
   [ADR-0011](0011-data-access-by-policy-and-classification-level.md); `docs/domain/`
@@ -36,7 +36,9 @@ it.
    - **Member:** holds clearances and reads and uploads data, as today.
    - **Guest:** an external person, such as a consultant from another organization. A guest is
      added explicitly and then works like a member: with a clearance, a guest reads and uploads
-     under the host's policies. A guest cannot become an organization admin.
+     under the host's policies. A guest cannot become an organization admin. The guest role is
+     fixed (M3, decided on 2026-10-23): to make a guest an internal member, the membership is ended
+     and the person is added again.
    - **OrgAdmin:** manages the organization: its members, policies and clearances.
 4. **Access to another organization's data is possible, but only explicitly.** The user is first
    added to that organization as a guest, and then given a clearance there. A clearance never
@@ -72,7 +74,7 @@ it.
 |---|---|---|
 | M1 | A user has at most one membership per organization | Use case: add member (`ExistsAsync`) |
 | M2 | An organization always has at least one organization admin, so the last one cannot be removed or demoted | Use case: remove member / change role |
-| M3 | A guest cannot be an organization admin | Entity: `Membership` |
+| M3 | The guest role is fixed: a guest cannot change to another role, and no member or organization admin becomes a guest | Entity: `Membership.ChangeRole` |
 | C5 | A clearance on a policy of organization X can be granted only to a member or guest of X | Use case: create clearance |
 | C6 | Only an organization admin of X grants or revokes clearances on X's policies, and creates or deletes X's policies | Use case + authorization |
 | C7 | Ending a membership in X revokes every clearance of that user on X's policies | Use case: leave / remove member / delete account |
@@ -156,3 +158,9 @@ need-to-know. Consequences:
   second organization admin is appointed;
 - revoking one's own clearance stays allowed, because it only removes access;
 - C8 is enforced in step 3 of #95, with the organization-scoped authorization.
+
+**Decided on 2026-10-23: the guest role is fixed (M3).** The first version of M3 only blocked
+Guest → OrgAdmin, which could be bypassed in two steps (Guest → Member → OrgAdmin). Now a guest
+membership never changes role, and a member or organization admin never becomes a guest. An
+external person who becomes internal goes through ending the membership, which revokes their
+clearances (C7), and being added again as a member, so their access is granted again from scratch.

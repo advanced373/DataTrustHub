@@ -110,6 +110,31 @@ namespace DataTrustHub.Infrastructure.Migrations
                     b.ToTable("DataItems");
                 });
 
+            modelBuilder.Entity("DataTrustHub.Infrastructure.Persistance.Model.DbMembership", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "OrganizationId")
+                        .IsUnique();
+
+                    b.ToTable("Memberships");
+                });
+
             modelBuilder.Entity("DataTrustHub.Infrastructure.Persistance.Model.DbOrganization", b =>
                 {
                     b.Property<Guid>("Id")

@@ -21,22 +21,27 @@ public class ApiFactory : WebApplicationFactory<Program>
 
         builder.ConfigureServices(services =>
         {
-            // Remove all DbContext-related registrations to avoid dual-provider conflict
-            var descriptorsToRemove = services
-                .Where(d =>
-                    d.ServiceType == typeof(DbContextOptions<DContext>) ||
-                    d.ServiceType == typeof(DbContextOptions) ||
-                    d.ServiceType == typeof(DContext) ||
-                    d.ServiceType == typeof(IDbContextOptionsConfiguration<DContext>))
-                .ToList();
-
-            foreach (var descriptor in descriptorsToRemove)
-                services.Remove(descriptor);
+            RemoveDbContext(services);
 
             var dbName = Guid.NewGuid().ToString();
             services.AddDbContext<DContext>(options =>
                 options.UseInMemoryDatabase(dbName));
         });
+    }
+
+    // Removes all DbContext-related registrations, so a test provider can be added without a dual-provider conflict
+    protected static void RemoveDbContext(IServiceCollection services)
+    {
+        var descriptorsToRemove = services
+            .Where(d =>
+                d.ServiceType == typeof(DbContextOptions<DContext>) ||
+                d.ServiceType == typeof(DbContextOptions) ||
+                d.ServiceType == typeof(DContext) ||
+                d.ServiceType == typeof(IDbContextOptionsConfiguration<DContext>))
+            .ToList();
+
+        foreach (var descriptor in descriptorsToRemove)
+            services.Remove(descriptor);
     }
 
     // Added last, so these values win over appsettings, User Secrets and environment variables

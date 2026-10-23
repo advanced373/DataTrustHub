@@ -4,8 +4,9 @@
 > confirms it, it becomes an ADR. Until then, treat the boundaries as a guide, not as a rule the
 > tests enforce.
 
-> **Coming next:** ADR-0014 adds memberships (Member, Guest, OrgAdmin) to Access Governance, and
-> turns organizations into tenants. This page describes the code as it is today.
+> **In progress:** ADR-0014 turns organizations into tenants. The `Membership` aggregate (Member,
+> Guest, OrgAdmin) exists in Access Governance; its use cases and the organization-scoped
+> authorization come next (#95). This page describes the code as it is today.
 
 DataTrustHub is one deployable application with one database and one `DataTrustHub.Domain` project.
 The contexts below are **logical** boundaries inside that monolith: they are where the model would
@@ -30,7 +31,7 @@ It is about who may see what: the structure of access.
 
 | | |
 |---|---|
-| **Owns** | `Organization`, `Policy`, `Clearance`, the value object `ClassificationLevel` |
+| **Owns** | `Organization`, `Policy`, `Clearance`, `Membership`, the value objects `ClassificationLevel` and `MembershipRole` |
 | **Use cases** | create, list, get and delete organizations, policies and clearances |
 | **Code today** | `Features/Administration` (`*Organization*` / `*Group*`, `*Policy*`, `*Clearance*`) |
 | **Publishes** | a user's clearances, read by Data Management |

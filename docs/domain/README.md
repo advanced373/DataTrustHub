@@ -37,9 +37,12 @@ Access Governance                       (bounded context)
 │   └── Organization                    (entity, aggregate root)
 ├── Policy aggregate
 │   └── Policy                          (entity, aggregate root)  ──▶ OrganizationId
-└── Clearance aggregate
-    ├── Clearance                       (entity, aggregate root)  ──▶ UserId, PolicyId
-    └── ClassificationLevel             (value object)
+├── Clearance aggregate
+│   ├── Clearance                       (entity, aggregate root)  ──▶ UserId, PolicyId
+│   └── ClassificationLevel             (value object)
+└── Membership aggregate
+    ├── Membership                      (entity, aggregate root)  ──▶ UserId, OrganizationId
+    └── MembershipRole                  (value object)
 
 Data Management                         (bounded context)
 └── DataItem aggregate
@@ -55,12 +58,13 @@ Data Management                         (bounded context)
 | Access Governance | Organization | `Organization` | — | `IOrganizationRepository` |
 | Access Governance | Policy | `Policy` | — | `IPolicyRepository` |
 | Access Governance | Clearance | `Clearance` | `ClassificationLevel` | `IClearanceRepository` |
+| Access Governance | Membership | `Membership` | `MembershipRole` | `IMembershipRepository` |
 | Data Management | DataItem | `DataItem` | uses `ClassificationLevel` when classifying | `IDataItemRepository` |
 
 So today:
-- There are **5 entities**, and each is the root of its own aggregate (**5 aggregates**). None of
+- There are **6 entities**, and each is the root of its own aggregate (**6 aggregates**). None of
   them contains another entity.
-- There is **1 value object**: `ClassificationLevel`.
+- There are **2 value objects**: `ClassificationLevel` and `MembershipRole`.
 - There are **3 bounded contexts**. They are still a proposal; see
   [bounded-contexts.md](bounded-contexts.md).
 

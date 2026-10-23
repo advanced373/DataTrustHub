@@ -15,8 +15,8 @@ a document only if the rules say so.
 The access rules:
 
 1. People have accounts (**users**). An **organization** is a tenant, i.e. a company on the platform.
-   Today users are linked to organizations only through their clearances; memberships are decided
-   in ADR-0014 and not built yet.
+   A user belongs to an organization through a **membership**, as a member, a guest or an
+   organization admin (ADR-0014). Memberships are stored, but no use case manages them yet (#95).
 2. An organization defines **policies**: named areas of access, such as "Project Apollo" or "HR".
 3. A **data item** (an uploaded document) is either **personal** or **classified**.
    - A **personal** data item is private to the user who uploaded it.
@@ -40,7 +40,13 @@ The rules are recorded in ADR-0011. The architecture that implements them is in 
 | Term | Meaning | In code |
 |---|---|---|
 | **User** | A person with an account. Their role is `User` or `Admin` | `User` |
-| **Admin** | A user who manages organizations, policies, users and clearances. Admins have no automatic access to data (need-to-know) | `User.Role` |
+| **Admin** | A user who manages organizations, policies, users and clearances. Admins have no automatic access to data (need-to-know). Under ADR-0014 this role becomes the *platform admin* | `User.Role` |
+| **Platform admin** | A user with the `Admin` role. Under ADR-0014 they manage tenants only: create and delete organizations and appoint their first organization admin. Not to be confused with an organization admin | `UserRoles.Admin`, `User.IsAdmin` |
+| **Membership** | A user's membership in one organization, with a role there. A user can be a member of several organizations, with at most one membership in each | `Membership` |
+| **Membership role** | The role of a membership: member, guest or organization admin | `MembershipRole` |
+| **Member** | A membership role: holds clearances, reads and uploads data in the organization | `MembershipRole.Member` |
+| **Guest** | A membership role for an external person, added explicitly. Works like a member, but can never become an organization admin | `MembershipRole.Guest` |
+| **Organization admin** | A membership role that manages one organization: its members, policies and clearances. Write *OrgAdmin* in code only | `MembershipRole.OrgAdmin` |
 | **Organization** | A tenant: the company that policies, clearances and classified data belong to. The word is never *group*. The old *Group* names in the API and the UI are being renamed (#91) | `Organization` |
 | **Policy** | A named area of access inside one organization. Every classified data item belongs to one policy | `Policy` |
 | **Classification level** | A named sensitivity level with a priority: Public (0), Internal, Confidential, Secret, Top Secret (4) | `ClassificationLevel` |
@@ -63,13 +69,13 @@ These are the words for how the code is structured (ADR-0012).
 | **Application layer** | `DataTrustHub.Features`: one **use case** per vertical slice, as a command handler or a query handler |
 | **Infrastructure layer** | `DataTrustHub.Infrastructure`: the adapters (repositories, mappers, `DContext`) |
 | **Presentation layer** | `DataTrustHub.API` (Carter endpoints) and the WebApp |
-| **Entity** | A domain object with an identity and behaviour: `User`, `Organization`, `Policy`, `Clearance`, `DataItem` |
+| **Entity** | A domain object with an identity and behaviour: `User`, `Organization`, `Policy`, `Clearance`, `Membership`, `DataItem` |
 | **Aggregate root** | An entity that is loaded and saved as a whole, through its own repository. Today every entity is its own aggregate root |
-| **Value object** | An immutable object defined by its values: `ClassificationLevel` |
+| **Value object** | An immutable object defined by its values: `ClassificationLevel`, `MembershipRole` |
 | **Invariant / business rule** | A rule that must always hold. A rule of one aggregate lives in an entity method (`IsReadableBy`, `MarkDeleted`, `CheckCanBeDeletedBy`). A rule that needs other aggregates or the whole set (uniqueness, references, deletion guards) is checked in the use case through repositories. Never in validators. The full list is in [aggregates.md](aggregates.md) |
 | **Factory method** | The only way to create a new entity. It applies the entity's rules: `User.Register`, `Policy.Create`, `Clearance.Grant`, `DataItem.CreateClassified` |
 | **Rehydration** | Rebuilding a stored entity without running its creation rules, through an `internal` constructor that only the persistence mappers can see |
-| **Domain error** | An expected rule failure, returned as a `Result` instead of thrown: `UserErrors`, `DataItemErrors` |
+| **Domain error** | An expected rule failure, returned as a `Result` instead of thrown: `UserErrors`, `DataItemErrors`, `MembershipErrors` |
 | **Port** | An interface the domain or application layer needs, implemented outside it: `I*Repository`, `IUnitOfWork`, `IPasswordHasher` |
 | **Adapter** | The Infrastructure implementation of a port |
 | **Repository** | A port that loads and stores one aggregate as an entity. Only commands use repositories |

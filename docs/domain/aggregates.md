@@ -142,9 +142,17 @@ changes nothing. A member and an organization admin can swap roles; the guest ro
 
 | # | Invariant / rule | Enforced in |
 |---|---|---|
-| M1 | A user has at most one membership per organization | Database: unique index on (`UserId`, `OrganizationId`). Use case: add member (`ExistsAsync`), from step 2 of #95 |
+| M1 | A user has at most one membership per organization | Use case: `AddMember` (`ExistsAsync`) → `Membership.AlreadyMember` (409); `AppointOrganizationAdmin` reuses an existing membership (`GetAsync`). Database: unique index on (`UserId`, `OrganizationId`); when two concurrent requests both pass the check, the save fails with `UniqueConstraintViolationException`, and `AddMember` and `AppointOrganizationAdmin` answer `Membership.AlreadyMember` too (for appoint, a retry gets `Organization.AlreadyHasOrgAdmin`) |
 | M2 | An organization always has at least one organization admin, so the last one cannot be removed or demoted | Use case: remove member / change role (`CountOrgAdminsAsync`), from step 2 of #95. The migration appoints every platform admin as organization admin of every existing organization |
-| M3 | The guest role is fixed: a guest cannot change to another role, and a member or organization admin cannot become a guest. To change it, the membership is ended and the person is added again, so their access is granted again from scratch | Entity: `ChangeRole` → `Membership.GuestRoleIsFixed` (409) |
+| M3 | The guest role is fixed: a guest cannot change to another role, and a member or organization admin cannot become a guest. To change it, the membership is ended and the person is added again, so their access is granted again from scratch | Entity: `ChangeRole` → `Membership.GuestRoleIsFixed` (409), e.g. when `AppointOrganizationAdmin` is called for a guest |
+
+**Appoint an organization admin** (`AppointOrganizationAdmin`, platform admin only) checks, in this
+order: the organization exists (`Organization.NotFound`), the user exists (`Membership.UserNotFound`),
+the user is not the caller (`Membership.CannotAppointSelf`, 409), and the organization has no
+organization admin yet (`CountOrgAdminsAsync`, `Organization.AlreadyHasOrgAdmin`, 409). So the platform
+admin appoints only the first organization admin, and never themselves; the others will be appointed
+by the organization's own admins, by changing a member's role (step 2b of #95). Then a non-member gets a new `OrgAdmin` membership, a member's role is
+changed, and a guest is refused (M3).
 
 ### Value object: MembershipRole
 

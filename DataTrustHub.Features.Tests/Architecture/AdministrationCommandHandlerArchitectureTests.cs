@@ -1,3 +1,5 @@
+using DataTrustHub.Features.Administration.AddMember;
+using DataTrustHub.Features.Administration.AppointOrganizationAdmin;
 using DataTrustHub.Features.Administration.CreateAccount;
 using DataTrustHub.Features.Administration.CreateClearance;
 using DataTrustHub.Features.Administration.CreateOrganization;
@@ -24,7 +26,9 @@ public class AdministrationCommandHandlerArchitectureTests
         typeof(CreateAccountHandler),
         typeof(DeleteAccountHandler),
         typeof(CreateClearanceHandler),
-        typeof(DeleteClearanceHandler)
+        typeof(DeleteClearanceHandler),
+        typeof(AppointOrganizationAdminHandler),
+        typeof(AddMemberHandler)
     ];
 
     [Fact]

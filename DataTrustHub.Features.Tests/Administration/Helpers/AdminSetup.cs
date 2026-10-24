@@ -164,6 +164,20 @@ internal static class AdminSetup
     internal static Task<HttpResponseMessage> LeaveOrganizationAsync(HttpClient caller, Guid organizationId) =>
         caller.DeleteAsync(OwnMembershipEndpoint(organizationId));
 
+    // --- organization pages (#95 step 5a) ---
+
+    internal const string MyOrganizationsEndpoint = "/organizations/mine";
+
+    // ADR-0019: the email travels in the JSON body of a POST, never in the URL
+    internal static string FindUserByEmailEndpoint(Guid organizationId) => $"/organizations/{organizationId}/users/find-by-email";
+
+    internal static Task<HttpResponseMessage> PostFindUserByEmailAsync(HttpClient caller, Guid organizationId, string? email) =>
+        caller.PostAsJsonAsync(FindUserByEmailEndpoint(organizationId), new { Email = email });
+
+    // The GET route of the first round, with the email in the query string, kept only to prove it no longer answers
+    internal static string LegacyFindUserByEmailEndpoint(Guid organizationId, string email) =>
+        $"/organizations/{organizationId}/users?email={Uri.EscapeDataString(email)}";
+
     internal record MembershipResponse(Guid MembershipId);
 
     private record CreateOrganizationResponse(Guid OrganizationId);

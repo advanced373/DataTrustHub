@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.WebUtilities;
+
 namespace DataTrustHub.Services.Api;
 
 public interface IAdminApiClient
@@ -35,6 +37,20 @@ public interface IAdminApiClient
     Task<ApiResult<bool>> ChangeMemberRoleAsync(Guid organizationId, Guid userId, string role, CancellationToken cancellationToken);
 
     Task<ApiResult<bool>> RemoveMemberAsync(Guid organizationId, Guid userId, CancellationToken cancellationToken);
+
+    Task<ApiResult<IReadOnlyList<PolicyResponse>>> ListPoliciesAsync(Guid organizationId, CancellationToken cancellationToken);
+
+    Task<ApiResult<Guid>> CreatePolicyAsync(Guid organizationId, string name, CancellationToken cancellationToken);
+
+    Task<ApiResult<bool>> DeletePolicyAsync(Guid organizationId, Guid policyId, CancellationToken cancellationToken);
+
+    // userId and policyId optionally narrow the list; only ids go in the query string (ADR-0019)
+    Task<ApiResult<IReadOnlyList<ClearanceResponse>>> ListClearancesAsync(
+        Guid organizationId, Guid? userId, Guid? policyId, CancellationToken cancellationToken);
+
+    Task<ApiResult<Guid>> GrantClearanceAsync(Guid organizationId, ClearanceGrant grant, CancellationToken cancellationToken);
+
+    Task<ApiResult<bool>> RevokeClearanceAsync(Guid organizationId, Guid clearanceId, CancellationToken cancellationToken);
 }
 
 internal sealed class AdminApiClient(HttpClient httpClient) : IAdminApiClient
@@ -122,6 +138,53 @@ internal sealed class AdminApiClient(HttpClient httpClient) : IAdminApiClient
 
     public Task<ApiResult<bool>> RemoveMemberAsync(Guid organizationId, Guid userId, CancellationToken cancellationToken) =>
         DeleteAsync(string.Format(ApiRoutes.OrganizationMember, organizationId, userId), cancellationToken);
+
+    public Task<ApiResult<IReadOnlyList<PolicyResponse>>> ListPoliciesAsync(
+        Guid organizationId, CancellationToken cancellationToken) =>
+        GetAsync<IReadOnlyList<PolicyResponse>>(string.Format(ApiRoutes.OrganizationPolicies, organizationId), cancellationToken);
+
+    public async Task<ApiResult<Guid>> CreatePolicyAsync(
+        Guid organizationId, string name, CancellationToken cancellationToken)
+    {
+        var result = await PostAsync<CreatePolicyRequest, PolicyCreatedResponse>(
+            string.Format(ApiRoutes.OrganizationPolicies, organizationId),
+            new CreatePolicyRequest(name),
+            cancellationToken);
+
+        return result.Map(response => response.PolicyId);
+    }
+
+    public Task<ApiResult<bool>> DeletePolicyAsync(Guid organizationId, Guid policyId, CancellationToken cancellationToken) =>
+        DeleteAsync(string.Format(ApiRoutes.OrganizationPolicy, organizationId, policyId), cancellationToken);
+
+    public Task<ApiResult<IReadOnlyList<ClearanceResponse>>> ListClearancesAsync(
+        Guid organizationId, Guid? userId, Guid? policyId, CancellationToken cancellationToken)
+    {
+        var filters = new Dictionary<string, string?>
+        {
+            [ApiRoutes.UserIdParameter] = userId?.ToString(),
+            [ApiRoutes.PolicyIdParameter] = policyId?.ToString()
+        };
+        var route = QueryHelpers.AddQueryString(
+            string.Format(ApiRoutes.OrganizationClearances, organizationId),
+            filters.Where(filter => filter.Value is not null));
+
+        return GetAsync<IReadOnlyList<ClearanceResponse>>(route, cancellationToken);
+    }
+
+    public async Task<ApiResult<Guid>> GrantClearanceAsync(
+        Guid organizationId, ClearanceGrant grant, CancellationToken cancellationToken)
+    {
+        var request = new CreateClearanceRequest(
+            grant.UserId, grant.PolicyId, grant.Name, grant.LevelName, grant.LevelPriority);
+        var result = await PostAsync<CreateClearanceRequest, ClearanceCreatedResponse>(
+            string.Format(ApiRoutes.OrganizationClearances, organizationId), request, cancellationToken);
+
+        return result.Map(response => response.ClearanceId);
+    }
+
+    public Task<ApiResult<bool>> RevokeClearanceAsync(Guid organizationId, Guid clearanceId, CancellationToken cancellationToken) =>
+        DeleteAsync(string.Format(ApiRoutes.OrganizationClearance, organizationId, clearanceId), cancellationToken);
 
     private Task<ApiResult<TResponse>> GetAsync<TResponse>(string route, CancellationToken cancellationToken) =>
         ApiRequest.SendAsync<TResponse>(token => httpClient.GetAsync(route, token), cancellationToken);

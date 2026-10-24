@@ -1,0 +1,30 @@
+@using DataTrustHub.Controllers
+@model CreatePolicyViewModel
+@{
+    ViewData["Title"] = "Create policy";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <h1 class="h3 mb-1">Create policy</h1>
+                <p class="text-muted mb-4">In @Model.OrganizationName. The name must be unique in the organization.</p>
+                <form asp-action="@nameof(OrganizationPoliciesController.Create)" asp-route-organizationId="@Model.OrganizationId" method="post">
+                    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+                    <div class="form-floating mb-3">
+                        <input asp-for="Name" class="form-control" autocomplete="off" placeholder="Name" />
+                        <label asp-for="Name"></label>
+                        <span asp-validation-for="Name" class="text-danger"></span>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Create</button>
+                    <a class="btn btn-link" asp-action="@nameof(OrganizationPoliciesController.Index)" asp-route-organizationId="@Model.OrganizationId">Cancel</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

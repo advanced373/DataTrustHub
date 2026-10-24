@@ -16,6 +16,11 @@ internal sealed record ChangeMemberRoleRequest(string Role);
 
 internal sealed record AppointOrganizationAdminRequest(Guid UserId);
 
+internal sealed record CreatePolicyRequest(string Name);
+
+internal sealed record CreateClearanceRequest(
+    Guid UserId, Guid PolicyId, string Name, string ClassificationLevelName, int ClassificationLevelPriority);
+
 internal sealed record LoginResponse(string Token);
 
 internal sealed record UserCreatedResponse(Guid UserId);
@@ -51,6 +56,10 @@ internal sealed record OrganizationCreatedResponse(Guid OrganizationId);
 
 internal sealed record MembershipCreatedResponse(Guid MembershipId);
 
+internal sealed record PolicyCreatedResponse(Guid PolicyId);
+
+internal sealed record ClearanceCreatedResponse(Guid ClearanceId);
+
 public sealed record AccountResponse(Guid Id, string Email, string Role);
 
 public sealed record OrganizationResponse(Guid Id, string Name);
@@ -62,6 +71,14 @@ public sealed record MemberResponse(Guid MembershipId, Guid UserId, string Email
 
 // Role is the user's membership role in the organization, or null when they are not in it
 public sealed record UserByEmailResponse(Guid UserId, string Email, bool IsMember, string? Role);
+
+public sealed record PolicyResponse(Guid Id, string Name, Guid OrganizationId);
+
+public sealed record ClearanceResponse(
+    Guid Id, string Name, Guid UserId, Guid PolicyId, string ClassificationLevelName, int ClassificationLevelPriority);
+
+// What the organization admin fills in to grant a clearance
+public sealed record ClearanceGrant(Guid UserId, Guid PolicyId, string Name, string LevelName, int LevelPriority);
 
 // Covers SharedKernel.Error (description), ValidationError (errors) and ProblemDetails (detail) bodies
 internal sealed record ApiError(string? Code, string? Description, string? Detail, ApiError[]? Errors);

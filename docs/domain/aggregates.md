@@ -38,7 +38,7 @@ reference each other **by id only**.
 | U2 | An email is at most 256 characters; a password is at least 8 | Validator: `RegisterUser` |
 | U3 | A user cannot delete their own account, so an admin cannot lock everyone out | Entity: `CheckCanBeDeletedBy` → `Account.CannotDeleteOwnAccount` |
 | U4 | Login gives the same error for an unknown email and a wrong password, so it does not reveal which emails exist | Use case: `LoginUser` → `User.InvalidCredentials` |
-| U5 | Deleting a user also removes their clearances and soft-deletes the data items they own, all in one transaction | Use case: `DeleteAccount` |
+| U5 | Deleting a user also removes their clearances and memberships and soft-deletes the data items they own, all in one transaction | Use case: `DeleteAccount` |
 | U6 | Startup makes sure the configured admin exists, and promotes that user if needed | Use case: `AdminSeeder` |
 
 ## Organization
@@ -57,6 +57,7 @@ reference each other **by id only**.
 |---|---|---|
 | O1 | Organization names are unique | Use case: `CreateOrganization` (`NameExistsAsync`) |
 | O2 | An organization that still has policies cannot be deleted | Use case: `DeleteOrganization` (`AnyInOrganizationAsync`) |
+| O3 | Deleting an organization also removes its memberships, in the same transaction | Use case: `DeleteOrganization` (`ListForOrganizationAsync`) |
 
 ## Policy
 
@@ -100,6 +101,7 @@ level's priority is at least `priority`.
 | C2 | A clearance references an existing user and an existing policy | Use case: `CreateClearance` (`Clearance.UserNotFound`, `Clearance.PolicyNotFound`) |
 | C3 | A user holds at most one clearance per policy | Use case: `CreateClearance` (`Clearance.AlreadyGranted`) |
 | C4 | A level's priority is never negative | Validator: `CreateClearance` |
+| C7 | Ending a membership in an organization revokes every clearance of that user on the organization's policies, in the same transaction; clearances on other organizations' policies stay (ADR-0014) | Use case: `RemoveMember`, `LeaveOrganization` (`ClearanceRevocation`, through `IPolicyRepository.ListIdsInOrganizationAsync`); `DeleteAccount` removes all the user's clearances |
 
 ### Value object: ClassificationLevel
 
@@ -143,16 +145,29 @@ changes nothing. A member and an organization admin can swap roles; the guest ro
 | # | Invariant / rule | Enforced in |
 |---|---|---|
 | M1 | A user has at most one membership per organization | Use case: `AddMember` (`ExistsAsync`) → `Membership.AlreadyMember` (409); `AppointOrganizationAdmin` reuses an existing membership (`GetAsync`). Database: unique index on (`UserId`, `OrganizationId`); when two concurrent requests both pass the check, the save fails with `UniqueConstraintViolationException`, and `AddMember` and `AppointOrganizationAdmin` answer `Membership.AlreadyMember` too (for appoint, a retry gets `Organization.AlreadyHasOrgAdmin`) |
-| M2 | An organization always has at least one organization admin, so the last one cannot be removed or demoted | Use case: remove member / change role (`CountOrgAdminsAsync`), from step 2 of #95. The migration appoints every platform admin as organization admin of every existing organization |
+| M2 | An organization always has at least one organization admin, so the last one cannot be removed, demoted or leave | Use case: `ChangeMemberRole`, `RemoveMember`, `LeaveOrganization` (`OrgAdminRule`, `CountOrgAdminsAsync`) → `Membership.LastOrgAdmin` (409). Not `DeleteAccount`: an organization that loses its last organization admin that way gets one again from the platform admin. The migration appoints every platform admin as organization admin of every existing organization |
 | M3 | The guest role is fixed: a guest cannot change to another role, and a member or organization admin cannot become a guest. To change it, the membership is ended and the person is added again, so their access is granted again from scratch | Entity: `ChangeRole` → `Membership.GuestRoleIsFixed` (409), e.g. when `AppointOrganizationAdmin` is called for a guest |
 
 **Appoint an organization admin** (`AppointOrganizationAdmin`, platform admin only) checks, in this
 order: the organization exists (`Organization.NotFound`), the user exists (`Membership.UserNotFound`),
 the user is not the caller (`Membership.CannotAppointSelf`, 409), and the organization has no
 organization admin yet (`CountOrgAdminsAsync`, `Organization.AlreadyHasOrgAdmin`, 409). So the platform
-admin appoints only the first organization admin, and never themselves; the others will be appointed
-by the organization's own admins, by changing a member's role (step 2b of #95). Then a non-member gets a new `OrgAdmin` membership, a member's role is
+admin appoints only the first organization admin, and never themselves; the others are appointed
+by the organization's own admins, by changing a member's role. Then a non-member gets a new `OrgAdmin` membership, a member's role is
 changed, and a guest is refused (M3).
+
+**Change a member's role** (`ChangeMemberRole`, an organization admin of the organization) checks, in
+this order: the caller is an organization admin there (`Organization.NotFound` otherwise, so outsiders
+learn nothing), the user has a membership there (`Membership.NotFound`), and, when the role really
+changes, that an organization admin being demoted is not the last one (M2, `Membership.LastOrgAdmin`).
+The new role is `Member` or `OrgAdmin`; a guest's membership is refused by the entity (M3). The same
+role changes nothing. An organization admin may demote themselves while another one remains.
+
+**Remove a member** (`RemoveMember`, an organization admin) and **leave an organization**
+(`LeaveOrganization`, the caller, any role) end a membership: the last organization admin is refused
+(M2), and the user's clearances on the organization's policies are revoked in the same save (C7). A
+caller with no membership in the organization gets `Organization.NotFound` on leave. Leaving is how the
+platform admins that the migration made organization admins leave those organizations (ADR-0014).
 
 ### Value object: MembershipRole
 
@@ -206,5 +221,9 @@ These are findings, not decisions. Each one needs an issue before it changes.
   deleted policy become readable by their owner only.
 - **Two error codes for one rule** (U1): `User.EmailAlreadyInUse` on register and
   `Account.EmailAlreadyInUse` on admin create.
+- **M2 is checked, not locked:** the last-organization-admin rule is checked in the use case
+  (`CountOrgAdminsAsync`). Two organization admins who demote or remove each other, or leave, at the
+  same moment can both pass the count and leave the organization with none. The platform admin can
+  then appoint one again.
 - **Uniqueness is checked, not constrained:** U1, O1 and P2 are checked before saving. Two concurrent
   requests can both pass unless the database has a unique index.

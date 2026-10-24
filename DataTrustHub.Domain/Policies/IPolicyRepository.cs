@@ -10,6 +10,9 @@ public interface IPolicyRepository
 
     Task<bool> AnyInOrganizationAsync(Guid organizationId, CancellationToken cancellationToken);
 
+    // The ids of the organization's policies; used to revoke a former member's clearances there (C7)
+    Task<IReadOnlyList<Guid>> ListIdsInOrganizationAsync(Guid organizationId, CancellationToken cancellationToken);
+
     void Add(Policy policy);
 
     Task RemoveAsync(Policy policy, CancellationToken cancellationToken);

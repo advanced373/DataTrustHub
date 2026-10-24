@@ -1,3 +1,4 @@
+using DataTrustHub.Domain.Memberships;
 using DataTrustHub.Features.Administration.CreateAccount;
 using DataTrustHub.Features.Administration.CreateClearance;
 using DataTrustHub.Features.Administration.DeleteAccount;
@@ -22,6 +23,7 @@ public class AccountClearanceCommandHandlerTests
     private readonly FakePolicyRepository _policies = new();
     private readonly FakeClearanceRepository _clearances = new();
     private readonly FakeDataItemRepository _dataItems = new();
+    private readonly FakeMembershipRepository _memberships = new();
     private readonly FakePasswordHasher _hasher = new();
     private readonly CountingUnitOfWork _unitOfWork = new();
 
@@ -76,6 +78,40 @@ public class AccountClearanceCommandHandlerTests
         Assert.Equal(1, _unitOfWork.SaveChangesCalls);
     }
 
+    // AC5 of #95 step 2b: every membership of the user ends in the same save; other users' memberships stay
+    [Fact]
+    public async Task DeleteAccount_UserWithMemberships_RemovesEveryMembershipInTheSameCommit()
+    {
+        var user = _users.Seed(Email);
+        var orgAdminMembership = _memberships.Seed(Membership.AppointOrgAdmin(user.Id, Guid.NewGuid()));
+        var memberMembership = _memberships.Seed(Membership.AddMember(user.Id, Guid.NewGuid()));
+        var guestMembership = _memberships.Seed(Membership.AddGuest(user.Id, Guid.NewGuid()));
+        var otherUsersMembership = _memberships.Seed(Membership.AddMember(Guid.NewGuid(), memberMembership.OrganizationId));
+
+        var result = await DeleteAccountHandler().Handle(new DeleteAccountCommand(user.Id, Guid.NewGuid()), default);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(
+            new HashSet<Guid> { orgAdminMembership.Id, memberMembership.Id, guestMembership.Id },
+            _memberships.Removed.Select(m => m.Id).ToHashSet());
+        Assert.DoesNotContain(otherUsersMembership, _memberships.Removed);
+        Assert.Equal(1, _unitOfWork.SaveChangesCalls);
+    }
+
+    // M2 does not block deleting an account: the organization's last organization admin goes too
+    [Fact]
+    public async Task DeleteAccount_LastOrgAdminOfOrganization_StillDeletesAndRemovesTheMembership()
+    {
+        var user = _users.Seed(Email);
+        var lastOrgAdmin = _memberships.Seed(Membership.AppointOrgAdmin(user.Id, Guid.NewGuid()));
+
+        var result = await DeleteAccountHandler().Handle(new DeleteAccountCommand(user.Id, Guid.NewGuid()), default);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(lastOrgAdmin.Id, Assert.Single(_memberships.Removed).Id);
+        Assert.Equal(1, _unitOfWork.SaveChangesCalls);
+    }
+
     [Fact]
     public async Task DeleteAccount_Missing_FailsWithoutStagingOrCommit()
     {
@@ -90,6 +126,7 @@ public class AccountClearanceCommandHandlerTests
     {
         var admin = _users.Seed(Email);
         _clearances.Seed(admin.Id, Guid.NewGuid());
+        _memberships.Seed(Membership.AddMember(admin.Id, Guid.NewGuid()));
         var item = _dataItems.Seed(admin.Id);
 
         var result = await DeleteAccountHandler().Handle(new DeleteAccountCommand(admin.Id, admin.Id), default);
@@ -210,6 +247,7 @@ public class AccountClearanceCommandHandlerTests
         Assert.Empty(_users.Removed);
         Assert.Empty(_clearances.Removed);
         Assert.Empty(_dataItems.Updated);
+        Assert.Empty(_memberships.Removed);
         Assert.Equal(0, _unitOfWork.SaveChangesCalls);
     }
 
@@ -222,7 +260,7 @@ public class AccountClearanceCommandHandlerTests
 
     private CreateAccountHandler CreateAccountHandler() => new(_users, _hasher, _unitOfWork);
 
-    private DeleteAccountHandler DeleteAccountHandler() => new(_users, _clearances, _dataItems, _unitOfWork);
+    private DeleteAccountHandler DeleteAccountHandler() => new(_users, _clearances, _dataItems, _memberships, _unitOfWork);
 
     private CreateClearanceHandler CreateClearanceHandler() => new(_users, _policies, _clearances, _unitOfWork);
 

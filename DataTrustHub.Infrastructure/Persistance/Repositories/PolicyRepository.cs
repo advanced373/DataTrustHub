@@ -18,6 +18,12 @@ internal sealed class PolicyRepository(DContext db) : IPolicyRepository
     public Task<bool> AnyInOrganizationAsync(Guid organizationId, CancellationToken cancellationToken) =>
         db.Policies.AnyAsync(p => p.OrganizationId == organizationId, cancellationToken);
 
+    public async Task<IReadOnlyList<Guid>> ListIdsInOrganizationAsync(Guid organizationId, CancellationToken cancellationToken) =>
+        await db.Policies.AsNoTracking()
+            .Where(p => p.OrganizationId == organizationId)
+            .Select(p => p.Id)
+            .ToListAsync(cancellationToken);
+
     public void Add(Policy policy)
     {
         var row = policy.ToDb();

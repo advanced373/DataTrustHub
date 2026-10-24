@@ -6,7 +6,7 @@ using static DataTrustHub.Features.Tests.Administration.Helpers.MembershipSetup;
 
 namespace DataTrustHub.Features.Tests.Administration;
 
-// AC1 and AC5 of #95 step 2a: the caller id comes from the JWT sub claim; an authenticated caller without one
+// AC1 and AC5 of #95 step 2a, AC8 of step 2b: the caller id comes from the JWT sub claim; an authenticated caller without one
 // gets 401 from the endpoint, even when they pass the route's role check
 public class MembershipCallerWithoutSubjectTests(NoSubjectApiFactory factory) : IClassFixture<NoSubjectApiFactory>
 {
@@ -50,6 +50,36 @@ public class MembershipCallerWithoutSubjectTests(NoSubjectApiFactory factory) : 
         var client = factory.CreateClient();
 
         var response = await client.GetAsync(MembersEndpoint(Guid.NewGuid()));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ChangeMemberRole_CallerWithoutSubject_Returns401()
+    {
+        var client = factory.CreateClient();
+
+        var response = await PutMemberRoleAsync(client, Guid.NewGuid(), Guid.NewGuid(), MemberRole);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task RemoveMember_CallerWithoutSubject_Returns401()
+    {
+        var client = factory.CreateClient();
+
+        var response = await DeleteMemberAsync(client, Guid.NewGuid(), Guid.NewGuid());
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task LeaveOrganization_CallerWithoutSubject_Returns401()
+    {
+        var client = factory.CreateClient();
+
+        var response = await LeaveOrganizationAsync(client, Guid.NewGuid());
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }

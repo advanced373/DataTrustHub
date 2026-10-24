@@ -10,8 +10,8 @@ namespace DataTrustHub.Features.Administration.AppointOrganizationAdmin;
 public record AppointOrganizationAdminCommand(Guid OrganizationId, Guid CallerId, Guid UserId);
 
 // The platform admin appoints the first organization admin of an organization, never themselves
-// (ADR-0014). Further organization admins will be appointed by the organization's own admins, by
-// changing a member's role (step 2b of #95). It gives the platform admin no access to the organization itself
+// (ADR-0014). Further organization admins are appointed by the organization's own admins, by changing a
+// member's role (ChangeMemberRole). It gives the platform admin no access to the organization itself
 public class AppointOrganizationAdminHandler(
     IOrganizationRepository organizations,
     IUserRepository users,

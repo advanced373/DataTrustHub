@@ -68,6 +68,21 @@ internal static class AdminSetup
         return (await response.Content.ReadFromJsonAsync<MembershipResponse>())!.MembershipId;
     }
 
+    internal static string MemberEndpoint(Guid organizationId, Guid userId) => $"{MembersEndpoint(organizationId)}/{userId}";
+
+    internal static string MemberRoleEndpoint(Guid organizationId, Guid userId) => $"{MemberEndpoint(organizationId, userId)}/role";
+
+    internal static string OwnMembershipEndpoint(Guid organizationId) => $"/organizations/{organizationId}/membership";
+
+    internal static Task<HttpResponseMessage> PutMemberRoleAsync(HttpClient caller, Guid organizationId, Guid userId, string? role) =>
+        caller.PutAsJsonAsync(MemberRoleEndpoint(organizationId, userId), new { Role = role });
+
+    internal static Task<HttpResponseMessage> DeleteMemberAsync(HttpClient caller, Guid organizationId, Guid userId) =>
+        caller.DeleteAsync(MemberEndpoint(organizationId, userId));
+
+    internal static Task<HttpResponseMessage> LeaveOrganizationAsync(HttpClient caller, Guid organizationId) =>
+        caller.DeleteAsync(OwnMembershipEndpoint(organizationId));
+
     internal record MembershipResponse(Guid MembershipId);
 
     private record CreateOrganizationResponse(Guid OrganizationId);

@@ -6,7 +6,7 @@ using static DataTrustHub.Features.Tests.Administration.Helpers.MembershipSetup;
 
 namespace DataTrustHub.Features.Tests.Administration;
 
-// AC1 and AC5 of #95 step 2a, AC8 of step 2b, AC1 of steps 3a (policies) and 3b (clearances): the caller id comes from the JWT sub claim; an authenticated caller without one
+// AC1 and AC5 of #95 step 2a, AC8 of step 2b, AC1 of steps 3a (policies) and 3b (clearances), AC1 and AC2 of step 5a (organization pages): the caller id comes from the JWT sub claim; an authenticated caller without one
 // gets 401 from the endpoint, even when they pass the route's role check
 public class MembershipCallerWithoutSubjectTests(NoSubjectApiFactory factory) : IClassFixture<NoSubjectApiFactory>
 {
@@ -164,6 +164,28 @@ public class MembershipCallerWithoutSubjectTests(NoSubjectApiFactory factory) : 
         var client = factory.CreateClient();
 
         var response = await client.DeleteAsync(ClearanceEndpoint(Guid.NewGuid(), Guid.NewGuid()));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    // --- organization pages (#95 step 5a) ---
+
+    [Fact]
+    public async Task ListMyOrganizations_CallerWithoutSubject_Returns401()
+    {
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync(MyOrganizationsEndpoint);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task FindUserByEmail_CallerWithoutSubject_Returns401()
+    {
+        var client = factory.CreateClient();
+
+        var response = await PostFindUserByEmailAsync(client, Guid.NewGuid(), "nosubject_target@example.com");
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }

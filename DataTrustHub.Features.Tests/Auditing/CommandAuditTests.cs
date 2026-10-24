@@ -260,18 +260,17 @@ public class CommandAuditTests(ApiFactory factory) : IClassFixture<ApiFactory>
         AssertRecord(record, AddMemberAction, scenario.OrgAdminId, RejectedOutcome, ValidationCode);
     }
 
-    // --- AC7: queries are not audited ---
+    // --- AC7: queries are not audited (the download GET /data/{id} is, see DataAccessAuditTests, #24 step 2) ---
 
     [Fact]
     public async Task Queries_LeaveNoAuditRecord()
     {
         var cleared = await CreateClearedUserAsync("audit_queries", Secret);
-        var itemId = await UploadAndReadIdAsync(cleared.Client, cleared.PolicyId, Confidential);
+        await UploadAndReadIdAsync(cleared.Client, cleared.PolicyId, Confidential);
 
         var records = await RecordsAddedByAsync(async () =>
         {
             await cleared.Client.GetAsync(DataItemsEndpoint);
-            await cleared.Client.GetAsync($"{DataItemsEndpoint}/{itemId}");
             await cleared.Client.GetAsync(ClassificationOptionsEndpoint);
             return await cleared.Client.GetAsync(AdminSetup.MyOrganizationsEndpoint);
         });

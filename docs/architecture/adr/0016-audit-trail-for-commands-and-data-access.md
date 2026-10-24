@@ -1,7 +1,7 @@
 # ADR-0016: Audit trail for commands and data access
 
 - **Status:** Accepted
-- **Date:** 2026-10-22
+- **Date:** 2026-10-22; amended 2026-10-24 (failure handling, own context, who sees what)
 - **Related:** #24, #6, #22; [ADR-0012](0012-clean-architecture-with-vertical-slices.md)
 
 ## Context
@@ -42,6 +42,30 @@ the trail.
    The trail is shown on an admin page, filtered by user, action and date range.
 7. **The old audit on `main` is not ported.** It is replaced by this design. When `main` is
    reconciled (#22), its two audit commits are dropped.
+
+## Amendments (2026-10-24, while building #24)
+
+8. **The record is written through its own database context**, never through the request's unit of
+   work. After a failed save the request's context still holds the rejected changes; the audit save
+   must neither retry them nor be lost with them.
+9. **When the audit write itself fails:**
+   - for a **command**, the failure is logged (action, outcome and exception type only) and the
+     command's answer is unchanged: its change is already committed or already refused;
+   - for a **download**, it fails closed: no content leaves without its record (the request answers 500);
+   - for a **denied read**, the failure is logged and the answer stays 404, so an audit outage does
+     not reveal which hidden items exist (ADR-0011).
+10. **A read of a missing item is not recorded**: nothing was accessed. A denied read does one more
+    insert than a missing one; this timing difference is accepted.
+11. **Who sees what, precisely:**
+    - an organization admin sees the records whose organization is theirs, including refused
+      attempts by outsiders on their organization's data;
+    - the platform admin sees only **tenant-level actions** (`CreateOrganization`,
+      `DeleteOrganization`, `AppointOrganizationAdmin`, `CreateAccount`, `DeleteAccount`,
+      `RegisterUser`, `LoginUser`), never a tenant's own trail;
+    - a user never sees their own records through these pages: a refused read can name the
+      organization of an item the user may not read.
+12. Sign-ins are recorded without an actor for now (the request is anonymous until the token is
+    issued); recording the signed-in user is #134.
 
 ## Alternatives considered
 

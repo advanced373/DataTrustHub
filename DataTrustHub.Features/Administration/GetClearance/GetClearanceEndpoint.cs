@@ -5,6 +5,8 @@ using DataTrustHub.SharedKernel;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 
 namespace DataTrustHub.Features.Administration.GetClearance;
 
@@ -16,16 +18,34 @@ public record GetClearanceResponse(
     string ClassificationLevelName,
     int ClassificationLevelPriority);
 
+// Any authenticated user may call; the handler checks that the caller is an organization admin there
 public class GetClearanceEndpoint : ICarterModule
 {
     public void AddRoutes(IEndpointRouteBuilder app) =>
         app.MapGet(Constants.EndpointRoute, Handle)
            .WithTags(Constants.EndpointTag)
-           .RequireAuthorization(policy => policy.RequireRole(UserRoles.Admin));
+           .RequireAuthorization();
 
-    private static async Task<IResult> Handle(Guid id, IQueryHandler<GetClearanceQuery, Result<GetClearanceResponse>> handler, CancellationToken cancellationToken)
+    private static async Task<IResult> Handle(
+        Guid organizationId,
+        Guid clearanceId,
+        IQueryHandler<GetClearanceQuery, Result<GetClearanceResponse>> handler,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
     {
-        var result = await handler.Handle(new GetClearanceQuery(id), cancellationToken);
+        var callerId = ExtractUserId(httpContext.User);
+        if (callerId is null) return Results.Unauthorized();
+
+        var query = new GetClearanceQuery(organizationId, callerId.Value, clearanceId);
+        var result = await handler.Handle(query, cancellationToken);
         return result.ToHttpResult(Results.Ok);
+    }
+
+    private static Guid? ExtractUserId(ClaimsPrincipal user)
+    {
+        var sub = user.FindFirstValue(JwtRegisteredClaimNames.Sub)
+               ?? user.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        return Guid.TryParse(sub, out var id) ? id : null;
     }
 }

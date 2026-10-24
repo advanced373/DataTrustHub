@@ -6,6 +6,8 @@ internal class CreateClearanceValidator : AbstractValidator<CreateClearanceComma
 {
     public CreateClearanceValidator()
     {
+        RuleFor(x => x.OrganizationId).NotEmpty();
+        RuleFor(x => x.CallerId).NotEmpty();
         RuleFor(x => x.UserId).NotEmpty();
         RuleFor(x => x.PolicyId).NotEmpty();
 

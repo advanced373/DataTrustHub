@@ -156,8 +156,11 @@ public class ClassifiedUploadTests(ApiFactory factory) : IClassFixture<ApiFactor
             await AdminSetup.CreatePolicyAsync(firstOrgAdmin, "B order policy", firstOrganization),
             await AdminSetup.CreatePolicyAsync(firstOrgAdmin, "A order policy", firstOrganization)
         };
-        foreach (var policyId in policyIds)
-            await AdminSetup.PostClearanceAsync(admin, userId, policyId, "Secret", Secret);
+        await AdminSetup.AddMemberAsync(laterOrgAdmin, laterOrganization, userId, MembershipSetup.MemberRole);
+        await AdminSetup.AddMemberAsync(firstOrgAdmin, firstOrganization, userId, MembershipSetup.MemberRole);
+        await AdminSetup.CreateClearanceAsync(laterOrgAdmin, laterOrganization, userId, policyIds[0], "Secret", Secret);
+        await AdminSetup.CreateClearanceAsync(firstOrgAdmin, firstOrganization, userId, policyIds[1], "Secret", Secret);
+        await AdminSetup.CreateClearanceAsync(firstOrgAdmin, firstOrganization, userId, policyIds[2], "Secret", Secret);
 
         var options = await user.GetFromJsonAsync<OptionsResponse>(OptionsEndpoint);
 
@@ -187,8 +190,9 @@ public class ClassifiedUploadTests(ApiFactory factory) : IClassFixture<ApiFactor
         var admin = await TestUsers.CreateClientAsync(factory, $"{prefix}_admin@example.com", UserRoles.Admin);
         var user = await TestUsers.CreateClientAsync(factory, $"{prefix}_user@example.com");
         var userId = await TestUsers.GetIdAsync(factory, $"{prefix}_user@example.com");
-        var policyId = await AdminSetup.CreatePolicyAsync(factory, admin, $"{prefix} policy");
-        await AdminSetup.PostClearanceAsync(admin, userId, policyId, $"Level {priority}", priority);
+        // Since #95 step 3b the organization admin of the policy's organization grants it to a member (C5, C6)
+        var (organizationId, orgAdmin, policyId) = await AdminSetup.CreatePolicyWithOrgAdminAsync(factory, admin, $"{prefix} policy");
+        await AdminSetup.AddMemberAndGrantClearanceAsync(orgAdmin, organizationId, userId, policyId, $"Level {priority}", priority);
         return (user, policyId);
     }
 

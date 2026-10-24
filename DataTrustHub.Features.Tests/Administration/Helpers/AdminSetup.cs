@@ -13,10 +13,12 @@ namespace DataTrustHub.Features.Tests.Administration.Helpers;
 internal static class AdminSetup
 {
     internal const string OrganizationsEndpoint = "/admin/organizations";
-    internal const string ClearancesEndpoint = "/admin/clearances";
 
     // The platform admin's policy routes before #95 step 3a, kept only to prove they no longer exist
     internal const string LegacyPoliciesEndpoint = "/admin/policies";
+
+    // The platform admin's clearance routes before #95 step 3b, kept only to prove they no longer exist
+    internal const string LegacyClearancesEndpoint = "/admin/clearances";
 
     private const string OrgAdminEmailPrefix = "policy_orgadmin_";
     private const string OrgAdminEmailDomain = "@example.com";
@@ -60,9 +62,20 @@ internal static class AdminSetup
         return (organizationId, orgAdmin);
     }
 
+    // --- clearances (ADR-0014, C6): granted by an organization admin of the policy's organization ---
+
+    internal const string DefaultLevelName = "Secret";
+    internal const int DefaultLevelPriority = 2;
+
+    internal static string ClearancesEndpoint(Guid organizationId) => $"/organizations/{organizationId}/clearances";
+
+    internal static string ClearanceEndpoint(Guid organizationId, Guid clearanceId) =>
+        $"{ClearancesEndpoint(organizationId)}/{clearanceId}";
+
     internal static Task<HttpResponseMessage> PostClearanceAsync(
-        HttpClient admin, Guid userId, Guid policyId, string level = "Secret", int priority = 2) =>
-        admin.PostAsJsonAsync(ClearancesEndpoint, new
+        HttpClient caller, Guid organizationId, Guid userId, Guid policyId,
+        string level = DefaultLevelName, int priority = DefaultLevelPriority) =>
+        caller.PostAsJsonAsync(ClearancesEndpoint(organizationId), new
         {
             UserId = userId,
             PolicyId = policyId,
@@ -71,10 +84,37 @@ internal static class AdminSetup
             ClassificationLevelPriority = priority
         });
 
-    internal static async Task<Guid> CreateClearanceAsync(HttpClient admin, Guid userId, Guid policyId)
+    // Fails the test at once when the grant is refused, so a broken setup does not pass as Guid.Empty
+    internal static async Task<Guid> CreateClearanceAsync(
+        HttpClient orgAdmin, Guid organizationId, Guid userId, Guid policyId,
+        string level = DefaultLevelName, int priority = DefaultLevelPriority)
     {
-        var response = await PostClearanceAsync(admin, userId, policyId);
+        var response = await PostClearanceAsync(orgAdmin, organizationId, userId, policyId, level, priority);
+        response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<CreateClearanceResponse>())!.ClearanceId;
+    }
+
+    // C5: the organization admin first adds the user as a member, then grants the clearance
+    internal static async Task<Guid> AddMemberAndGrantClearanceAsync(
+        HttpClient orgAdmin, Guid organizationId, Guid userId, Guid policyId, string level, int priority)
+    {
+        (await PostMemberAsync(orgAdmin, organizationId, userId, MembershipSetup.MemberRole)).EnsureSuccessStatusCode();
+        return await CreateClearanceAsync(orgAdmin, organizationId, userId, policyId, level, priority);
+    }
+
+    // A policy in a new organization "{name} organization", with the organization admin who may grant clearances on it
+    internal static async Task<(Guid OrganizationId, HttpClient OrgAdmin, Guid PolicyId)> CreatePolicyWithOrgAdminAsync(
+        ApiFactory factory, HttpClient platformAdmin, string name)
+    {
+        var (organizationId, orgAdmin) = await CreateOrganizationWithOrgAdminAsync(factory, platformAdmin, $"{name} organization");
+        return (organizationId, orgAdmin, await CreatePolicyAsync(orgAdmin, name, organizationId));
+    }
+
+    // Every stored clearance, read directly, so a test can prove what a request did or did not change
+    internal static async Task<List<DbClearance>> StoredClearancesAsync(ApiFactory factory)
+    {
+        using var scope = factory.Services.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<DContext>().Clearances.AsNoTracking().ToListAsync();
     }
 
     // Every stored policy, read directly, so a test can prove what a request did or did not change

@@ -1,4 +1,5 @@
 using DataTrustHub.Domain.Abstractions;
+using DataTrustHub.Domain.Clearances;
 using DataTrustHub.Domain.Memberships;
 using DataTrustHub.Features.Tests.Helpers;
 using DataTrustHub.Infrastructure.Persistance;
@@ -26,6 +27,7 @@ internal static class MembershipSetup
     internal const string OrgAdminRole = "OrgAdmin";
 
     private const string EmailDomain = "@example.com";
+    private const string SeededClearanceName = "Seeded clearance";
 
     internal static async Task<OrganizationScenario> CreateOrganizationWithOrgAdminAsync(ApiFactory factory, string prefix)
     {
@@ -93,18 +95,30 @@ internal static class MembershipSetup
         return await db.Clearances.AsNoTracking().Where(c => c.UserId == userId).Select(c => c.Id).ToListAsync();
     }
 
+    // The clearances are stored directly: C5 and C8 (#95 step 3b) are not under test here, and the C7 scenarios
+    // also need a holder without a membership or the organization's only organization admin as holder
     internal static async Task<ClearanceScenario> CreateClearancesAsync(
         ApiFactory factory, OrganizationScenario scenario, Guid userId, string prefix)
     {
-        var admin = scenario.PlatformAdmin;
         var policyHere = await AdminSetup.CreatePolicyAsync(scenario.OrgAdmin, $"{prefix} policy", scenario.OrganizationId);
-        var policyElsewhere = await AdminSetup.CreatePolicyAsync(factory, admin, $"{prefix} elsewhere policy");
+        var policyElsewhere = await AdminSetup.CreatePolicyAsync(factory, scenario.PlatformAdmin, $"{prefix} elsewhere policy");
         var (_, otherUserId) = await CreateUserAsync(factory, $"{prefix}_other_cleared");
         return new ClearanceScenario(
-            await AdminSetup.CreateClearanceAsync(admin, userId, policyHere),
-            await AdminSetup.CreateClearanceAsync(admin, userId, policyElsewhere),
+            await SeedClearanceAsync(factory, userId, policyHere),
+            await SeedClearanceAsync(factory, userId, policyElsewhere),
             otherUserId,
-            await AdminSetup.CreateClearanceAsync(admin, otherUserId, policyHere));
+            await SeedClearanceAsync(factory, otherUserId, policyHere));
+    }
+
+    // Stores a clearance directly, without the grant use case and so without C5, C6 and C8
+    internal static async Task<Guid> SeedClearanceAsync(ApiFactory factory, Guid userId, Guid policyId)
+    {
+        using var scope = factory.Services.CreateScope();
+        var clearance = Clearance.Grant(
+            SeededClearanceName, userId, policyId, new ClassificationLevel(AdminSetup.DefaultLevelName, AdminSetup.DefaultLevelPriority));
+        await scope.ServiceProvider.GetRequiredService<IClearanceRepository>().AddAsync(clearance, default);
+        await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync();
+        return clearance.Id;
     }
 
     private static string PlatformAdminEmail(string prefix) => $"{prefix}_platform{EmailDomain}";

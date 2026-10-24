@@ -90,7 +90,7 @@ public class MembershipCascadeTests(ApiFactory factory) : IClassFixture<ApiFacto
     public async Task DeleteOrganization_WithPolicies_Returns409AndKeepsMemberships()
     {
         var scenario = await CreateOrganizationWithOrgAdminAsync(factory, "cascade_org_policies");
-        await CreatePolicyAsync(scenario.PlatformAdmin, "cascade_org_policies policy", scenario.OrganizationId);
+        await CreatePolicyAsync(scenario.OrgAdmin, "cascade_org_policies policy", scenario.OrganizationId);
 
         var response = await scenario.PlatformAdmin.DeleteAsync(OrganizationEndpoint(scenario.OrganizationId));
 

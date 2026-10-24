@@ -46,7 +46,7 @@ public class DataVisibilityTests(ApiFactory factory) : IClassFixture<ApiFactory>
     public async Task ClearedOnAnotherPolicy_DoesNotSeeItem()
     {
         var setup = await ArrangeAsync("vis_other");
-        var otherPolicy = await AdminSetup.CreatePolicyAsync(setup.Admin, "vis_other second policy");
+        var otherPolicy = await AdminSetup.CreatePolicyAsync(factory, setup.Admin, "vis_other second policy");
         var reader = await CreateClearedUserAsync(setup with { PolicyId = otherPolicy }, "vis_other_reader", Secret);
 
         Assert.Empty((await reader.GetFromJsonAsync<List<SummaryResponse>>(ListEndpoint))!);
@@ -83,7 +83,7 @@ public class DataVisibilityTests(ApiFactory factory) : IClassFixture<ApiFactory>
     private async Task<Setup> ArrangeAsync(string prefix)
     {
         var admin = await TestUsers.CreateClientAsync(factory, $"{prefix}_admin@example.com", UserRoles.Admin);
-        var policyId = await AdminSetup.CreatePolicyAsync(admin, $"{prefix} policy");
+        var policyId = await AdminSetup.CreatePolicyAsync(factory, admin, $"{prefix} policy");
         var owner = await CreateClearedUserAsync(new Setup(admin, admin, policyId, Guid.Empty), $"{prefix}_owner", Secret);
         var itemId = await UploadAsync(owner, policyId, Confidential);
         return new Setup(admin, owner, policyId, itemId);

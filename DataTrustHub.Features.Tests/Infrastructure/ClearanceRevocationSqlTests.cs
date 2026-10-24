@@ -15,10 +15,11 @@ public class ClearanceRevocationSqlTests(SqliteApiFactory factory) : IClassFixtu
     [Fact]
     public async Task ListIdsInOrganization_OnSqlite_ReturnsOnlyThatOrganizationsPolicyIds()
     {
-        var (platformAdmin, organizationId) = await CreateOrganizationWithoutMembersAsync(factory, "sql_policy_ids");
-        var first = await CreatePolicyAsync(platformAdmin, "sql_policy_ids first", organizationId);
-        var second = await CreatePolicyAsync(platformAdmin, "sql_policy_ids second", organizationId);
-        await CreatePolicyAsync(platformAdmin, "sql_policy_ids elsewhere");
+        var scenario = await CreateOrganizationWithOrgAdminAsync(factory, "sql_policy_ids");
+        var organizationId = scenario.OrganizationId;
+        var first = await CreatePolicyAsync(scenario.OrgAdmin, "sql_policy_ids first", organizationId);
+        var second = await CreatePolicyAsync(scenario.OrgAdmin, "sql_policy_ids second", organizationId);
+        await CreatePolicyAsync(factory, scenario.PlatformAdmin, "sql_policy_ids elsewhere");
 
         using var scope = factory.Services.CreateScope();
         var ids = await scope.ServiceProvider.GetRequiredService<IPolicyRepository>().ListIdsInOrganizationAsync(organizationId, default);

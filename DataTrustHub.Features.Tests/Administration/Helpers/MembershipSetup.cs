@@ -97,8 +97,8 @@ internal static class MembershipSetup
         ApiFactory factory, OrganizationScenario scenario, Guid userId, string prefix)
     {
         var admin = scenario.PlatformAdmin;
-        var policyHere = await AdminSetup.CreatePolicyAsync(admin, $"{prefix} policy", scenario.OrganizationId);
-        var policyElsewhere = await AdminSetup.CreatePolicyAsync(admin, $"{prefix} elsewhere policy");
+        var policyHere = await AdminSetup.CreatePolicyAsync(scenario.OrgAdmin, $"{prefix} policy", scenario.OrganizationId);
+        var policyElsewhere = await AdminSetup.CreatePolicyAsync(factory, admin, $"{prefix} elsewhere policy");
         var (_, otherUserId) = await CreateUserAsync(factory, $"{prefix}_other_cleared");
         return new ClearanceScenario(
             await AdminSetup.CreateClearanceAsync(admin, userId, policyHere),

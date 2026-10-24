@@ -21,6 +21,7 @@ The access rules:
    them, and any member or guest can leave. Ending a membership revokes the user's clearances in that
    organization (#95).
 2. An organization defines **policies**: named areas of access, such as "Project Apollo" or "HR".
+   Its organization admins create and delete them.
 3. A **data item** (an uploaded document) is either **personal** or **classified**.
    - A **personal** data item is private to the user who uploaded it.
    - A **classified** data item is placed under one policy, at one **classification level**, from
@@ -43,13 +44,13 @@ The rules are recorded in ADR-0011. The architecture that implements them is in 
 | Term | Meaning | In code |
 |---|---|---|
 | **User** | A person with an account. Their role is `User` or `Admin` | `User` |
-| **Admin** | A user who manages organizations, policies, users and clearances. Admins have no automatic access to data (need-to-know). Under ADR-0014 this role becomes the *platform admin* | `User.Role` |
+| **Admin** | A user who manages organizations, users and clearances; policies are now managed by organization admins. Admins have no automatic access to data (need-to-know). Under ADR-0014 this role becomes the *platform admin* | `User.Role` |
 | **Platform admin** | A user with the `Admin` role. Under ADR-0014 they manage tenants only: create and delete organizations and appoint their first organization admin. Not to be confused with an organization admin | `UserRoles.Admin`, `User.IsAdmin` |
 | **Membership** | A user's membership in one organization, with a role there. A user can be a member of several organizations, with at most one membership in each | `Membership` |
 | **Membership role** | The role of a membership: member, guest or organization admin | `MembershipRole` |
 | **Member** | A membership role: holds clearances, reads and uploads data in the organization | `MembershipRole.Member` |
 | **Guest** | A membership role for an external person, added explicitly. Works like a member, but never manages the organization. The guest role is fixed: a guest never changes role, and no member or organization admin becomes a guest; the membership is ended and the person added again instead | `MembershipRole.Guest` |
-| **Organization admin** | A membership role that manages one organization: its members, policies and clearances. Write *OrgAdmin* in code only | `MembershipRole.OrgAdmin` |
+| **Organization admin** | A membership role that manages one organization: its members, policies and clearances (clearances from #95 step 3b). Write *OrgAdmin* in code only | `MembershipRole.OrgAdmin` |
 | **Appoint an organization admin** | The platform admin makes a user the first organization admin of one organization: a new membership, or a member's role changed. Only the first one: when the organization already has an organization admin, its own admins appoint the others, by changing a member's role. The platform admin never appoints themselves, and a guest cannot be appointed (the guest role is fixed). It gives the platform admin no access to the organization | `AppointOrganizationAdmin`, `Membership.AppointOrgAdmin` |
 | **Add a member** | An organization admin adds a user to their organization as a member or a guest. A user already in the organization cannot be added again | `AddMember`, `Membership.AddMember`, `Membership.AddGuest` |
 | **Change a member's role** | An organization admin makes a member an organization admin, or an organization admin a member; this is how further organization admins are appointed. The guest role is fixed, and the last organization admin cannot be demoted | `ChangeMemberRole`, `Membership.ChangeRole` |

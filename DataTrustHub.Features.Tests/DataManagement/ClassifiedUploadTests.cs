@@ -64,7 +64,7 @@ public class ClassifiedUploadTests(ApiFactory factory) : IClassFixture<ApiFactor
     {
         var (user, _) = await CreateClearedUserAsync("classified_other", Secret);
         var admin = await TestUsers.CreateClientAsync(factory, "classified_other_admin2@example.com", UserRoles.Admin);
-        var otherPolicyId = await AdminSetup.CreatePolicyAsync(admin, "Uncleared policy");
+        var otherPolicyId = await AdminSetup.CreatePolicyAsync(factory, admin, "Uncleared policy");
 
         var response = await UploadAsync(user, otherPolicyId, Confidential);
 
@@ -146,13 +146,15 @@ public class ClassifiedUploadTests(ApiFactory factory) : IClassFixture<ApiFactor
         var admin = await TestUsers.CreateClientAsync(factory, $"{prefix}_admin@example.com", UserRoles.Admin);
         var user = await TestUsers.CreateClientAsync(factory, $"{prefix}_user@example.com");
         var userId = await TestUsers.GetIdAsync(factory, $"{prefix}_user@example.com");
-        var laterOrganization = await AdminSetup.CreateOrganizationAsync(admin, "Z order organization");
-        var firstOrganization = await AdminSetup.CreateOrganizationAsync(admin, "M order organization");
+        var (laterOrganization, laterOrgAdmin) =
+            await AdminSetup.CreateOrganizationWithOrgAdminAsync(factory, admin, "Z order organization");
+        var (firstOrganization, firstOrgAdmin) =
+            await AdminSetup.CreateOrganizationWithOrgAdminAsync(factory, admin, "M order organization");
         var policyIds = new[]
         {
-            await AdminSetup.CreatePolicyAsync(admin, "A order policy", laterOrganization),
-            await AdminSetup.CreatePolicyAsync(admin, "B order policy", firstOrganization),
-            await AdminSetup.CreatePolicyAsync(admin, "A order policy", firstOrganization)
+            await AdminSetup.CreatePolicyAsync(laterOrgAdmin, "A order policy", laterOrganization),
+            await AdminSetup.CreatePolicyAsync(firstOrgAdmin, "B order policy", firstOrganization),
+            await AdminSetup.CreatePolicyAsync(firstOrgAdmin, "A order policy", firstOrganization)
         };
         foreach (var policyId in policyIds)
             await AdminSetup.PostClearanceAsync(admin, userId, policyId, "Secret", Secret);
@@ -185,7 +187,7 @@ public class ClassifiedUploadTests(ApiFactory factory) : IClassFixture<ApiFactor
         var admin = await TestUsers.CreateClientAsync(factory, $"{prefix}_admin@example.com", UserRoles.Admin);
         var user = await TestUsers.CreateClientAsync(factory, $"{prefix}_user@example.com");
         var userId = await TestUsers.GetIdAsync(factory, $"{prefix}_user@example.com");
-        var policyId = await AdminSetup.CreatePolicyAsync(admin, $"{prefix} policy");
+        var policyId = await AdminSetup.CreatePolicyAsync(factory, admin, $"{prefix} policy");
         await AdminSetup.PostClearanceAsync(admin, userId, policyId, $"Level {priority}", priority);
         return (user, policyId);
     }

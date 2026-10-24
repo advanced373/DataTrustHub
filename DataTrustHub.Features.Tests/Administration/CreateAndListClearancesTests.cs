@@ -17,7 +17,7 @@ public class CreateAndListClearancesTests(ApiFactory factory) : IClassFixture<Ap
     public async Task CreateClearance_Valid_IsListedWithItsLevel()
     {
         var (admin, userId) = await CreateAdminAndUserAsync("clearance_create");
-        var policyId = await CreatePolicyAsync(admin, "Clearance create policy");
+        var policyId = await CreatePolicyAsync(factory, admin, "Clearance create policy");
 
         var response = await PostClearanceAsync(admin, userId, policyId, "TopSecret", 3);
         var listed = await admin.GetFromJsonAsync<List<ClearanceResponse>>($"{ClearancesEndpoint}?userId={userId}");
@@ -31,8 +31,8 @@ public class CreateAndListClearancesTests(ApiFactory factory) : IClassFixture<Ap
     public async Task CreateClearance_SameLevelTwice_ReusesTheClassificationLevel()
     {
         var (admin, userId) = await CreateAdminAndUserAsync("clearance_reuse");
-        await PostClearanceAsync(admin, userId, await CreatePolicyAsync(admin, "Reuse policy 1"), "Reused", 7);
-        await PostClearanceAsync(admin, userId, await CreatePolicyAsync(admin, "Reuse policy 2"), "Reused", 7);
+        await PostClearanceAsync(admin, userId, await CreatePolicyAsync(factory, admin, "Reuse policy 1"), "Reused", 7);
+        await PostClearanceAsync(admin, userId, await CreatePolicyAsync(factory, admin, "Reuse policy 2"), "Reused", 7);
 
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DContext>();
@@ -43,7 +43,7 @@ public class CreateAndListClearancesTests(ApiFactory factory) : IClassFixture<Ap
     public async Task CreateClearance_SameUserAndPolicyTwice_Returns409()
     {
         var (admin, userId) = await CreateAdminAndUserAsync("clearance_duplicate");
-        var policyId = await CreatePolicyAsync(admin, "Duplicate clearance policy");
+        var policyId = await CreatePolicyAsync(factory, admin, "Duplicate clearance policy");
         await PostClearanceAsync(admin, userId, policyId);
 
         var response = await PostClearanceAsync(admin, userId, policyId);
@@ -56,7 +56,7 @@ public class CreateAndListClearancesTests(ApiFactory factory) : IClassFixture<Ap
     public async Task CreateClearance_UnknownUserOrPolicy_Returns404()
     {
         var (admin, userId) = await CreateAdminAndUserAsync("clearance_unknown");
-        var policyId = await CreatePolicyAsync(admin, "Unknown refs policy");
+        var policyId = await CreatePolicyAsync(factory, admin, "Unknown refs policy");
 
         await ErrorAssert.HasErrorAsync(
             await PostClearanceAsync(admin, Guid.NewGuid(), policyId), HttpStatusCode.NotFound,
@@ -70,7 +70,7 @@ public class CreateAndListClearancesTests(ApiFactory factory) : IClassFixture<Ap
     public async Task CreateClearance_NegativePriority_Returns400()
     {
         var (admin, userId) = await CreateAdminAndUserAsync("clearance_invalid");
-        var policyId = await CreatePolicyAsync(admin, "Invalid clearance policy");
+        var policyId = await CreatePolicyAsync(factory, admin, "Invalid clearance policy");
 
         var response = await PostClearanceAsync(admin, userId, policyId, "Secret", -1);
 

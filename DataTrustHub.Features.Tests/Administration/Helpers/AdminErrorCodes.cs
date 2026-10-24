@@ -6,7 +6,6 @@ internal static class AdminErrorCodes
     internal const string OrganizationNameAlreadyInUse = "Organization.NameAlreadyInUse";
     internal const string OrganizationNotFound = "Organization.NotFound";
     internal const string OrganizationHasPolicies = "Organization.HasPolicies";
-    internal const string PolicyOrganizationNotFound = "Policy.OrganizationNotFound";
     internal const string PolicyNameAlreadyInUse = "Policy.NameAlreadyInUse";
     internal const string PolicyNotFound = "Policy.NotFound";
     internal const string PolicyHasClearances = "Policy.HasClearances";
@@ -25,6 +24,7 @@ internal static class AdminErrorCodes
     internal const string MembershipNotFound = "Membership.NotFound";
     internal const string MembershipLastOrgAdmin = "Membership.LastOrgAdmin";
     internal const string MembershipUnknownRole = "Membership.UnknownRole";
+    internal const string ValidationGeneral = "Validation.General";
 }
 
 internal static class AdminErrorMessages
@@ -32,7 +32,6 @@ internal static class AdminErrorMessages
     internal const string OrganizationNameAlreadyInUse = "An organization with this name already exists.";
     internal const string OrganizationNotFound = "The organization was not found.";
     internal const string OrganizationHasPolicies = "The organization still has policies. Delete its policies first.";
-    internal const string PolicyOrganizationNotFound = "The specified organization does not exist.";
     internal const string PolicyNameAlreadyInUse = "A policy with this name already exists for the given organization.";
     internal const string PolicyNotFound = "The policy was not found.";
     internal const string PolicyHasClearances = "The policy still has clearances. Delete its clearances first.";
@@ -50,4 +49,5 @@ internal static class AdminErrorMessages
     internal const string MembershipGuestRoleIsFixed = "A guest stays a guest. End the membership and add the person again to change it.";
     internal const string MembershipNotFound = "The user is not a member of this organization.";
     internal const string MembershipLastOrgAdmin = "The organization must keep at least one organization admin. Appoint another one first.";
+    internal const string ValidationGeneral = "One or more validation errors occurred";
 }

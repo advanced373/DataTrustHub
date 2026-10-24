@@ -4,115 +4,234 @@ using DataTrustHub.Features.Tests.Administration.Helpers;
 using DataTrustHub.Features.Tests.Helpers;
 using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.Infrastructure.Persistance.Model;
-using DataTrustHub.SharedKernel;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
+using static DataTrustHub.Features.Tests.Administration.Helpers.AdminSetup;
+using static DataTrustHub.Features.Tests.Administration.Helpers.MembershipSetup;
 
 namespace DataTrustHub.Features.Tests.Administration;
 
+// AC3, AC4 and AC5 of #95 step 3a: an organization admin lists, reads and deletes the policies of their
+// organization; a policy of another organization is not found through it (C6, P3)
 public class ManagePoliciesTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
-    private const string OrganizationsEndpoint = "/admin/organizations";
-    private const string PoliciesEndpoint = "/admin/policies";
+    // --- ListPolicies (AC3) ---
 
     [Fact]
-    public async Task ListPolicies_FilteredByOrganization_ReturnsOnlyThatOrganizationsPolicies()
+    public async Task ListPolicies_OrgAdmin_ReturnsOnlyThatOrganizationsPolicies()
     {
-        var admin = await CreateAdminAsync("policies_list_admin@example.com");
-        var organizationA = await CreateOrganizationAsync(admin, "Policies organization A");
-        var organizationB = await CreateOrganizationAsync(admin, "Policies organization B");
-        var policyA = await CreatePolicyAsync(admin, "Policy A", organizationA);
-        var policyB = await CreatePolicyAsync(admin, "Policy B", organizationB);
+        var scenario = await CreateOrganizationWithOrgAdminAsync(factory, "policies_list_scope");
+        var other = await CreateOrganizationWithOrgAdminAsync(factory, "policies_list_scope_other");
+        var policyA = await CreatePolicyAsync(scenario.OrgAdmin, "Policy A", scenario.OrganizationId);
+        await CreatePolicyAsync(other.OrgAdmin, "Policy B", other.OrganizationId);
 
-        var all = await admin.GetFromJsonAsync<List<PolicyResponse>>(PoliciesEndpoint);
-        var filtered = await admin.GetFromJsonAsync<List<PolicyResponse>>($"{PoliciesEndpoint}?organizationId={organizationA}");
+        var listed = await scenario.OrgAdmin.GetFromJsonAsync<List<PolicyResponse>>(PoliciesEndpoint(scenario.OrganizationId));
 
-        Assert.Contains(all!, p => p.Id == policyA);
-        Assert.Contains(all!, p => p.Id == policyB);
-        var only = Assert.Single(filtered!);
-        Assert.Equal(policyA, only.Id);
+        Assert.Equal([new PolicyResponse(policyA, "Policy A", scenario.OrganizationId)], listed);
     }
 
     [Fact]
-    public async Task GetPolicy_ExistingAndMissing()
+    public async Task ListPolicies_OrgAdmin_ReturnsPoliciesOrderedByName()
     {
-        var admin = await CreateAdminAsync("policies_get_admin@example.com");
-        var organizationId = await CreateOrganizationAsync(admin, "Policies get organization");
-        var policyId = await CreatePolicyAsync(admin, "Readable policy", organizationId);
+        var scenario = await CreateOrganizationWithOrgAdminAsync(factory, "policies_list_order");
+        var zed = await CreatePolicyAsync(scenario.OrgAdmin, "Z policy", scenario.OrganizationId);
+        var alpha = await CreatePolicyAsync(scenario.OrgAdmin, "A policy", scenario.OrganizationId);
 
-        var found = await admin.GetFromJsonAsync<PolicyResponse>($"{PoliciesEndpoint}/{policyId}");
-        var missing = await admin.GetAsync($"{PoliciesEndpoint}/{Guid.NewGuid()}");
+        var listed = await scenario.OrgAdmin.GetFromJsonAsync<List<PolicyResponse>>(PoliciesEndpoint(scenario.OrganizationId));
 
-        Assert.Equal(new PolicyResponse(policyId, "Readable policy", organizationId), found);
-        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+        Assert.Equal([alpha, zed], listed!.Select(p => p.Id).ToArray());
     }
+
+    [Fact]
+    public async Task ListPolicies_OrganizationWithoutPolicies_Returns200Empty()
+    {
+        var scenario = await CreateOrganizationWithOrgAdminAsync(factory, "policies_list_empty");
+
+        var response = await scenario.OrgAdmin.GetAsync(PoliciesEndpoint(scenario.OrganizationId));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Empty((await response.Content.ReadFromJsonAsync<List<PolicyResponse>>())!);
+    }
+
+    // The old ?organizationId= filter is gone: the route alone scopes the list
+    [Fact]
+    public async Task ListPolicies_QueryWithAnotherOrganizationId_StillListsTheRouteOrganization()
+    {
+        var scenario = await CreateOrganizationWithOrgAdminAsync(factory, "policies_list_query");
+        var other = await CreateOrganizationWithOrgAdminAsync(factory, "policies_list_query_other");
+        var policyHere = await CreatePolicyAsync(scenario.OrgAdmin, "Query policy here", scenario.OrganizationId);
+        await CreatePolicyAsync(other.OrgAdmin, "Query policy elsewhere", other.OrganizationId);
+
+        var listed = await scenario.OrgAdmin.GetFromJsonAsync<List<PolicyResponse>>(
+            $"{PoliciesEndpoint(scenario.OrganizationId)}?organizationId={other.OrganizationId}");
+
+        Assert.Equal([policyHere], listed!.Select(p => p.Id).ToArray());
+    }
+
+    // --- GetPolicy (AC4) ---
+
+    [Fact]
+    public async Task GetPolicy_OrgAdmin_ReturnsIt()
+    {
+        var scenario = await CreateOrganizationWithOrgAdminAsync(factory, "policies_get");
+        var policyId = await CreatePolicyAsync(scenario.OrgAdmin, "Readable policy", scenario.OrganizationId);
+
+        var found = await scenario.OrgAdmin.GetFromJsonAsync<PolicyResponse>(PolicyEndpoint(scenario.OrganizationId, policyId));
+
+        Assert.Equal(new PolicyResponse(policyId, "Readable policy", scenario.OrganizationId), found);
+    }
+
+    [Fact]
+    public async Task GetPolicy_Missing_Returns404PolicyNotFound()
+    {
+        var scenario = await CreateOrganizationWithOrgAdminAsync(factory, "policies_get_missing");
+
+        var response = await scenario.OrgAdmin.GetAsync(PolicyEndpoint(scenario.OrganizationId, Guid.NewGuid()));
+
+        await AssertPolicyNotFoundAsync(response);
+    }
+
+    // Never reveal another organization's policy
+    [Fact]
+    public async Task GetPolicy_OfAnotherOrganizationThroughOwnRoute_Returns404PolicyNotFound()
+    {
+        var scenario = await CreateOrganizationWithOrgAdminAsync(factory, "policies_get_other");
+        var other = await CreateOrganizationWithOrgAdminAsync(factory, "policies_get_other_org");
+        var otherPolicy = await CreatePolicyAsync(other.OrgAdmin, "Other organization policy", other.OrganizationId);
+
+        var response = await scenario.OrgAdmin.GetAsync(PolicyEndpoint(scenario.OrganizationId, otherPolicy));
+
+        await AssertPolicyNotFoundAsync(response);
+    }
+
+    // --- DeletePolicy (AC4) ---
 
     [Fact]
     public async Task DeletePolicy_WithoutClearances_Returns204AndRemovesIt()
     {
-        var admin = await CreateAdminAsync("policies_delete_admin@example.com");
-        var organizationId = await CreateOrganizationAsync(admin, "Policies delete organization");
-        var policyId = await CreatePolicyAsync(admin, "Disposable policy", organizationId);
+        var scenario = await CreateOrganizationWithOrgAdminAsync(factory, "policies_delete");
+        var policyId = await CreatePolicyAsync(scenario.OrgAdmin, "Disposable policy", scenario.OrganizationId);
 
-        var response = await admin.DeleteAsync($"{PoliciesEndpoint}/{policyId}");
+        var response = await scenario.OrgAdmin.DeleteAsync(PolicyEndpoint(scenario.OrganizationId, policyId));
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await admin.GetAsync($"{PoliciesEndpoint}/{policyId}")).StatusCode);
+        Assert.DoesNotContain(await StoredPoliciesAsync(factory), p => p.Id == policyId);
+        await AssertPolicyNotFoundAsync(await scenario.OrgAdmin.GetAsync(PolicyEndpoint(scenario.OrganizationId, policyId)));
     }
 
+    // Invariant P3
     [Fact]
     public async Task DeletePolicy_WithClearances_Returns409WithCode()
     {
-        var admin = await CreateAdminAsync("policies_conflict_admin@example.com");
-        var organizationId = await CreateOrganizationAsync(admin, "Policies conflict organization");
-        var policyId = await CreatePolicyAsync(admin, "Policy with clearance", organizationId);
+        var scenario = await CreateOrganizationWithOrgAdminAsync(factory, "policies_conflict");
+        var policyId = await CreatePolicyAsync(scenario.OrgAdmin, "Policy with clearance", scenario.OrganizationId);
         await AddClearanceAsync(policyId);
 
-        var response = await admin.DeleteAsync($"{PoliciesEndpoint}/{policyId}");
+        var response = await scenario.OrgAdmin.DeleteAsync(PolicyEndpoint(scenario.OrganizationId, policyId));
 
         await ErrorAssert.HasErrorAsync(response, HttpStatusCode.Conflict,
             AdminErrorCodes.PolicyHasClearances, AdminErrorMessages.PolicyHasClearances);
     }
 
     [Fact]
-    public async Task DeletePolicy_Missing_Returns404WithCode()
+    public async Task DeletePolicy_WithClearances_KeepsPolicy()
     {
-        var admin = await CreateAdminAsync("policies_delete_missing@example.com");
+        var scenario = await CreateOrganizationWithOrgAdminAsync(factory, "policies_conflict_kept");
+        var policyId = await CreatePolicyAsync(scenario.OrgAdmin, "Kept policy with clearance", scenario.OrganizationId);
+        await AddClearanceAsync(policyId);
 
-        var response = await admin.DeleteAsync($"{PoliciesEndpoint}/{Guid.NewGuid()}");
+        await scenario.OrgAdmin.DeleteAsync(PolicyEndpoint(scenario.OrganizationId, policyId));
 
-        await ErrorAssert.HasErrorAsync(response, HttpStatusCode.NotFound,
-            AdminErrorCodes.PolicyNotFound, AdminErrorMessages.PolicyNotFound);
+        Assert.Contains(await StoredPoliciesAsync(factory), p => p.Id == policyId);
     }
 
     [Fact]
-    public async Task PolicyEndpoints_RegularUser_Return403()
+    public async Task DeletePolicy_Missing_Returns404PolicyNotFound()
     {
-        var user = await TestUsers.CreateClientAsync(factory, "policies_regular@example.com");
-        var someId = Guid.NewGuid();
+        var scenario = await CreateOrganizationWithOrgAdminAsync(factory, "policies_delete_missing");
 
-        Assert.Equal(HttpStatusCode.Forbidden, (await user.GetAsync(PoliciesEndpoint)).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await user.GetAsync($"{PoliciesEndpoint}/{someId}")).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await user.DeleteAsync($"{PoliciesEndpoint}/{someId}")).StatusCode);
+        var response = await scenario.OrgAdmin.DeleteAsync(PolicyEndpoint(scenario.OrganizationId, Guid.NewGuid()));
+
+        await AssertPolicyNotFoundAsync(response);
+    }
+
+    [Fact]
+    public async Task DeletePolicy_OfAnotherOrganizationThroughOwnRoute_Returns404PolicyNotFound()
+    {
+        var scenario = await CreateOrganizationWithOrgAdminAsync(factory, "policies_delete_other");
+        var other = await CreateOrganizationWithOrgAdminAsync(factory, "policies_delete_other_org");
+        var otherPolicy = await CreatePolicyAsync(other.OrgAdmin, "Other organization disposable", other.OrganizationId);
+
+        var response = await scenario.OrgAdmin.DeleteAsync(PolicyEndpoint(scenario.OrganizationId, otherPolicy));
+
+        await AssertPolicyNotFoundAsync(response);
+    }
+
+    [Fact]
+    public async Task DeletePolicy_OfAnotherOrganizationThroughOwnRoute_KeepsPolicy()
+    {
+        var scenario = await CreateOrganizationWithOrgAdminAsync(factory, "policies_delete_other_kept");
+        var other = await CreateOrganizationWithOrgAdminAsync(factory, "policies_delete_other_kept_org");
+        var otherPolicy = await CreatePolicyAsync(other.OrgAdmin, "Other organization kept", other.OrganizationId);
+
+        await scenario.OrgAdmin.DeleteAsync(PolicyEndpoint(scenario.OrganizationId, otherPolicy));
+
+        var stored = Assert.Single(await StoredPoliciesAsync(factory), p => p.Id == otherPolicy);
+        Assert.Equal(other.OrganizationId, stored.OrganizationId);
+    }
+
+    // A 409 from P3 would reveal that the other organization's policy exists, so the scope check must come first
+    [Fact]
+    public async Task DeletePolicy_OfAnotherOrganizationWithClearances_Returns404PolicyNotFound()
+    {
+        var scenario = await CreateOrganizationWithOrgAdminAsync(factory, "policies_delete_other_cleared");
+        var other = await CreateOrganizationWithOrgAdminAsync(factory, "policies_delete_other_cleared_org");
+        var otherPolicy = await CreatePolicyAsync(other.OrgAdmin, "Other organization cleared", other.OrganizationId);
+        await AddClearanceAsync(otherPolicy);
+
+        var response = await scenario.OrgAdmin.DeleteAsync(PolicyEndpoint(scenario.OrganizationId, otherPolicy));
+
+        await AssertPolicyNotFoundAsync(response);
+    }
+
+    // --- AC5: the platform admin's /admin/policies routes are gone ---
+
+    [Fact]
+    public async Task LegacyPolicyRoutes_PlatformAdmin_Return404FromRouting()
+    {
+        var scenario = await CreateOrganizationWithOrgAdminAsync(factory, "policies_legacy_routes");
+        var policyId = await CreatePolicyAsync(scenario.OrgAdmin, "Legacy route policy", scenario.OrganizationId);
+        var admin = scenario.PlatformAdmin;
+        var legacyPolicyRoute = $"{LegacyPoliciesEndpoint}/{policyId}";
+
+        Assert.Equal(HttpStatusCode.NotFound, (await admin.GetAsync(LegacyPoliciesEndpoint)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await admin.PostAsJsonAsync(
+            LegacyPoliciesEndpoint, new { Name = "Legacy policy", scenario.OrganizationId })).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await admin.GetAsync(legacyPolicyRoute)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await admin.DeleteAsync(legacyPolicyRoute)).StatusCode);
+    }
+
+    [Fact]
+    public async Task LegacyPolicyRoutes_PlatformAdmin_ChangeNothing()
+    {
+        var scenario = await CreateOrganizationWithOrgAdminAsync(factory, "policies_legacy_unchanged");
+        var policyId = await CreatePolicyAsync(scenario.OrgAdmin, "Legacy kept policy", scenario.OrganizationId);
+        var admin = scenario.PlatformAdmin;
+
+        await admin.PostAsJsonAsync(LegacyPoliciesEndpoint, new { Name = "Legacy created policy", scenario.OrganizationId });
+        await admin.DeleteAsync($"{LegacyPoliciesEndpoint}/{policyId}");
+
+        var stored = await StoredPoliciesAsync(factory);
+        Assert.Contains(stored, p => p.Id == policyId);
+        Assert.DoesNotContain(stored, p => p.Name == "Legacy created policy");
     }
 
     // --- helpers ---
 
-    private Task<HttpClient> CreateAdminAsync(string email) =>
-        TestUsers.CreateClientAsync(factory, email, UserRoles.Admin);
+    private static Task AssertPolicyNotFoundAsync(HttpResponseMessage response) =>
+        ErrorAssert.HasErrorAsync(response, HttpStatusCode.NotFound, AdminErrorCodes.PolicyNotFound, AdminErrorMessages.PolicyNotFound);
 
-    private static async Task<Guid> CreateOrganizationAsync(HttpClient admin, string name)
-    {
-        var response = await admin.PostAsJsonAsync(OrganizationsEndpoint, new { Name = name });
-        return (await response.Content.ReadFromJsonAsync<CreateOrganizationResponse>())!.OrganizationId;
-    }
-
-    private static async Task<Guid> CreatePolicyAsync(HttpClient admin, string name, Guid organizationId)
-    {
-        var response = await admin.PostAsJsonAsync(PoliciesEndpoint, new { Name = name, OrganizationId = organizationId });
-        return (await response.Content.ReadFromJsonAsync<CreatePolicyResponse>())!.PolicyId;
-    }
-
+    // Stored directly: the clearance use cases are not under test here
     private async Task AddClearanceAsync(Guid policyId)
     {
         using var scope = factory.Services.CreateScope();
@@ -129,6 +248,4 @@ public class ManagePoliciesTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     private record PolicyResponse(Guid Id, string Name, Guid OrganizationId);
-    private record CreateOrganizationResponse(Guid OrganizationId);
-    private record CreatePolicyResponse(Guid PolicyId);
 }

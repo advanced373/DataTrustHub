@@ -34,3 +34,4 @@ Status values: `Proposed`, `Accepted`, `Superseded by ADR-NNNN`, `Deprecated`.
 | [0016](0016-audit-trail-for-commands-and-data-access.md) | Audit trail for commands and data access | Accepted | 2026-10-22 |
 | [0017](0017-azure-deployment.md) | Deploy the MVP to Azure with GitHub Actions | Accepted | 2026-10-22 |
 | [0018](0018-staging-and-production-with-migrations-in-ci-cd.md) | Staging and production environments, and database migrations in CI/CD | Accepted | 2026-10-22 |
+| [0019](0019-no-personal-data-in-urls.md) | Personal data stays out of URLs | Accepted | 2026-10-24 |

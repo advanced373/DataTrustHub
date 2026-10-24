@@ -44,6 +44,12 @@ else if (Model.Items.Count > 0)
                                 <a class="btn btn-sm btn-outline-secondary" asp-action="@nameof(MyOrganizationsController.Members)" asp-route-organizationId="@organization.OrganizationId">
                                     <i class="bi bi-people"></i> Members
                                 </a>
+                                <a class="btn btn-sm btn-outline-secondary" asp-controller="@ControllerNames.OrganizationPolicies" asp-action="@nameof(OrganizationPoliciesController.Index)" asp-route-organizationId="@organization.OrganizationId">
+                                    <i class="bi bi-journal-text"></i> Policies
+                                </a>
+                                <a class="btn btn-sm btn-outline-secondary" asp-controller="@ControllerNames.OrganizationClearances" asp-action="@nameof(OrganizationClearancesController.Index)" asp-route-organizationId="@organization.OrganizationId">
+                                    <i class="bi bi-shield-lock"></i> Clearances
+                                </a>
                             }
                             <form asp-action="@nameof(MyOrganizationsController.Leave)" asp-route-organizationId="@organization.OrganizationId" method="post" class="d-inline"
                                   onsubmit="return confirm(this.dataset.confirm);" data-confirm="@($"Leave \"{organization.OrganizationName}\"? Your clearances there are revoked.")">

@@ -3,6 +3,7 @@ using DataTrustHub.Domain.Clearances;
 using DataTrustHub.Domain.DataItems;
 using DataTrustHub.Domain.Memberships;
 using DataTrustHub.Domain.Users;
+using DataTrustHub.Features._Shared.Auditing;
 using DataTrustHub.Features.DataManagement.AddDataItem;
 using DataTrustHub.Features.DataManagement.DeleteDataItem;
 using DataTrustHub.Features.Tests.Administration.Helpers;
@@ -37,6 +38,7 @@ public class DataItemCommandHandlerTests
     private readonly FakePolicyRepository _policies = new();
     private readonly FakeMembershipRepository _memberships = new();
     private readonly FakeUnitOfWork _unitOfWork = new();
+    private readonly AuditScope _auditScope = new();
 
     [Fact]
     public async Task AddDataItem_PersonalUpload_AddsItemAndCommitsOnce()
@@ -323,6 +325,89 @@ public class DataItemCommandHandlerTests
         Assert.Equal(0, _unitOfWork.SaveCount);
     }
 
+    // --- AC6 of #24 step 1: the two use cases fill the audit scope with what only they learn ---
+
+    [Fact]
+    public async Task AddDataItem_PersonalUpload_SetsNewItemAsAuditTargetWithoutOrganization()
+    {
+        _users.ExistingIds.Add(_ownerId);
+
+        var result = await CreateAddHandler().Handle(new AddDataItemCommand(CreateFile(), _ownerId), default);
+
+        Assert.Equal(new AuditTarget(AuditTargetTypes.DataItem, result.Value), _auditScope.Target);
+        Assert.Null(_auditScope.OrganizationId);
+    }
+
+    [Fact]
+    public async Task AddDataItem_ClassifiedUpload_SetsNewItemAsAuditTargetAndPolicyOrganization()
+    {
+        _users.ExistingIds.Add(_ownerId);
+        var organizationId = Guid.NewGuid();
+        var policy = _policies.Seed(PolicyName, organizationId);
+        _clearances.Clearances.Add(Clearance.Grant("c", _ownerId, policy.Id, ClassificationLevel.FindStandard(Secret)!));
+
+        var command = new AddDataItemCommand(CreateFile(), _ownerId, policy.Id, Confidential);
+        var result = await CreateAddHandler().Handle(command, default);
+
+        Assert.Equal(new AuditTarget(AuditTargetTypes.DataItem, result.Value), _auditScope.Target);
+        Assert.Equal(organizationId, _auditScope.OrganizationId);
+    }
+
+    [Fact]
+    public async Task AddDataItem_Rejected_LeavesAuditScopeEmpty()
+    {
+        _users.ExistingIds.Add(_ownerId);
+
+        var command = new AddDataItemCommand(CreateFile(), _ownerId, _policyId, Confidential);
+        await CreateAddHandler().Handle(command, default);
+
+        Assert.Null(_auditScope.Target);
+        Assert.Null(_auditScope.OrganizationId);
+    }
+
+    [Fact]
+    public async Task DeleteDataItem_ClassifiedWithPolicy_SetsPolicyOrganizationInAuditScope()
+    {
+        var (item, organizationId) = SeedClassifiedItem();
+        _memberships.Seed(Membership.AddMember(_ownerId, organizationId));
+
+        await CreateDeleteHandler().Handle(new DeleteDataItemCommand(item.Id, _ownerId), default);
+
+        Assert.Equal(organizationId, _auditScope.OrganizationId);
+    }
+
+    [Fact]
+    public async Task DeleteDataItem_ClassifiedRejected_StillSetsPolicyOrganizationInAuditScope()
+    {
+        var (item, organizationId) = SeedClassifiedItem();
+
+        var result = await CreateDeleteHandler().Handle(new DeleteDataItemCommand(item.Id, Guid.NewGuid()), default);
+
+        Assert.Equal(DataItemErrors.NotFound, result.Error);
+        Assert.Equal(organizationId, _auditScope.OrganizationId);
+    }
+
+    [Fact]
+    public async Task DeleteDataItem_Personal_LeavesAuditScopeOrganizationEmpty()
+    {
+        var item = DataItem.CreatePersonal(FileName, FileBytes.Length, Convert.ToBase64String(FileBytes), _ownerId);
+        _dataItems.Stored[item.Id] = item;
+
+        await CreateDeleteHandler().Handle(new DeleteDataItemCommand(item.Id, _ownerId), default);
+
+        Assert.Null(_auditScope.OrganizationId);
+    }
+
+    [Fact]
+    public async Task DeleteDataItem_ClassifiedPolicyGone_LeavesAuditScopeOrganizationEmpty()
+    {
+        var item = SeedClassifiedItemWithoutPolicy();
+
+        await CreateDeleteHandler().Handle(new DeleteDataItemCommand(item.Id, _ownerId), default);
+
+        Assert.Null(_auditScope.OrganizationId);
+    }
+
     // --- helpers ---
 
     // A Confidential item under a policy of a new organization, uploaded by the owner within their clearance
@@ -367,9 +452,9 @@ public class DataItemCommandHandlerTests
             (result.Error.Code, result.Error.Description, result.Error.Type));
     }
 
-    private AddDataItemHandler CreateAddHandler() => new(_users, _clearances, _dataItems, _unitOfWork);
+    private AddDataItemHandler CreateAddHandler() => new(_users, _clearances, _dataItems, _policies, _unitOfWork, _auditScope);
 
-    private DeleteDataItemHandler CreateDeleteHandler() => new(_dataItems, _policies, _memberships, _unitOfWork);
+    private DeleteDataItemHandler CreateDeleteHandler() => new(_dataItems, _policies, _memberships, _unitOfWork, _auditScope);
 
     private static FormFile CreateFile() =>
         new(new MemoryStream(FileBytes), 0, FileBytes.Length, FormFieldName, FileName);

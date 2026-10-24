@@ -6,11 +6,12 @@ using static DataTrustHub.Features.Tests.DataManagement.Helpers.ReadRuleScenario
 
 namespace DataTrustHub.Features.Tests.DataManagement;
 
-// The read rule (ADR-0011, invariant D3) has an entity form, DataItem.IsReadableBy, and a SQL form,
+// The read rule (ADR-0014, invariant D3') has an entity form, DataItem.IsReadableBy, and a SQL form,
 // DataAccess.VisibleTo. These tests keep the two forms in line on one shared scenario (#99).
 public class ReadRuleEquivalenceTests(ReadRuleScenario scenario) : IClassFixture<ReadRuleScenario>
 {
-    private const string OwnerBranch = "owner";
+    private const string PersonalOwnerBranch = "personal, owner";
+    private const string ClassifiedOwnerBranch = "classified, owner reads only through a clearance (no bypass)";
     private const string DeletedBranch = "deleted";
     private const string PersonalNonOwnerBranch = "personal, non-owner";
     private const string OtherPolicyBranch = "clearance on another policy";
@@ -22,16 +23,23 @@ public class ReadRuleEquivalenceTests(ReadRuleScenario scenario) : IClassFixture
 
     private static readonly string[] Branches =
     [
-        OwnerBranch, DeletedBranch, PersonalNonOwnerBranch, OtherPolicyBranch,
+        PersonalOwnerBranch, ClassifiedOwnerBranch, DeletedBranch, PersonalNonOwnerBranch, OtherPolicyBranch,
         BelowLevelBranch, EqualLevelBranch, AboveLevelBranch, NeedToKnowBranch, OtherUsersClearanceBranch
     ];
 
     // Each branch of the rule, with at least one true and one false outcome
     public static TheoryData<string, string, string, bool> BranchCases => new()
     {
-        { OwnerBranch, Owner, OwnerPersonal, true },
-        { OwnerBranch, ApolloSecretReader, ReaderApolloConfidential, true },
-        { OwnerBranch, UnclearedUser, ApolloPublic, false },
+        { PersonalOwnerBranch, Owner, OwnerPersonal, true },
+        { PersonalOwnerBranch, RevokedOwner, RevokedOwnerPersonal, true },
+        { PersonalOwnerBranch, Owner, OwnerPersonalDeleted, false },
+        // D3': owning a classified item gives nothing; the owner's own clearance decides
+        { ClassifiedOwnerBranch, RevokedOwner, RevokedOwnerApolloConfidential, false },
+        { ClassifiedOwnerBranch, DemotedOwner, DemotedOwnerApolloConfidential, false },
+        { ClassifiedOwnerBranch, OtherPolicyOwner, OtherPolicyOwnerApolloConfidential, false },
+        { ClassifiedOwnerBranch, Owner, ApolloTopSecret, true },
+        { ClassifiedOwnerBranch, Owner, ApolloConfidential, true },
+        { ClassifiedOwnerBranch, ApolloSecretReader, ReaderApolloConfidential, true },
         { DeletedBranch, ApolloSecretReader, ApolloSecret, true },
         { DeletedBranch, ApolloSecretReader, ApolloSecretDeleted, false },
         { DeletedBranch, Owner, OwnerPersonalDeleted, false },
@@ -39,12 +47,14 @@ public class ReadRuleEquivalenceTests(ReadRuleScenario scenario) : IClassFixture
         { PersonalNonOwnerBranch, ApolloSecretReader, ReaderPersonal, true },
         { PersonalNonOwnerBranch, ApolloSecretReader, OwnerPersonal, false },
         { PersonalNonOwnerBranch, Owner, ReaderPersonal, false },
+        { PersonalNonOwnerBranch, HrTopSecretReader, RevokedOwnerPersonal, false },
         { OtherPolicyBranch, HrTopSecretReader, HrInternal, true },
         { OtherPolicyBranch, HrTopSecretReader, ApolloPublic, false },
         { OtherPolicyBranch, ApolloSecretReader, HrInternal, false },
         { BelowLevelBranch, InternalReader, ApolloPublic, true },
         { BelowLevelBranch, InternalReader, ApolloConfidential, false },
         { BelowLevelBranch, ApolloSecretReader, ApolloTopSecret, false },
+        { BelowLevelBranch, InternalReader, RevokedOwnerApolloConfidential, false },
         { EqualLevelBranch, ApolloSecretReader, ApolloSecret, true },
         { EqualLevelBranch, InternalReader, HrInternal, true },
         // An equal or higher level never denies by itself: these false rows hold that level on another policy
@@ -52,9 +62,13 @@ public class ReadRuleEquivalenceTests(ReadRuleScenario scenario) : IClassFixture
         { AboveLevelBranch, ApolloSecretReader, ApolloConfidential, true },
         { AboveLevelBranch, Owner, ReaderApolloConfidential, true },
         { AboveLevelBranch, HrTopSecretReader, ApolloConfidential, false },
+        // The owner losing their clearance does not hide the item from others who hold one
+        { AboveLevelBranch, ApolloSecretReader, RevokedOwnerApolloConfidential, true },
+        { AboveLevelBranch, Owner, DemotedOwnerApolloConfidential, true },
         // The entity form gets every user's clearances; only the user's own may count
         { OtherUsersClearanceBranch, InternalReader, HrInternal, true },
         { OtherUsersClearanceBranch, UnclearedUser, HrInternal, false },
+        { OtherUsersClearanceBranch, UnclearedUser, ApolloPublic, false },
         { OtherUsersClearanceBranch, Admin, ApolloTopSecret, false },
         { NeedToKnowBranch, Admin, AdminPersonal, true },
         { NeedToKnowBranch, Admin, ApolloPublic, false },

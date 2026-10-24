@@ -23,6 +23,10 @@ public sealed class ReadRuleScenario : IAsyncLifetime
     public const string HrTopSecretReader = "hr-top-secret-reader";     // Top Secret on HR only
     public const string Admin = "admin";                                // Admin role, no clearance
     public const string UnclearedUser = "uncleared-user";               // no clearance
+    // Owners whose clearance changed after they uploaded (D3': the owner has no right on classified items)
+    public const string RevokedOwner = "revoked-owner";                 // Secret on Apollo at upload, then revoked: none
+    public const string DemotedOwner = "demoted-owner";                 // Secret on Apollo at upload, then Internal on Apollo
+    public const string OtherPolicyOwner = "other-policy-owner";        // Secret on Apollo at upload, then Secret on HR only
 
     // Data items, owned by Owner unless the name says otherwise
     public const string OwnerPersonal = "owner-personal";
@@ -37,6 +41,10 @@ public sealed class ReadRuleScenario : IAsyncLifetime
     public const string ReaderPersonal = "apollo-secret-reader-personal";
     public const string ReaderApolloConfidential = "apollo-secret-reader-apollo-confidential";
     public const string AdminPersonal = "admin-personal";
+    public const string RevokedOwnerPersonal = "revoked-owner-personal";
+    public const string RevokedOwnerApolloConfidential = "revoked-owner-apollo-confidential";
+    public const string DemotedOwnerApolloConfidential = "demoted-owner-apollo-confidential";
+    public const string OtherPolicyOwnerApolloConfidential = "other-policy-owner-apollo-confidential";
 
     private const string ConnectionString = "DataSource=:memory:";
     private const string OrganizationName = "Read rule organization";
@@ -88,6 +96,7 @@ public sealed class ReadRuleScenario : IAsyncLifetime
         BuildUsers();
         BuildClearances();
         BuildDataItems();
+        ChangeClearancesAfterUpload();
 
         await using var db = CreateContext();
         await db.Database.EnsureCreatedAsync();
@@ -99,7 +108,8 @@ public sealed class ReadRuleScenario : IAsyncLifetime
 
     private void BuildUsers()
     {
-        foreach (var key in new[] { Owner, ApolloSecretReader, InternalReader, HrTopSecretReader, UnclearedUser })
+        foreach (var key in new[] { Owner, ApolloSecretReader, InternalReader, HrTopSecretReader, UnclearedUser,
+                     RevokedOwner, DemotedOwner, OtherPolicyOwner })
             users[key] = User.Register(key + EmailDomain, HashedPassword);
 
         users[Admin] = User.CreateAdmin(Admin + EmailDomain, HashedPassword);
@@ -113,6 +123,9 @@ public sealed class ReadRuleScenario : IAsyncLifetime
         Grant(InternalReader, apollo, Internal);
         Grant(InternalReader, hr, Internal);
         Grant(HrTopSecretReader, hr, TopSecret);
+        Grant(RevokedOwner, apollo, Secret);
+        Grant(DemotedOwner, apollo, Secret);
+        Grant(OtherPolicyOwner, apollo, Secret);
     }
 
     private void BuildDataItems()
@@ -129,7 +142,24 @@ public sealed class ReadRuleScenario : IAsyncLifetime
         AddPersonal(ReaderPersonal, ApolloSecretReader);
         AddClassified(ReaderApolloConfidential, ApolloSecretReader, apollo, Confidential);
         AddPersonal(AdminPersonal, Admin);
+        AddPersonal(RevokedOwnerPersonal, RevokedOwner);
+        AddClassified(RevokedOwnerApolloConfidential, RevokedOwner, apollo, Confidential);
+        AddClassified(DemotedOwnerApolloConfidential, DemotedOwner, apollo, Confidential);
+        AddClassified(OtherPolicyOwnerApolloConfidential, OtherPolicyOwner, apollo, Confidential);
     }
+
+    // Upload needs a clearance (D2), so these owners lose or change it only after their items exist.
+    // Runs before Persist, so the entity data and the persisted rows hold the same clearances.
+    private void ChangeClearancesAfterUpload()
+    {
+        Revoke(RevokedOwner);
+        Revoke(DemotedOwner);
+        Grant(DemotedOwner, apollo, Internal);
+        Revoke(OtherPolicyOwner);
+        Grant(OtherPolicyOwner, hr, Secret);
+    }
+
+    private void Revoke(string userKey) => clearances.RemoveAll(clearance => clearance.UserId == users[userKey].Id);
 
     private void Grant(string userKey, Policy policy, ClassificationLevel level) =>
         clearances.Add(Clearance.Grant(ClearanceName, users[userKey].Id, policy.Id, level));

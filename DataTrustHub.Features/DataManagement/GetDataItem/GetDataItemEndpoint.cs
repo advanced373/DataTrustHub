@@ -18,7 +18,8 @@ public record GetDataItemResponse(
     string? Content,
     int? ClassificationPriority,
     string? PolicyName,
-    bool IsOwner);
+    bool IsOwner,
+    bool CanDelete);
 
 public class GetDataItemEndpoint : ICarterModule
 {

@@ -38,7 +38,7 @@ reference each other **by id only**.
 | U2 | An email is at most 256 characters; a password is at least 8 | Validator: `RegisterUser` |
 | U3 | A user cannot delete their own account, so an admin cannot lock everyone out | Entity: `CheckCanBeDeletedBy` → `Account.CannotDeleteOwnAccount` |
 | U4 | Login gives the same error for an unknown email and a wrong password, so it does not reveal which emails exist | Use case: `LoginUser` → `User.InvalidCredentials` |
-| U5 | Deleting a user also removes their clearances and memberships and soft-deletes the data items they own, all in one transaction | Use case: `DeleteAccount` |
+| U5′ | Deleting a user also removes their clearances and memberships and soft-deletes their personal data items, all in one transaction. Their classified data items are not touched: they stay with their organization, whose organization admins can delete them (ADR-0014) | Use case: `DeleteAccount` |
 | U6 | Startup makes sure the configured admin exists, and promotes that user if needed | Use case: `AdminSeeder` |
 
 ## Organization
@@ -215,7 +215,8 @@ name.
 
 **Behaviour:**
 - `IsReadableBy(userId, userClearances)`
-- `MarkDeleted(requesterId)`
+- `MarkDeleted(requesterId, requesterRights)`. `DeletionRights` carries what the item cannot know: whether its
+  organization still exists, and whether the requester is a member or an organization admin there
 
 | # | Invariant / rule | Enforced in |
 |---|---|---|
@@ -223,7 +224,7 @@ name.
 | D2 | An owner may classify only under a policy they hold a clearance on, and at most at that clearance's level | Entity: `CreateClassified` → `DataItem.NotCleared` (400) |
 | D3′ | **Read rule:** a classified item is readable only by a holder of a clearance on its policy at or above its level; its owner has no special right on it. A personal item is readable only by its owner. A deleted item is readable by no one (ADR-0014) | Entity: `IsReadableBy`. Its SQL form is `DataAccess.VisibleTo`, used by list and download. `ReadRuleEquivalenceTests` proves both forms agree (#99) |
 | D4 | **Need-to-know:** admins have no bypass. An unreadable item answers 404 (`DataItem.NotFound`), so its existence is not revealed | Entity (D3′) and use cases `GetDataItem`, `ListDataItems` |
-| D5 | Only the owner deletes. Deleting someone else's item, or deleting twice, answers 404 | Entity: `MarkDeleted` |
+| D5′ | **Delete rule:** a personal item is deleted by its owner only. A classified item belongs to its organization (its policy's organization): it is deleted by its owner while they are a member of that organization (any role), or by an organization admin of that organization, even one who cannot read it. A classified item whose policy no longer exists is deleted by its owner only. Anyone else, or deleting twice, gets 404, so the item's existence is not revealed (ADR-0014) | Entity: `MarkDeleted`. Use case: `DeleteDataItem` gathers the requester's rights (`IPolicyRepository`, `IMembershipRepository`). Its SQL form is `DataAccess.DeletableBy`, used for the `canDelete` flag of list and download |
 | D6 | A file is required and is at most 100 MB. Its name is at most 512 characters | Use case: `AddDataItem` (`DataItem.NoFileProvided`, `DataItem.FileTooLarge`), and Validator |
 | D7 | The owner must be an existing user | Use case: `AddDataItem` (`DataItem.UserNotFound`) |
 
@@ -234,7 +235,12 @@ These are findings, not decisions. Each one needs an issue before it changes.
 - **Clearance levels are free-form** (C4): any name, and any priority from 0 upwards. Data items,
   however, use only the standard levels. Should a clearance accept only `ClassificationLevel.Standard`?
 - **Deleting a policy ignores its data items** (P3 checks clearances only). Classified items under a
-  deleted policy become readable by no one, because no clearance on that policy remains (D3′).
+  deleted policy become readable by no one, because no clearance on that policy remains (D3′). They
+  have no organization any more, so no organization admin can delete them and membership cannot be
+  checked: only their owner can delete them (D5′), by id through the API, since no page lists them.
+- **An organization admin without a clearance cannot see what they may delete** (D5′). They can delete
+  a classified item of their organization only by its id through the API: the WebApp lists readable
+  items only (D3′), because the names of unreadable items can be sensitive.
 - **Two error codes for one rule** (U1): `User.EmailAlreadyInUse` on register and
   `Account.EmailAlreadyInUse` on admin create.
 - **M2 is checked, not locked:** the last-organization-admin rule is checked in the use case

@@ -4,9 +4,9 @@ using DataTrustHub.SharedKernel;
 namespace DataTrustHub.Domain.DataItems;
 
 // A stored file. Personal items have no policy and only their owner reads them; classified items
-// belong to a policy and a level, and are read by holders of a clearance on that policy at or
-// above the level (ADR-0011). The SQL form of the read rule lives in the read side; a test keeps
-// both forms in line (ADR-0012).
+// belong to a policy and a level, and are read only by holders of a clearance on that policy at or
+// above the level. The owner has no special right on a classified item (ADR-0014, D3'). The SQL form
+// of the read rule lives in the read side; a test keeps both forms in line (ADR-0012).
 public sealed class DataItem
 {
     public const string PersonalMarking = "UNCLASSIFIED";
@@ -75,13 +75,13 @@ public sealed class DataItem
             Guid.NewGuid(), name, size, content, ownerUserId, level.Name, policyId, level.Priority, isDeleted: false));
     }
 
+    // A personal item is read by its owner only; a classified one through a clearance only, owner included
     public bool IsReadableBy(Guid userId, IEnumerable<Clearance> userClearances)
     {
         if (IsDeleted) return false;
-        if (OwnerUserId == userId) return true;
+        if (PolicyId is not Guid policyId) return OwnerUserId == userId;
 
-        return PolicyId is Guid policyId
-            && userClearances.Any(c => c.UserId == userId && c.Allows(policyId, ClassificationPriority!.Value));
+        return userClearances.Any(c => c.UserId == userId && c.Allows(policyId, ClassificationPriority!.Value));
     }
 
     // Only the owner deletes; anyone else, or a second delete, sees "not found" so nothing is revealed

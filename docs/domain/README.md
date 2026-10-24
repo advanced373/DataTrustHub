@@ -103,3 +103,4 @@ be checked against the code.
 Related decisions:
 - ADR-0011: the access model (policies, classification levels, clearances, need-to-know).
 - ADR-0012: Clean Architecture with vertical slices.
+- ADR-0014: organizations as tenants, memberships, and classified data that belongs to the organization (read rule D3′).

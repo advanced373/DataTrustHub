@@ -14,7 +14,7 @@
 
 @if (Model.Items.Count == 0 && Model.ErrorMessage is null)
 {
-    <p class="text-muted">No organizations yet. Create one to start defining policies.</p>
+    <p class="text-muted">No organizations yet. Create one, then appoint its first organization admin.</p>
 }
 else if (Model.Items.Count > 0)
 {
@@ -32,8 +32,8 @@ else if (Model.Items.Count > 0)
                     <tr>
                         <td>@organization.Name</td>
                         <td class="text-end">
-                            <a class="btn btn-sm btn-outline-secondary" asp-controller="Policies" asp-action="Index" asp-route-organizationId="@organization.Id">
-                                <i class="bi bi-file-earmark-lock"></i> Policies
+                            <a class="btn btn-sm btn-outline-secondary" asp-action="@nameof(DataTrustHub.Controllers.OrganizationsController.AppointAdmin)" asp-route-id="@organization.Id">
+                                <i class="bi bi-person-gear"></i> Appoint admin
                             </a>
                             <partial name="_DeleteButton" model="@(new DeleteButtonModel(organization.Id, $"Delete the organization \"{organization.Name}\"?"))" />
                         </td>

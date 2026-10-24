@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using DataTrustHub.Services.Api;
 
 namespace DataTrustHub.Models;
 
@@ -18,61 +17,20 @@ public sealed class CreateAccountViewModel
     public string Password { get; set; } = string.Empty;
 }
 
-public sealed class CreatePolicyViewModel
-{
-    [Required, StringLength(Constants.MaxNameLength)]
-    public string Name { get; set; } = string.Empty;
-
-    [Required(ErrorMessage = Messages.OrganizationRequired), Display(Name = "Organization")]
-    public Guid? OrganizationId { get; set; }
-
-    // Options for the organization dropdown; filled by the controller, not posted back
-    public IReadOnlyList<OrganizationResponse> Organizations { get; set; } = [];
-}
-
-public sealed record PolicyRow(Guid Id, string Name, Guid OrganizationId, string OrganizationName);
-
-public sealed record PolicyListViewModel(
-    IReadOnlyList<PolicyRow> Items,
-    IReadOnlyList<OrganizationResponse> Organizations,
-    Guid? SelectedOrganizationId,
-    string? ErrorMessage = null);
-
 public sealed class CreateOrganizationViewModel
 {
     [Required, StringLength(Constants.MaxNameLength)]
     public string Name { get; set; } = string.Empty;
 }
 
-// A policy in a dropdown, labelled with its organization so same-named policies can be told apart
-public sealed record PolicyOption(Guid Id, string Label);
-
-public sealed record ClearanceRow(
-    Guid Id, string UserEmail, string PolicyLabel, string Name, string LevelName, int LevelPriority);
-
-public sealed record ClearanceListViewModel(
-    IReadOnlyList<ClearanceRow> Items,
-    IReadOnlyList<AccountResponse> Users,
-    Guid? SelectedUserId,
-    string? ErrorMessage = null);
-
-public sealed class GrantClearanceViewModel
+// The platform admin appoints an organization's first organization admin by their email address
+public sealed class AppointOrganizationAdminViewModel
 {
-    [Required(ErrorMessage = Messages.UserRequired), Display(Name = "User")]
-    public Guid? UserId { get; set; }
+    [Required, EmailAddress, StringLength(Constants.MaxEmailLength)]
+    public string Email { get; set; } = string.Empty;
 
-    [Required(ErrorMessage = Messages.PolicyRequired), Display(Name = "Policy")]
-    public Guid? PolicyId { get; set; }
+    // Filled by the controller from the route and the API, not posted back
+    public Guid OrganizationId { get; set; }
 
-    [Required(ErrorMessage = Messages.LevelRequired), Display(Name = "Classification level")]
-    public int? LevelPriority { get; set; }
-
-    // Optional; defaults to "<level> on <policy>"
-    [StringLength(Constants.MaxNameLength), Display(Name = "Clearance name (optional)")]
-    public string? Name { get; set; }
-
-    // Dropdown options; filled by the controller, not posted back
-    public IReadOnlyList<AccountResponse> Users { get; set; } = [];
-
-    public IReadOnlyList<PolicyOption> Policies { get; set; } = [];
+    public string OrganizationName { get; set; } = string.Empty;
 }

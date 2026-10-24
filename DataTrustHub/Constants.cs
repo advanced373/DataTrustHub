@@ -32,14 +32,17 @@ internal static class ApiRoutes
     internal const string ClassificationOptions = "data/classification-options";
     internal const string AdminAccounts = "admin/accounts";
     internal const string AdminAccountById = "admin/accounts/{0}";
-    internal const string AdminPolicies = "admin/policies";
     internal const string AdminOrganizations = "admin/organizations";
     internal const string AdminOrganizationById = "admin/organizations/{0}";
-    internal const string AdminPolicyById = "admin/policies/{0}";
-    internal const string AdminPoliciesByOrganization = "admin/policies?organizationId={0}";
-    internal const string AdminClearances = "admin/clearances";
-    internal const string AdminClearanceById = "admin/clearances/{0}";
-    internal const string AdminClearancesByUser = "admin/clearances?userId={0}";
+    internal const string AdminOrganizationAdmins = "admin/organizations/{0}/admins";
+
+    // Organization-scoped routes; the API answers 404 to a caller without the needed membership there
+    internal const string MyOrganizations = "organizations/mine";
+    internal const string MyMembership = "organizations/{0}/membership";
+    internal const string OrganizationMembers = "organizations/{0}/members";
+    internal const string OrganizationMember = "organizations/{0}/members/{1}";
+    internal const string OrganizationMemberRole = "organizations/{0}/members/{1}/role";
+    internal const string OrganizationFindUserByEmail = "organizations/{0}/users/find-by-email";
 }
 
 // Attribute routes of the administration pages, under /Admin/<section>
@@ -47,23 +50,42 @@ internal static class AdminRoutes
 {
     internal const string Users = "Admin/Users";
     internal const string Organizations = "Admin/Organizations";
-    internal const string Policies = "Admin/Policies";
-    internal const string Clearances = "Admin/Clearances";
     internal const string Create = "Create";
     internal const string Delete = "{id:guid}/Delete";
+    internal const string AppointAdmin = "{id:guid}/AppointAdmin";
 }
 
-// Classification levels offered when granting a clearance; a higher priority sees more
-internal static class ClassificationLevels
+// Attribute routes of the signed-in user's organization pages, under /Organizations
+internal static class OrganizationRoutes
 {
-    internal static readonly IReadOnlyList<(string Name, int Priority)> All =
-    [
-        ("Public", 0),
-        ("Internal", 1),
-        ("Confidential", 2),
-        ("Secret", 3),
-        ("Top Secret", 4)
-    ];
+    internal const string Root = "Organizations";
+    internal const string Leave = "{organizationId:guid}/Leave";
+    internal const string Members = "{organizationId:guid}/Members";
+    internal const string AddMember = "{organizationId:guid}/Members/Add";
+    internal const string ChangeRole = "{organizationId:guid}/Members/{userId:guid}/Role";
+    internal const string RemoveMember = "{organizationId:guid}/Members/{userId:guid}/Remove";
+}
+
+// Membership roles as the API names them (ADR-0014); the UI shows them through LabelOf
+internal static class MembershipRoles
+{
+    internal const string Member = "Member";
+    internal const string Guest = "Guest";
+    internal const string OrgAdmin = "OrgAdmin";
+
+    // Organization admins are appointed, not added
+    internal static readonly IReadOnlyList<string> Addable = [Member, Guest];
+
+    private static readonly Dictionary<string, string> Labels = new()
+    {
+        [Member] = "Member",
+        [Guest] = "Guest",
+        [OrgAdmin] = "Organization admin"
+    };
+
+    // An unknown role is shown as the API sent it
+    internal static string LabelOf(string? role) =>
+        role is not null && Labels.TryGetValue(role, out var label) ? label : role ?? string.Empty;
 }
 
 internal static class ControllerNames
@@ -74,8 +96,7 @@ internal static class ControllerNames
     internal const string Admin = "Admin";
     internal const string Users = "Users";
     internal const string Organizations = "Organizations";
-    internal const string Policies = "Policies";
-    internal const string Clearances = "Clearances";
+    internal const string MyOrganizations = "MyOrganizations";
 }
 
 internal static class TempDataKeys
@@ -100,20 +121,16 @@ internal static class Messages
     internal const string LevelAboveClearance = "You can classify at most at your own clearance level on this policy.";
     internal const string AccountCreated = "Account {0} created.";
     internal const string AccountDeleted = "Account deleted. Its clearances were removed and its data was deleted.";
-    internal const string PolicyCreated = "Policy \"{0}\" created.";
-    internal const string PolicyDeleted = "Policy deleted.";
     internal const string OrganizationCreated = "Organization \"{0}\" created.";
     internal const string OrganizationDeleted = "Organization deleted.";
+    internal const string OrganizationNotFound = "The organization was not found.";
+    internal const string OrganizationAdminAppointed = "{0} was appointed organization admin.";
+    internal const string OrganizationLeft = "You left the organization. Your clearances there were revoked.";
+    internal const string NoUserWithEmail = "No user has this email address.";
+    internal const string AlreadyMember = "{0} is already in this organization, as {1}.";
+    internal const string MemberAdded = "{0} added as {1}.";
+    internal const string MemberRoleChanged = "Role changed to {0}.";
+    internal const string MemberRemoved = "Member removed. Their clearances in this organization were revoked.";
     internal const string FileRequired = "Select a file to upload.";
-    internal const string OrganizationRequired = "Select an organization.";
-    internal const string UnknownOrganization = "(deleted organization)";
-    internal const string UnknownUser = "(deleted user)";
-    internal const string UnknownPolicy = "(deleted policy)";
-    internal const string UserRequired = "Select a user.";
-    internal const string PolicyRequired = "Select a policy.";
-    internal const string LevelRequired = "Select a classification level.";
-    internal const string ClearanceGranted = "Clearance granted to {0}.";
-    internal const string ClearanceRevoked = "Clearance revoked.";
-    internal const string DefaultClearanceName = "{0} on {1}";
     internal const string FileTooLarge = "The file exceeds the maximum size of 100 MB.";
 }

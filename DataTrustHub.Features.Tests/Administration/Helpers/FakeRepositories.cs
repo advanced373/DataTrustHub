@@ -241,7 +241,7 @@ internal sealed class FakeDataItemRepository : IDataItemRepository
     internal DataItem Seed(Guid ownerUserId, bool isDeleted = false)
     {
         var item = DataItem.CreatePersonal("seeded.txt", 1, "AA==", ownerUserId);
-        if (isDeleted) item.MarkDeleted(ownerUserId);
+        if (isDeleted) item.MarkDeleted(ownerUserId, DeletionRights.WithoutOrganization);
         Stored.Add(item);
         return item;
     }

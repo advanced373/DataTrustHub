@@ -1,9 +1,11 @@
 using DataTrustHub.Domain.Abstractions;
 using DataTrustHub.Domain.Clearances;
 using DataTrustHub.Domain.DataItems;
+using DataTrustHub.Domain.Memberships;
 using DataTrustHub.Domain.Users;
 using DataTrustHub.Features.DataManagement.AddDataItem;
 using DataTrustHub.Features.DataManagement.DeleteDataItem;
+using DataTrustHub.Features.Tests.Administration.Helpers;
 using DataTrustHub.SharedKernel;
 using Microsoft.AspNetCore.Http;
 using Xunit;
@@ -20,6 +22,7 @@ public class DataItemCommandHandlerTests
     private const int Secret = 3;
     private const int NonStandardPriority = 9;
     private const int NegativePriority = -1;
+    private const string PolicyName = "Apollo";
     private const string IncompleteClassificationCode = "DataItem.IncompleteClassification";
     private const string IncompleteClassificationMessage = "A classified item needs both a policy and a classification level.";
     private const string UnknownClassificationLevelCode = "DataItem.UnknownClassificationLevel";
@@ -31,6 +34,8 @@ public class DataItemCommandHandlerTests
     private readonly FakeUserRepository _users = new();
     private readonly FakeClearanceRepository _clearances = new();
     private readonly FakeDataItemRepository _dataItems = new();
+    private readonly FakePolicyRepository _policies = new();
+    private readonly FakeMembershipRepository _memberships = new();
     private readonly FakeUnitOfWork _unitOfWork = new();
 
     [Fact]
@@ -215,7 +220,136 @@ public class DataItemCommandHandlerTests
         Assert.Equal(0, _unitOfWork.SaveCount);
     }
 
+    // --- D5' (#95 step 4b): the use case gathers the requester's rights in the item's organization ---
+
+    [Fact]
+    public async Task DeleteDataItem_ClassifiedOwnerWhoIsMember_MarksDeletedAndCommitsOnce()
+    {
+        var (item, organizationId) = SeedClassifiedItem();
+        _memberships.Seed(Membership.AddMember(_ownerId, organizationId));
+
+        var result = await CreateDeleteHandler().Handle(new DeleteDataItemCommand(item.Id, _ownerId), default);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(item.IsDeleted);
+        Assert.Equal(1, _unitOfWork.SaveCount);
+    }
+
+    [Fact]
+    public async Task DeleteDataItem_ClassifiedOwnerWithoutMembership_ReturnsNotFoundAndCommitsNothing()
+    {
+        var (item, _) = SeedClassifiedItem();
+
+        var result = await CreateDeleteHandler().Handle(new DeleteDataItemCommand(item.Id, _ownerId), default);
+
+        Assert.Equal(DataItemErrors.NotFound, result.Error);
+        Assert.False(item.IsDeleted);
+        Assert.Equal(0, _unitOfWork.SaveCount);
+    }
+
+    [Fact]
+    public async Task DeleteDataItem_ClassifiedOwnerMemberOfAnotherOrganizationOnly_ReturnsNotFound()
+    {
+        var (item, _) = SeedClassifiedItem();
+        _memberships.Seed(Membership.AddMember(_ownerId, Guid.NewGuid()));
+
+        var result = await CreateDeleteHandler().Handle(new DeleteDataItemCommand(item.Id, _ownerId), default);
+
+        Assert.Equal(DataItemErrors.NotFound, result.Error);
+        Assert.Equal(0, _unitOfWork.SaveCount);
+    }
+
+    [Fact]
+    public async Task DeleteDataItem_ClassifiedOrgAdminOfItsOrganization_MarksDeletedAndCommitsOnce()
+    {
+        var (item, organizationId) = SeedClassifiedItem();
+        var orgAdminId = Guid.NewGuid();
+        _memberships.Seed(Membership.AppointOrgAdmin(orgAdminId, organizationId));
+
+        var result = await CreateDeleteHandler().Handle(new DeleteDataItemCommand(item.Id, orgAdminId), default);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(item.IsDeleted);
+        Assert.Equal(1, _unitOfWork.SaveCount);
+    }
+
+    [Fact]
+    public async Task DeleteDataItem_ClassifiedOrgAdminOfAnotherOrganization_ReturnsNotFound()
+    {
+        var (item, _) = SeedClassifiedItem();
+        var orgAdminId = Guid.NewGuid();
+        _memberships.Seed(Membership.AppointOrgAdmin(orgAdminId, Guid.NewGuid()));
+
+        var result = await CreateDeleteHandler().Handle(new DeleteDataItemCommand(item.Id, orgAdminId), default);
+
+        Assert.Equal(DataItemErrors.NotFound, result.Error);
+        Assert.Equal(0, _unitOfWork.SaveCount);
+    }
+
+    [Fact]
+    public async Task DeleteDataItem_ClassifiedMemberWhoIsNotOwner_ReturnsNotFoundAndCommitsNothing()
+    {
+        var (item, organizationId) = SeedClassifiedItem();
+        var memberId = Guid.NewGuid();
+        _memberships.Seed(Membership.AddMember(memberId, organizationId));
+
+        var result = await CreateDeleteHandler().Handle(new DeleteDataItemCommand(item.Id, memberId), default);
+
+        Assert.Equal(DataItemErrors.NotFound, result.Error);
+        Assert.False(item.IsDeleted);
+        Assert.Equal(0, _unitOfWork.SaveCount);
+    }
+
+    [Fact]
+    public async Task DeleteDataItem_ClassifiedPolicyGone_OwnerMarksDeleted()
+    {
+        var item = SeedClassifiedItemWithoutPolicy();
+
+        var result = await CreateDeleteHandler().Handle(new DeleteDataItemCommand(item.Id, _ownerId), default);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(item.IsDeleted);
+        Assert.Equal(1, _unitOfWork.SaveCount);
+    }
+
+    [Fact]
+    public async Task DeleteDataItem_ClassifiedPolicyGone_NonOwnerReturnsNotFound()
+    {
+        var item = SeedClassifiedItemWithoutPolicy();
+
+        var result = await CreateDeleteHandler().Handle(new DeleteDataItemCommand(item.Id, Guid.NewGuid()), default);
+
+        Assert.Equal(DataItemErrors.NotFound, result.Error);
+        Assert.Equal(0, _unitOfWork.SaveCount);
+    }
+
     // --- helpers ---
+
+    // A Confidential item under a policy of a new organization, uploaded by the owner within their clearance
+    private (DataItem Item, Guid OrganizationId) SeedClassifiedItem()
+    {
+        var organizationId = Guid.NewGuid();
+        var policy = _policies.Seed(PolicyName, organizationId);
+        var item = CreateClassified(policy.Id);
+        _dataItems.Stored[item.Id] = item;
+        return (item, organizationId);
+    }
+
+    // A classified item whose policy no longer exists (deleting a policy ignores its data items)
+    private DataItem SeedClassifiedItemWithoutPolicy()
+    {
+        var item = CreateClassified(_policyId);
+        _dataItems.Stored[item.Id] = item;
+        return item;
+    }
+
+    private DataItem CreateClassified(Guid policyId)
+    {
+        var level = ClassificationLevel.FindStandard(Confidential)!;
+        var clearance = Clearance.Grant("c", _ownerId, policyId, ClassificationLevel.FindStandard(Secret)!);
+        return DataItem.CreateClassified(
+            FileName, FileBytes.Length, Convert.ToBase64String(FileBytes), _ownerId, policyId, level, [clearance]).Value;
+    }
 
     private void GrantOwner(int priority) =>
         _clearances.Clearances.Add(Clearance.Grant("c", _ownerId, _policyId, ClassificationLevel.FindStandard(priority)!));
@@ -235,7 +369,7 @@ public class DataItemCommandHandlerTests
 
     private AddDataItemHandler CreateAddHandler() => new(_users, _clearances, _dataItems, _unitOfWork);
 
-    private DeleteDataItemHandler CreateDeleteHandler() => new(_dataItems, _unitOfWork);
+    private DeleteDataItemHandler CreateDeleteHandler() => new(_dataItems, _policies, _memberships, _unitOfWork);
 
     private static FormFile CreateFile() =>
         new(new MemoryStream(FileBytes), 0, FileBytes.Length, FormFieldName, FileName);

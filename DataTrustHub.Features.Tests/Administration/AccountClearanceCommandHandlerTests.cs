@@ -1,3 +1,5 @@
+using DataTrustHub.Domain.Clearances;
+using DataTrustHub.Domain.DataItems;
 using DataTrustHub.Domain.Memberships;
 using DataTrustHub.Domain.Users;
 using DataTrustHub.Features.Administration.CreateAccount;
@@ -19,6 +21,9 @@ public class AccountClearanceCommandHandlerTests
     private const string ClearanceName = "Handler clearance";
     private const string LevelName = "Secret";
     private const int LevelPriority = 2;
+    private const string ItemName = "Handler classified item";
+    private const long ItemSize = 1;
+    private const string ItemContent = "eA==";
 
     private readonly FakeUserRepository _users = new();
     private readonly FakePolicyRepository _policies = new();
@@ -100,6 +105,22 @@ public class AccountClearanceCommandHandlerTests
             new HashSet<Guid> { orgAdminMembership.Id, memberMembership.Id, guestMembership.Id },
             _memberships.Removed.Select(m => m.Id).ToHashSet());
         Assert.DoesNotContain(otherUsersMembership, _memberships.Removed);
+        Assert.Equal(1, _unitOfWork.SaveChangesCalls);
+    }
+
+    // U5' (#95 step 4b): classified items stay with their organization; only personal ones are soft-deleted
+    [Fact]
+    public async Task DeleteAccount_ClassifiedItems_AreNotTouched()
+    {
+        var user = _users.Seed(Email);
+        var personalItem = _dataItems.Seed(user.Id);
+        var classifiedItem = SeedClassifiedItem(user.Id);
+
+        var result = await DeleteAccountHandler().Handle(new DeleteAccountCommand(user.Id, Guid.NewGuid()), default);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(personalItem.Id, Assert.Single(_dataItems.Updated).Id);
+        Assert.False(classifiedItem.IsDeleted);
         Assert.Equal(1, _unitOfWork.SaveChangesCalls);
     }
 
@@ -256,6 +277,17 @@ public class AccountClearanceCommandHandlerTests
         var user = _users.Seed(Email);
         _memberships.Seed(Membership.AddMember(user.Id, OrganizationId));
         return user;
+    }
+
+    // A classified item the user uploaded within their clearance on a policy
+    private DataItem SeedClassifiedItem(Guid ownerId)
+    {
+        var policyId = Guid.NewGuid();
+        var level = new ClassificationLevel(LevelName, LevelPriority);
+        var item = DataItem.CreateClassified(
+            ItemName, ItemSize, ItemContent, ownerId, policyId, level, [Clearance.Grant(ClearanceName, ownerId, policyId, level)]).Value;
+        _dataItems.Stored.Add(item);
+        return item;
     }
 
     private void AssertNothingStagedForAccountDelete()

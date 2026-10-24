@@ -179,7 +179,7 @@ public sealed class ReadRuleScenario : IAsyncLifetime
 
     private void Add(string key, DataItem item, bool deleted)
     {
-        if (deleted && item.MarkDeleted(item.OwnerUserId).IsFailure)
+        if (deleted && item.MarkDeleted(item.OwnerUserId, DeletionRights.WithoutOrganization).IsFailure)
             throw new InvalidOperationException($"Scenario item '{key}' could not be deleted");
 
         dataItems[key] = item;

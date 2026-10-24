@@ -1,6 +1,7 @@
 using DataTrustHub.Domain.Abstractions;
 using DataTrustHub.Domain.Memberships;
 using DataTrustHub.Domain.Users;
+using DataTrustHub.Features._Shared.Auditing;
 using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Features.Administration.Authorization;
 using DataTrustHub.SharedKernel;
@@ -8,7 +9,11 @@ using DataTrustHub.SharedKernel;
 namespace DataTrustHub.Features.Administration.AddMember;
 
 // Role is Member or Guest (checked by the validator)
-public record AddMemberCommand(Guid OrganizationId, Guid CallerId, Guid UserId, string Role);
+public record AddMemberCommand(Guid OrganizationId, Guid CallerId, Guid UserId, string Role)
+    : IOrganizationScopedCommand, ITargetedCommand
+{
+    AuditTarget ITargetedCommand.Target => new(AuditTargetTypes.User, UserId);
+}
 
 public class AddMemberHandler(
     IUserRepository users,

@@ -20,6 +20,7 @@ namespace DataTrustHub.Infrastructure.Persistance
         public DbSet<DbClearance> Clearances => Set<DbClearance>();
         public DbSet<DbPolicy> Policies => Set<DbPolicy>();
         public DbSet<DbMembership> Memberships => Set<DbMembership>();
+        public DbSet<DbAuditRecord> AuditRecords => Set<DbAuditRecord>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

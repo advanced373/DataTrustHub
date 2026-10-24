@@ -3,6 +3,7 @@ using DataTrustHub.Domain.Clearances;
 using DataTrustHub.Domain.Memberships;
 using DataTrustHub.Domain.Policies;
 using DataTrustHub.Domain.Users;
+using DataTrustHub.Features._Shared.Auditing;
 using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Features.Administration.Authorization;
 using DataTrustHub.SharedKernel;
@@ -16,7 +17,8 @@ public record CreateClearanceCommand(
     Guid PolicyId,
     string Name,
     string ClassificationLevelName,
-    int ClassificationLevelPriority);
+    int ClassificationLevelPriority)
+    : IOrganizationScopedCommand;
 
 // An organization admin grants a clearance on a policy of their organization (C6) to a member or guest
 // there (C5), never to themselves (C8)

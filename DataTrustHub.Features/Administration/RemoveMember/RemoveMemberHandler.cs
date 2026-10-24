@@ -2,6 +2,7 @@ using DataTrustHub.Domain.Abstractions;
 using DataTrustHub.Domain.Clearances;
 using DataTrustHub.Domain.Memberships;
 using DataTrustHub.Domain.Policies;
+using DataTrustHub.Features._Shared.Auditing;
 using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Features.Administration.Authorization;
 using DataTrustHub.Features.Administration.MembershipRules;
@@ -9,7 +10,11 @@ using DataTrustHub.SharedKernel;
 
 namespace DataTrustHub.Features.Administration.RemoveMember;
 
-public record RemoveMemberCommand(Guid OrganizationId, Guid CallerId, Guid UserId);
+public record RemoveMemberCommand(Guid OrganizationId, Guid CallerId, Guid UserId)
+    : IOrganizationScopedCommand, ITargetedCommand
+{
+    AuditTarget ITargetedCommand.Target => new(AuditTargetTypes.User, UserId);
+}
 
 // An organization admin ends a member's or guest's membership, and with it the user's clearances on the
 // organization's policies (C7), in one save. The last organization admin cannot be removed (M2)

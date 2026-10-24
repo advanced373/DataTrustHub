@@ -1,4 +1,5 @@
 using Carter;
+using DataTrustHub.Features._Shared.Auditing;
 using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Features._Shared.Jwt;
 using DataTrustHub.Features._Shared.Seeding;
@@ -20,6 +21,7 @@ public static class FeaturesRegistration
     {
         services.AddCarter();
         RegisterHandlers(services);
+        RegisterAuditing(services);
         RegisterJwt(services, configuration);
         RegisterAdminSeeding(services, configuration);
         return services;
@@ -31,9 +33,9 @@ public static class FeaturesRegistration
         return app;
     }
 
-    // Scrutor: Scan registers every slice handler, Decorate wraps each one in the validation decorator.
-    // Further cross-cutting decorators (e.g. auditing, #24) are added with another Decorate call;
-    // the last one registered is the outermost (ADR-0012).
+    // Scrutor: Scan registers every slice handler, Decorate wraps each one in its decorators. The last one
+    // registered is the outermost (ADR-0012): the audit decorator wraps validation, so it also records
+    // rejected input (ADR-0016).
     private static void RegisterHandlers(IServiceCollection services)
     {
         services.Scan(scan => scan
@@ -46,11 +48,19 @@ public static class FeaturesRegistration
                 .WithScopedLifetime());
 
         services.Decorate(typeof(ICommandHandler<,>), typeof(CommandValidationDecorator<,>));
+        services.Decorate(typeof(ICommandHandler<,>), typeof(AuditCommandDecorator<,>));
         services.Decorate(typeof(IQueryHandler<,>), typeof(QueryValidationDecorator<,>));
 
         services.AddValidatorsFromAssembly(
             typeof(FeaturesRegistration).Assembly,
             includeInternalTypes: true);
+    }
+
+    // The audit decorator reads the actor from the request; handlers fill the request's audit scope
+    private static void RegisterAuditing(IServiceCollection services)
+    {
+        services.AddHttpContextAccessor();
+        services.AddScoped<AuditScope>();
     }
 
     private static void RegisterJwt(IServiceCollection services, IConfiguration configuration)

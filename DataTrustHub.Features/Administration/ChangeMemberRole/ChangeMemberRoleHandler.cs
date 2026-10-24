@@ -1,5 +1,6 @@
 using DataTrustHub.Domain.Abstractions;
 using DataTrustHub.Domain.Memberships;
+using DataTrustHub.Features._Shared.Auditing;
 using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Features.Administration.Authorization;
 using DataTrustHub.Features.Administration.MembershipRules;
@@ -8,7 +9,11 @@ using DataTrustHub.SharedKernel;
 namespace DataTrustHub.Features.Administration.ChangeMemberRole;
 
 // Role is Member or OrgAdmin (checked by the validator)
-public record ChangeMemberRoleCommand(Guid OrganizationId, Guid CallerId, Guid UserId, string Role);
+public record ChangeMemberRoleCommand(Guid OrganizationId, Guid CallerId, Guid UserId, string Role)
+    : IOrganizationScopedCommand, ITargetedCommand
+{
+    AuditTarget ITargetedCommand.Target => new(AuditTargetTypes.User, UserId);
+}
 
 // An organization admin changes a member's role. This is how further organization admins are appointed
 // (ADR-0014); an organization admin may also demote themselves while another one remains (M2)

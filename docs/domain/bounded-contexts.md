@@ -53,9 +53,16 @@ It is about the data itself, and applying the read rule to it.
 ### Planned
 
 - **Sharing** (#3): giving another user access to a data item.
-- **Audit** (#24): recording who did what, through an audit decorator.
 
-They will each become a context, or a part of one, when they are designed.
+It will become a context, or a part of one, when it is designed.
+
+### Cross-cutting: the audit trail
+
+The audit trail (ADR-0016, #24) is not a context of its own: it crosses all of them. Every command of
+every context is recorded by `AuditCommandDecorator`, the outermost decorator of every command handler,
+as an `AuditRecord` (`Domain/Auditing`) appended through the `IAuditLog` port, in its own save. A record
+names users, organizations and targets by id only, without foreign keys, so it outlives them. Data
+access auditing and reading the trail come in the next steps of #24.
 
 ## Context map
 

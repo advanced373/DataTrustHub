@@ -1,7 +1,9 @@
 using DataTrustHub.Domain.Abstractions;
 using DataTrustHub.Domain.Clearances;
 using DataTrustHub.Domain.DataItems;
+using DataTrustHub.Domain.Policies;
 using DataTrustHub.Domain.Users;
+using DataTrustHub.Features._Shared.Auditing;
 using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.SharedKernel;
 using Microsoft.AspNetCore.Http;
@@ -15,12 +17,16 @@ public class AddDataItemHandler(
     IUserRepository users,
     IClearanceRepository clearances,
     IDataItemRepository dataItems,
-    IUnitOfWork unitOfWork) : ICommandHandler<AddDataItemCommand, Result<Guid>>
+    IPolicyRepository policies,
+    IUnitOfWork unitOfWork,
+    AuditScope auditScope) : ICommandHandler<AddDataItemCommand, Result<Guid>>
 {
     private readonly IUserRepository _users = users;
     private readonly IClearanceRepository _clearances = clearances;
     private readonly IDataItemRepository _dataItems = dataItems;
+    private readonly IPolicyRepository _policies = policies;
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
+    private readonly AuditScope _auditScope = auditScope;
 
     public async Task<Result<Guid>> Handle(
         AddDataItemCommand command,
@@ -39,9 +45,27 @@ public class AddDataItemHandler(
         var created = await CreateDataItem(command, command.File, content, cancellationToken);
         if (created.IsFailure) return Result.Failure<Guid>(created.Error);
 
+        var organizationId = await FindOrganizationIdAsync(created.Value, cancellationToken);
         _dataItems.Add(created.Value);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+        RecordInAuditScope(created.Value, organizationId);
         return Result.Success(created.Value.Id);
+    }
+
+    // A classified item's organization is its policy's; a personal item, or a policy gone, has none
+    private async Task<Guid?> FindOrganizationIdAsync(DataItem dataItem, CancellationToken ct)
+    {
+        if (dataItem.PolicyId is not Guid policyId) return null;
+
+        var policy = await _policies.GetByIdAsync(policyId, ct);
+        return policy?.OrganizationId;
+    }
+
+    // The new item exists only once saved, so the audit trail learns its target here
+    private void RecordInAuditScope(DataItem dataItem, Guid? organizationId)
+    {
+        _auditScope.SetTarget(new AuditTarget(AuditTargetTypes.DataItem, dataItem.Id));
+        if (organizationId is Guid itemOrganizationId) _auditScope.SetOrganization(itemOrganizationId);
     }
 
     // A personal item when no classification is given; a partial or unknown one is rejected;

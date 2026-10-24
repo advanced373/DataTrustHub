@@ -2,12 +2,17 @@ using DataTrustHub.Domain.Abstractions;
 using DataTrustHub.Domain.Memberships;
 using DataTrustHub.Domain.Organizations;
 using DataTrustHub.Domain.Users;
+using DataTrustHub.Features._Shared.Auditing;
 using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.SharedKernel;
 
 namespace DataTrustHub.Features.Administration.AppointOrganizationAdmin;
 
-public record AppointOrganizationAdminCommand(Guid OrganizationId, Guid CallerId, Guid UserId);
+public record AppointOrganizationAdminCommand(Guid OrganizationId, Guid CallerId, Guid UserId)
+    : IOrganizationScopedCommand, ITargetedCommand
+{
+    AuditTarget ITargetedCommand.Target => new(AuditTargetTypes.User, UserId);
+}
 
 // The platform admin appoints the first organization admin of an organization, never themselves
 // (ADR-0014). Further organization admins are appointed by the organization's own admins, by changing a

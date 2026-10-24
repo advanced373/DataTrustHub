@@ -3,12 +3,16 @@ using DataTrustHub.Domain.Clearances;
 using DataTrustHub.Domain.DataItems;
 using DataTrustHub.Domain.Memberships;
 using DataTrustHub.Domain.Users;
+using DataTrustHub.Features._Shared.Auditing;
 using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.SharedKernel;
 
 namespace DataTrustHub.Features.Administration.DeleteAccount;
 
-public record DeleteAccountCommand(Guid AccountId, Guid RequesterId);
+public record DeleteAccountCommand(Guid AccountId, Guid RequesterId) : ITargetedCommand
+{
+    AuditTarget ITargetedCommand.Target => new(AuditTargetTypes.User, AccountId);
+}
 
 public class DeleteAccountHandler(
     IUserRepository users,

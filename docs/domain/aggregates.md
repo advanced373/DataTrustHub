@@ -228,6 +228,40 @@ name.
 | D6 | A file is required and is at most 100 MB. Its name is at most 512 characters | Use case: `AddDataItem` (`DataItem.NoFileProvided`, `DataItem.FileTooLarge`), and Validator |
 | D7 | The owner must be an existing user | Use case: `AddDataItem` (`DataItem.UserNotFound`) |
 
+## AuditRecord
+
+*Cross-cutting: the audit trail (ADR-0016).* One entry of the audit trail: who did what, on which
+target, in which organization, with which outcome. Source: `Domain/Auditing/AuditRecord.cs`. It is not
+loaded or changed by any use case; it is only appended through the `IAuditLog` port.
+
+| Attribute | Notes |
+|---|---|
+| `Id` | |
+| `OccurredAt` | When the command or access completed, in UTC |
+| `ActorUserId` | The user who did it (by id); empty for an anonymous action (register, log in) |
+| `Action` | The command name without the `Command` suffix, e.g. `DeleteDataItem` |
+| `TargetType`, `TargetId` | What the action was on, e.g. `DataItem` and its id; both set or both empty |
+| `OrganizationId` | The organization the action ran in, when there is one (by id) |
+| `Outcome` | An `AuditOutcome`: `Succeeded`, `Rejected`, `Denied` or `Failed`, stored by name |
+| `ErrorCode` | The error code of a `Rejected` or `Denied` action, the exception type name of a `Failed` one |
+
+**Factory method:** `Create(occurredAt, actorUserId, action, targetType, targetId, organizationId,
+outcome, errorCode)`. Its arguments come from code, not from user input, so a broken rule throws.
+
+| # | Invariant / rule | Enforced in |
+|---|---|---|
+| A1 | An audit record has an action, a UTC time, a target type and target id together or neither, and an error code only when the outcome is not `Succeeded` | Entity: `Create` |
+| A2 | It holds nothing else: never a command's payload, file content, emails, passwords, hashes or tokens. Login and register are recorded anonymous, with the outcome only | Entity (no such attributes) and `AuditCommandDecorator` |
+| A3 | **Append-only:** no use case updates or deletes an audit record | Port: `IAuditLog` has `AppendAsync` only |
+| A4 | Every command leaves a record, also when validation or a domain rule rejects it, or when it throws; queries are not audited | `AuditCommandDecorator`, the outermost decorator of every command handler. An exception is recorded as `Failed` and rethrown unchanged; a failed audit write is logged and does not change the command's answer |
+| A5 | The trail survives a failed command: the record is saved on its own, after the command, never in the command's unit of work | Adapter: `AuditLog` writes through its own short-lived `DContext` |
+| A6 | No foreign keys: a record outlives the users, organizations and data items it names | Database: table `AuditRecords`, indexed on `OccurredAt` and on (`OrganizationId`, `OccurredAt`) |
+
+The organization and the target come from the command, when it declares them (`IOrganizationScopedCommand`,
+`ITargetedCommand`). When only the use case learns them while it runs, its handler fills the request's
+`AuditScope`, which wins: `AddDataItem` sets the new item and, for a classified item, its organization;
+`DeleteDataItem` sets the organization of a classified item whose policy exists.
+
 ## Known gaps
 
 These are findings, not decisions. Each one needs an issue before it changes.

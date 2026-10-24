@@ -4,12 +4,17 @@ namespace DataTrustHub.Services.Api;
 
 internal sealed record CredentialsRequest(string Email, string Password);
 
-internal sealed record CreatePolicyRequest(string Name, Guid OrganizationId);
-
 internal sealed record CreateOrganizationRequest(string Name);
 
-internal sealed record CreateClearanceRequest(
-    Guid UserId, Guid PolicyId, string Name, string ClassificationLevelName, int ClassificationLevelPriority);
+internal sealed record FindUserByEmailRequest(string Email);
+
+// Role is Member or Guest
+internal sealed record AddMemberRequest(Guid UserId, string Role);
+
+// Role is Member or OrgAdmin
+internal sealed record ChangeMemberRoleRequest(string Role);
+
+internal sealed record AppointOrganizationAdminRequest(Guid UserId);
 
 internal sealed record LoginResponse(string Token);
 
@@ -42,23 +47,21 @@ public sealed record ClassificationPolicyOption(Guid PolicyId, string PolicyName
 // One item with its content, base64-encoded by the API
 public sealed record DataItemContentResponse(Guid Id, string Name, string? Content);
 
-internal sealed record PolicyCreatedResponse(Guid PolicyId);
-
 internal sealed record OrganizationCreatedResponse(Guid OrganizationId);
 
-internal sealed record ClearanceCreatedResponse(Guid ClearanceId);
+internal sealed record MembershipCreatedResponse(Guid MembershipId);
 
 public sealed record AccountResponse(Guid Id, string Email, string Role);
 
 public sealed record OrganizationResponse(Guid Id, string Name);
 
-public sealed record PolicyResponse(Guid Id, string Name, Guid OrganizationId);
+// One of the signed-in user's memberships, with the organization it is in
+public sealed record MyOrganizationResponse(Guid OrganizationId, string OrganizationName, Guid MembershipId, string Role);
 
-public sealed record ClearanceResponse(
-    Guid Id, string Name, Guid UserId, Guid PolicyId, string ClassificationLevelName, int ClassificationLevelPriority);
+public sealed record MemberResponse(Guid MembershipId, Guid UserId, string Email, string Role);
 
-// What the admin fills in to grant a clearance
-public sealed record ClearanceGrant(Guid UserId, Guid PolicyId, string Name, string LevelName, int LevelPriority);
+// Role is the user's membership role in the organization, or null when they are not in it
+public sealed record UserByEmailResponse(Guid UserId, string Email, bool IsMember, string? Role);
 
 // Covers SharedKernel.Error (description), ValidationError (errors) and ProblemDetails (detail) bodies
 internal sealed record ApiError(string? Code, string? Description, string? Detail, ApiError[]? Errors);

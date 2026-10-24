@@ -1,6 +1,9 @@
 @if (User.Identity?.IsAuthenticated == true)
 {
     <div class="d-flex align-items-center gap-3">
+        <a class="btn btn-link btn-sm text-decoration-none" asp-controller="@DataTrustHub.ControllerNames.MyOrganizations" asp-action="Index">
+            <i class="bi bi-building"></i> My organizations
+        </a>
         <span class="text-muted">
             <i class="bi bi-person-circle"></i> @User.Identity.Name
         </span>

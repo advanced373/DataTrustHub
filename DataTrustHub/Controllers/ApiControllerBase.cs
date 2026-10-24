@@ -19,7 +19,7 @@ public abstract class ApiControllerBase(IUserSessionService userSession) : Contr
     }
 
     // Shows the individual validation messages when the API sends them, otherwise the summary message
-    private void AddApiErrors<T>(ApiResult<T> result)
+    protected void AddApiErrors<T>(ApiResult<T> result)
     {
         IEnumerable<string> messages = result.Details.Count > 0
             ? result.Details
@@ -29,10 +29,11 @@ public abstract class ApiControllerBase(IUserSessionService userSession) : Contr
             ModelState.AddModelError(string.Empty, message);
     }
 
-    protected IActionResult RedirectWithSuccess(string message, string action, string controller)
+    protected IActionResult RedirectWithSuccess(
+        string message, string action, string controller, object? routeValues = null)
     {
         TempData[TempDataKeys.Success] = message;
-        return RedirectToAction(action, controller);
+        return RedirectToAction(action, controller, routeValues);
     }
 
     // Renders a list page; a failed load shows the error above an empty list
@@ -48,13 +49,13 @@ public abstract class ApiControllerBase(IUserSessionService userSession) : Contr
 
     // For actions without a form, such as deletes: the outcome is shown as an alert after the redirect
     protected async Task<IActionResult> RedirectWithOutcomeAsync<T>(
-        ApiResult<T> result, string successMessage, string action, string controller)
+        ApiResult<T> result, string successMessage, string action, string controller, object? routeValues = null)
     {
         if (result.IsUnauthorized) return await SessionExpiredAsync();
-        if (result.IsSuccess) return RedirectWithSuccess(successMessage, action, controller);
+        if (result.IsSuccess) return RedirectWithSuccess(successMessage, action, controller, routeValues);
 
         TempData[TempDataKeys.Warning] = result.ErrorMessage;
-        return RedirectToAction(action, controller);
+        return RedirectToAction(action, controller, routeValues);
     }
 
     protected async Task<IActionResult> SessionExpiredAsync()

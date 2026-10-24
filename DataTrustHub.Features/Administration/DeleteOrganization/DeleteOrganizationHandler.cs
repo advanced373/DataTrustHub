@@ -2,12 +2,17 @@ using DataTrustHub.Domain.Abstractions;
 using DataTrustHub.Domain.Memberships;
 using DataTrustHub.Domain.Organizations;
 using DataTrustHub.Domain.Policies;
+using DataTrustHub.Features._Shared.Auditing;
 using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.SharedKernel;
 
 namespace DataTrustHub.Features.Administration.DeleteOrganization;
 
-public record DeleteOrganizationCommand(Guid OrganizationId);
+public record DeleteOrganizationCommand(Guid OrganizationId)
+    : IOrganizationScopedCommand, ITargetedCommand
+{
+    AuditTarget ITargetedCommand.Target => new(AuditTargetTypes.Organization, OrganizationId);
+}
 
 public class DeleteOrganizationHandler(
     IOrganizationRepository organizations,

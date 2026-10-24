@@ -2,6 +2,7 @@ using DataTrustHub.Domain.Abstractions;
 using DataTrustHub.Domain.DataItems;
 using DataTrustHub.Domain.Memberships;
 using DataTrustHub.Domain.Policies;
+using DataTrustHub.Features._Shared.Auditing;
 using DataTrustHub.Features.DataManagement;
 using DataTrustHub.Features.DataManagement.DeleteDataItem;
 using DataTrustHub.Features.Tests.DataManagement.Helpers;
@@ -158,7 +159,8 @@ public class DeleteRuleEquivalenceTests(DeleteRuleScenario scenario) : IClassFix
             provider.GetRequiredService<IDataItemRepository>(),
             provider.GetRequiredService<IPolicyRepository>(),
             provider.GetRequiredService<IMembershipRepository>(),
-            new NeverSavingUnitOfWork());
+            new NeverSavingUnitOfWork(),
+            new AuditScope());
 
         var command = new DeleteDataItemCommand(scenario.DataItems[itemKey].Id, scenario.Users[userKey].Id);
         var result = await handler.Handle(command, default);

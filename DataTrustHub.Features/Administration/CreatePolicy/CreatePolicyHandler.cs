@@ -1,13 +1,14 @@
 using DataTrustHub.Domain.Abstractions;
 using DataTrustHub.Domain.Memberships;
 using DataTrustHub.Domain.Policies;
+using DataTrustHub.Features._Shared.Auditing;
 using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Features.Administration.Authorization;
 using DataTrustHub.SharedKernel;
 
 namespace DataTrustHub.Features.Administration.CreatePolicy;
 
-public record CreatePolicyCommand(Guid OrganizationId, Guid CallerId, string Name);
+public record CreatePolicyCommand(Guid OrganizationId, Guid CallerId, string Name) : IOrganizationScopedCommand;
 
 // An organization admin creates a policy of their organization (C6)
 public class CreatePolicyHandler(

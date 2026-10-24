@@ -75,6 +75,9 @@ architecture that implements them is in ADR-0012 and [the architecture overview]
 | **Read rule** | A user may read a classified data item only if they hold a clearance on its policy at or above its level; its owner has no special right on it. A personal data item is read by its owner only. A deleted data item is read by no one (ADR-0014, D3′) | `DataItem.IsReadableBy` |
 | **Delete rule** | A personal data item is deleted by its owner only. A classified data item belongs to its organization (its policy's organization): it is deleted by its owner while they are a member there (any role), or by an organization admin there, even one who cannot read it. A classified data item whose policy no longer exists is deleted by its owner only (ADR-0014, D5′) | `DataItem.MarkDeleted`, `DeletionRights` |
 | **Need-to-know** | An admin cannot bypass the read rule. A data item the user may not read answers 404, so its existence is not revealed | — |
+| **Audit trail** | The append-only record of who did what: every command, also a rejected or failed one (ADR-0016). Nothing in it is updated or deleted | `IAuditLog`, `AuditCommandDecorator` |
+| **Audit record** | One entry of the audit trail: when, who (or anonymous), the action, the target, the organization and the outcome. Never a payload, file content, email, password, hash or token | `AuditRecord` |
+| **Outcome** | How an audited action ended: *Succeeded*; *Rejected* by validation or a domain error, with its error code; *Denied*, a read the user may not make; *Failed*, an exception | `AuditOutcome` |
 
 ## Building blocks (DDD / Clean Architecture)
 
@@ -86,14 +89,14 @@ These are the words for how the code is structured (ADR-0012).
 | **Application layer** | `DataTrustHub.Features`: one **use case** per vertical slice, as a command handler or a query handler |
 | **Infrastructure layer** | `DataTrustHub.Infrastructure`: the adapters (repositories, mappers, `DContext`) |
 | **Presentation layer** | `DataTrustHub.API` (Carter endpoints) and the WebApp |
-| **Entity** | A domain object with an identity and behaviour: `User`, `Organization`, `Policy`, `Clearance`, `Membership`, `DataItem` |
+| **Entity** | A domain object with an identity and behaviour: `User`, `Organization`, `Policy`, `Clearance`, `Membership`, `DataItem`, and `AuditRecord`, which is only appended |
 | **Aggregate root** | An entity that is loaded and saved as a whole, through its own repository. Today every entity is its own aggregate root |
 | **Value object** | An immutable object defined by its values: `ClassificationLevel`, `MembershipRole`, `DeletionRights` |
 | **Invariant / business rule** | A rule that must always hold. A rule of one aggregate lives in an entity method (`IsReadableBy`, `MarkDeleted`, `CheckCanBeDeletedBy`). A rule that needs other aggregates or the whole set (uniqueness, references, deletion guards) is checked in the use case through repositories. Never in validators. The full list is in [aggregates.md](aggregates.md) |
 | **Factory method** | The only way to create a new entity. It applies the entity's rules: `User.Register`, `Policy.Create`, `Clearance.Grant`, `DataItem.CreateClassified` |
 | **Rehydration** | Rebuilding a stored entity without running its creation rules, through an `internal` constructor that only the persistence mappers can see |
 | **Domain error** | An expected rule failure, returned as a `Result` instead of thrown: `UserErrors`, `DataItemErrors`, `MembershipErrors` |
-| **Port** | An interface the domain or application layer needs, implemented outside it: `I*Repository`, `IUnitOfWork`, `IPasswordHasher` |
+| **Port** | An interface the domain or application layer needs, implemented outside it: `I*Repository`, `IUnitOfWork`, `IPasswordHasher`, `IAuditLog` |
 | **Adapter** | The Infrastructure implementation of a port |
 | **Repository** | A port that loads and stores one aggregate as an entity. Only commands use repositories |
 | **Unit of work** | A port that commits all changes of one command in a single transaction: `IUnitOfWork`, implemented by `DContext` |
@@ -103,6 +106,6 @@ These are the words for how the code is structured (ADR-0012).
 | **Persistence model** | The shape of an EF table, `Db*` (`DbUser`, `DbDataItem`). It exists only in Infrastructure. Never call it an entity |
 | **Mapper** | Converts between a persistence model and an entity (Mapperly). It lives in Infrastructure |
 | **Input validation** | Checks on the shape of a request (required fields, length, format), in the slice's `*Validator`. Business rules do not go here |
-| **Decorator** | A cross-cutting step that Scrutor wraps around handlers: validation now, auditing later |
+| **Decorator** | A cross-cutting step that Scrutor wraps around handlers: validation, and auditing around every command handler (outermost) |
 | **Domain service** | A rule that needs several aggregates and belongs to none of them. There are none yet |
 | **Bounded context** | A part of the domain with its own model and language. Today there are three: Identity and Access, Access Governance and Data Management ([bounded-contexts.md](bounded-contexts.md)) |

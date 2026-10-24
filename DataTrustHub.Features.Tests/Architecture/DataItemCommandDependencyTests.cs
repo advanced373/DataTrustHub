@@ -4,6 +4,7 @@ using DataTrustHub.Domain.DataItems;
 using DataTrustHub.Domain.Memberships;
 using DataTrustHub.Domain.Policies;
 using DataTrustHub.Domain.Users;
+using DataTrustHub.Features._Shared.Auditing;
 using DataTrustHub.Features.DataManagement.AddDataItem;
 using DataTrustHub.Features.DataManagement.DeleteDataItem;
 using NetArchTest.Rules;
@@ -33,20 +34,29 @@ public class DataItemCommandDependencyTests
         ArchitectureAssert.Passed(result, "DataManagement command handlers must not depend on Infrastructure or EF Core");
     }
 
+    // #24 step 1: the use case also reads the policy's organization and fills the audit scope (ADR-0016)
     [Fact]
-    public void AddDataItemHandler_DependsOnlyOnRepositoriesAndUnitOfWork()
+    public void AddDataItemHandler_DependsOnlyOnRepositoriesUnitOfWorkAndAuditScope()
     {
-        Type[] expected = [typeof(IUserRepository), typeof(IClearanceRepository), typeof(IDataItemRepository), typeof(IUnitOfWork)];
+        Type[] expected =
+        [
+            typeof(IUserRepository), typeof(IClearanceRepository), typeof(IDataItemRepository), typeof(IPolicyRepository),
+            typeof(IUnitOfWork), typeof(AuditScope)
+        ];
 
         Assert.Equal(expected.ToHashSet(), ConstructorDependencies(typeof(AddDataItemHandler)));
     }
 
-    // D5' (#95 step 4b): the use case also reads the item's policy and the requester's membership there
+    // D5' (#95 step 4b): the use case also reads the item's policy and the requester's membership there;
+    // #24 step 1: it records the item's organization in the audit scope (ADR-0016)
     [Fact]
-    public void DeleteDataItemHandler_DependsOnlyOnRepositoriesAndUnitOfWork()
+    public void DeleteDataItemHandler_DependsOnlyOnRepositoriesUnitOfWorkAndAuditScope()
     {
         Type[] expected =
-            [typeof(IDataItemRepository), typeof(IPolicyRepository), typeof(IMembershipRepository), typeof(IUnitOfWork)];
+        [
+            typeof(IDataItemRepository), typeof(IPolicyRepository), typeof(IMembershipRepository), typeof(IUnitOfWork),
+            typeof(AuditScope)
+        ];
 
         Assert.Equal(expected.ToHashSet(), ConstructorDependencies(typeof(DeleteDataItemHandler)));
     }

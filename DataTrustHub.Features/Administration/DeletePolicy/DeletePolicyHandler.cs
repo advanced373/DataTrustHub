@@ -2,13 +2,18 @@ using DataTrustHub.Domain.Abstractions;
 using DataTrustHub.Domain.Clearances;
 using DataTrustHub.Domain.Memberships;
 using DataTrustHub.Domain.Policies;
+using DataTrustHub.Features._Shared.Auditing;
 using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Features.Administration.Authorization;
 using DataTrustHub.SharedKernel;
 
 namespace DataTrustHub.Features.Administration.DeletePolicy;
 
-public record DeletePolicyCommand(Guid OrganizationId, Guid CallerId, Guid PolicyId);
+public record DeletePolicyCommand(Guid OrganizationId, Guid CallerId, Guid PolicyId)
+    : IOrganizationScopedCommand, ITargetedCommand
+{
+    AuditTarget ITargetedCommand.Target => new(AuditTargetTypes.Policy, PolicyId);
+}
 
 // An organization admin deletes a policy of their organization (C6)
 public class DeletePolicyHandler(

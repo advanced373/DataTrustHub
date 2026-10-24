@@ -1,4 +1,5 @@
 ﻿using DataTrustHub.Domain.Abstractions;
+using DataTrustHub.Domain.Auditing;
 using DataTrustHub.Domain.Clearances;
 using DataTrustHub.Domain.DataItems;
 using DataTrustHub.Domain.Memberships;
@@ -6,6 +7,7 @@ using DataTrustHub.Domain.Organizations;
 using DataTrustHub.Domain.Policies;
 using DataTrustHub.Domain.Users;
 using DataTrustHub.Infrastructure.Persistance;
+using DataTrustHub.Infrastructure.Persistance.Auditing;
 using DataTrustHub.Infrastructure.Persistance.Repositories;
 using DataTrustHub.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
@@ -28,6 +30,7 @@ namespace DataTrustHub.Infrastructure
 
             services.AddSingleton<IPasswordHasher, PasswordHasher>();
             AddRepositories(services);
+            AddAuditLog(services);
 
             return services;
         }
@@ -43,5 +46,10 @@ namespace DataTrustHub.Infrastructure
             services.AddScoped<IMembershipRepository, MembershipRepository>();
             services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<DContext>());
         }
+
+        // Scoped like the context options it builds its own short-lived context from; it never shares the
+        // request's DContext, so an audit record is saved apart from the command's unit of work (ADR-0016)
+        private static void AddAuditLog(IServiceCollection services) =>
+            services.AddScoped<IAuditLog, AuditLog>();
     }
 }

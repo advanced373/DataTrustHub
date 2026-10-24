@@ -2,13 +2,18 @@ using DataTrustHub.Domain.Abstractions;
 using DataTrustHub.Domain.Clearances;
 using DataTrustHub.Domain.Memberships;
 using DataTrustHub.Domain.Policies;
+using DataTrustHub.Features._Shared.Auditing;
 using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Features.Administration.Authorization;
 using DataTrustHub.SharedKernel;
 
 namespace DataTrustHub.Features.Administration.DeleteClearance;
 
-public record DeleteClearanceCommand(Guid OrganizationId, Guid CallerId, Guid ClearanceId);
+public record DeleteClearanceCommand(Guid OrganizationId, Guid CallerId, Guid ClearanceId)
+    : IOrganizationScopedCommand, ITargetedCommand
+{
+    AuditTarget ITargetedCommand.Target => new(AuditTargetTypes.Clearance, ClearanceId);
+}
 
 // An organization admin revokes a clearance on a policy of their organization (C6). Revoking their own
 // clearance is allowed: it only removes access (ADR-0014)

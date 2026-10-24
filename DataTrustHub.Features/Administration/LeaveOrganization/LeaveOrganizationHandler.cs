@@ -2,13 +2,14 @@ using DataTrustHub.Domain.Abstractions;
 using DataTrustHub.Domain.Clearances;
 using DataTrustHub.Domain.Memberships;
 using DataTrustHub.Domain.Policies;
+using DataTrustHub.Features._Shared.Auditing;
 using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Features.Administration.MembershipRules;
 using DataTrustHub.SharedKernel;
 
 namespace DataTrustHub.Features.Administration.LeaveOrganization;
 
-public record LeaveOrganizationCommand(Guid OrganizationId, Guid CallerId);
+public record LeaveOrganizationCommand(Guid OrganizationId, Guid CallerId) : IOrganizationScopedCommand;
 
 // A member, guest or organization admin ends their own membership, and with it their clearances on the
 // organization's policies (C7), in one save. The last organization admin cannot leave (M2). This is also

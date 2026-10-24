@@ -82,5 +82,21 @@ public sealed record ClearanceResponse(
 // What the organization admin fills in to grant a clearance
 public sealed record ClearanceGrant(Guid UserId, Guid PolicyId, string Name, string LevelName, int LevelPriority);
 
+// One audit record of the audit trail. OccurredAt is in UTC; ActorEmail is null for an anonymous action
+// (ActorUserId null too) or an account that no longer exists
+public sealed record AuditRecordResponse(
+    Guid Id,
+    DateTime OccurredAt,
+    Guid? ActorUserId,
+    string? ActorEmail,
+    string Action,
+    string? TargetType,
+    Guid? TargetId,
+    string Outcome,
+    string? ErrorCode);
+
+// The optional filters of the audit trail; From and To are an inclusive range in UTC
+public sealed record AuditRecordFilter(Guid? UserId, string? Action, DateTime? From, DateTime? To);
+
 // Covers SharedKernel.Error (description), ValidationError (errors) and ProblemDetails (detail) bodies
 internal sealed record ApiError(string? Code, string? Description, string? Detail, ApiError[]? Errors);

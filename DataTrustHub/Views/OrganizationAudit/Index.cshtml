@@ -1,0 +1,19 @@
+@using DataTrustHub.Controllers
+@model OrganizationAuditViewModel
+@{
+    ViewData["Title"] = "Audit trail";
+}
+
+<partial name="_OrganizationNav" model="@(new OrganizationNavModel(Model.OrganizationId, ControllerNames.OrganizationAudit))" />
+
+<h1 class="h3 mb-1">Audit trail of @Model.OrganizationName</h1>
+<p class="text-muted mb-4">
+    Who did what in this organization, and the outcome of each action. Times are in UTC.
+    <a asp-controller="@ControllerNames.MyOrganizations" asp-action="@nameof(MyOrganizationsController.Index)">Back to my organizations</a>
+</p>
+
+<form method="get" asp-action="@nameof(OrganizationAuditController.Index)" asp-route-organizationId="@Model.OrganizationId">
+    <partial name="_AuditFilters" model="Model.Trail" />
+</form>
+
+<partial name="_AuditTable" model="Model.Trail" />

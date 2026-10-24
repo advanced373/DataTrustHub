@@ -1,0 +1,37 @@
+@model AuditTrailViewModel
+@* The filter fields of an audit trail page, inside the page's GET form. Only ids, action names and dates
+   go in the query string, never an email (ADR-0019) *@
+<div asp-validation-summary="All" class="text-danger mb-2"></div>
+<div class="row g-2 align-items-end mb-3">
+    <div class="col-auto">
+        <label for="userId" class="form-label small mb-1">User</label>
+        <select id="userId" name="userId" class="form-select">
+            <option value="">All users</option>
+            @foreach (var user in Model.Users)
+            {
+                <option value="@user.UserId" selected="@(user.UserId == Model.Filter.UserId)">@user.Email</option>
+            }
+        </select>
+    </div>
+    <div class="col-auto">
+        <label for="action" class="form-label small mb-1">Action</label>
+        <select id="action" name="action" class="form-select">
+            <option value="">All actions</option>
+            @foreach (var action in Model.Actions)
+            {
+                <option value="@action" selected="@(action == Model.Filter.Action)">@action</option>
+            }
+        </select>
+    </div>
+    <div class="col-auto">
+        <label for="from" class="form-label small mb-1">From (UTC)</label>
+        <input id="from" name="from" type="date" class="form-control" value="@Model.Filter.FromInput" />
+    </div>
+    <div class="col-auto">
+        <label for="to" class="form-label small mb-1">To (UTC)</label>
+        <input id="to" name="to" type="date" class="form-control" value="@Model.Filter.ToInput" />
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-outline-primary"><i class="bi bi-funnel"></i> Filter</button>
+    </div>
+</div>

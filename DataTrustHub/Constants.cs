@@ -35,6 +35,7 @@ internal static class ApiRoutes
     internal const string AdminOrganizations = "admin/organizations";
     internal const string AdminOrganizationById = "admin/organizations/{0}";
     internal const string AdminOrganizationAdmins = "admin/organizations/{0}/admins";
+    internal const string AdminAuditRecords = "admin/audit-records";
 
     // Organization-scoped routes; the API answers 404 to a caller without the needed membership there
     internal const string MyOrganizations = "organizations/mine";
@@ -47,10 +48,18 @@ internal static class ApiRoutes
     internal const string OrganizationPolicy = "organizations/{0}/policies/{1}";
     internal const string OrganizationClearances = "organizations/{0}/clearances";
     internal const string OrganizationClearance = "organizations/{0}/clearances/{1}";
+    internal const string OrganizationAuditRecords = "organizations/{0}/audit-records";
 
-    // Optional filters of the clearance list; ids only, never personal data (ADR-0019)
+    // Optional filters of the clearance list and the audit trail; ids, action names and times only,
+    // never personal data (ADR-0019)
     internal const string UserIdParameter = "userId";
     internal const string PolicyIdParameter = "policyId";
+    internal const string ActionParameter = "action";
+    internal const string FromParameter = "from";
+    internal const string ToParameter = "to";
+
+    // The round-trip format of a time in the query string, such as 2026-10-24T23:59:59.9999999Z
+    internal const string TimeFormat = "O";
 }
 
 // Attribute routes of the administration pages, under /Admin/<section>
@@ -58,6 +67,7 @@ internal static class AdminRoutes
 {
     internal const string Users = "Admin/Users";
     internal const string Organizations = "Admin/Organizations";
+    internal const string Audit = "Admin/Audit";
     internal const string Create = "Create";
     internal const string Delete = "{id:guid}/Delete";
     internal const string AppointAdmin = "{id:guid}/AppointAdmin";
@@ -78,6 +88,7 @@ internal static class OrganizationRoutes
     internal const string Clearances = "{organizationId:guid}/Clearances";
     internal const string GrantClearance = "{organizationId:guid}/Clearances/Grant";
     internal const string RevokeClearance = "{organizationId:guid}/Clearances/{clearanceId:guid}/Revoke";
+    internal const string Audit = "{organizationId:guid}/Audit";
 }
 
 // The standard classification levels offered when granting a clearance; a higher priority sees more
@@ -115,6 +126,80 @@ internal static class MembershipRoles
         role is not null && Labels.TryGetValue(role, out var label) ? label : role ?? string.Empty;
 }
 
+// The audited actions offered in the audit trail filters. The names are the command type names without the
+// Command suffix, as the API records them; DataItem.Download is the recorded read of a data item's content
+internal static class AuditActions
+{
+    // The actions inside an organization, shown in its audit trail
+    internal static readonly IReadOnlyList<string> Organization =
+    [
+        "AddMember",
+        "ChangeMemberRole",
+        "RemoveMember",
+        "LeaveOrganization",
+        "AppointOrganizationAdmin",
+        "CreatePolicy",
+        "DeletePolicy",
+        "CreateClearance",
+        "DeleteClearance",
+        "DeleteOrganization",
+        "AddDataItem",
+        "DeleteDataItem",
+        "DataItem.Download"
+    ];
+
+    // The tenant-level actions, the only ones in the platform admin's audit trail
+    internal static readonly IReadOnlyList<string> TenantLevel =
+    [
+        "CreateOrganization",
+        "DeleteOrganization",
+        "AppointOrganizationAdmin",
+        "CreateAccount",
+        "DeleteAccount",
+        "RegisterUser",
+        "LoginUser"
+    ];
+}
+
+// How an audited action ended, as the API names the outcome, with its Bootstrap badge class
+internal static class AuditOutcomes
+{
+    internal const string Succeeded = "Succeeded";
+    internal const string Rejected = "Rejected";
+    internal const string Denied = "Denied";
+    internal const string Failed = "Failed";
+
+    private const string UnknownBadgeClass = "text-bg-secondary";
+
+    private static readonly Dictionary<string, string> BadgeClasses = new()
+    {
+        [Succeeded] = "text-bg-success",
+        [Rejected] = "text-bg-warning",
+        [Denied] = "text-bg-danger",
+        [Failed] = "text-bg-dark"
+    };
+
+    // An unknown outcome gets a neutral badge
+    internal static string BadgeClassOf(string outcome) =>
+        BadgeClasses.GetValueOrDefault(outcome, UnknownBadgeClass);
+}
+
+// Display rules of the audit trail table
+internal static class AuditTrailDisplay
+{
+    // The API returns at most this many records, the newest first
+    internal const int MaxRecords = 200;
+
+    // Times are shown in UTC, as the API returns them
+    internal const string TimeFormat = "yyyy-MM-dd HH:mm:ss 'UTC'";
+
+    // A target id is shown by its first characters; the full id is in the tooltip
+    internal const int ShortIdLength = 8;
+
+    // The value format of a date input
+    internal const string DateInputFormat = "yyyy-MM-dd";
+}
+
 internal static class ControllerNames
 {
     internal const string Account = "Account";
@@ -126,6 +211,8 @@ internal static class ControllerNames
     internal const string MyOrganizations = "MyOrganizations";
     internal const string OrganizationPolicies = "OrganizationPolicies";
     internal const string OrganizationClearances = "OrganizationClearances";
+    internal const string OrganizationAudit = "OrganizationAudit";
+    internal const string Audit = "Audit";
 }
 
 internal static class TempDataKeys
@@ -170,6 +257,9 @@ internal static class Messages
     internal const string LevelRequired = "Select a classification level.";
     internal const string UnknownMember = "(former member)";
     internal const string UnknownPolicy = "(deleted policy)";
+    internal const string AnonymousActor = "Anonymous";
+    internal const string DeletedAccount = "Deleted account";
+    internal const string AuditTrailTruncated = "Showing the {0} most recent records; narrow the filters.";
     internal const string FileRequired = "Select a file to upload.";
     internal const string FileTooLarge = "The file exceeds the maximum size of 100 MB.";
 }

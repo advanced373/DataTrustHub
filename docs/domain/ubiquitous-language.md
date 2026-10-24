@@ -30,7 +30,8 @@ The access rules:
    **clearance**: access to one of its policies, up to one classification level. An organization admin
    never grants a clearance to themselves; another organization admin does.
 5. A user may read a classified data item only if they hold a clearance on its policy at that level or
-   higher. The owner can always read their own data item.
+   higher. The owner has no special right on it: classified data belongs to the organization. Only the
+   owner reads a personal data item (ADR-0014).
 6. **Need-to-know:** being an admin does not give access to data. If you may not read a data item,
    the system answers as if it did not exist.
 
@@ -38,8 +39,8 @@ Example: Ana has a *Secret* clearance on "Project Apollo".
 - She can read Apollo documents marked *Confidential* and *Secret*, but not *Top Secret*.
 - She cannot read HR documents at any level.
 
-The rules are recorded in ADR-0011. The architecture that implements them is in ADR-0012 and
-[the architecture overview](../architecture/overview.md).
+The rules are recorded in ADR-0011; ADR-0014 changes the read rule for classified data. The
+architecture that implements them is in ADR-0012 and [the architecture overview](../architecture/overview.md).
 
 ## Domain terms
 
@@ -71,7 +72,7 @@ The rules are recorded in ADR-0011. The architecture that implements them is in 
 | **Personal data item** | A data item with no policy, readable by its owner only. Its marking is `UNCLASSIFIED` | `DataItem.CreatePersonal` |
 | **Classified data item** | A data item with a policy and a classification level | `DataItem.CreateClassified` |
 | **Security marking** | The label shown on a data item, e.g. `SECRET` | `DataItem.SecurityMarking` |
-| **Read rule** | A user may read a data item if they are its owner, or if they hold a clearance on its policy at or above its level | `DataItem.IsReadableBy` |
+| **Read rule** | A user may read a classified data item only if they hold a clearance on its policy at or above its level; its owner has no special right on it. A personal data item is read by its owner only. A deleted data item is read by no one (ADR-0014, D3′) | `DataItem.IsReadableBy` |
 | **Need-to-know** | An admin cannot bypass the read rule. A data item the user may not read answers 404, so its existence is not revealed | — |
 
 ## Building blocks (DDD / Clean Architecture)

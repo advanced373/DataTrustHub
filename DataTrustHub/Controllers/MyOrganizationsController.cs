@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using DataTrustHub.Models;
 using DataTrustHub.Services.Api;
 using DataTrustHub.Services.Session;
@@ -12,16 +11,16 @@ namespace DataTrustHub.Controllers;
 [Authorize]
 [Route(OrganizationRoutes.Root)]
 public class MyOrganizationsController(IAdminApiClient adminApi, IUserSessionService userSession)
-    : ApiControllerBase(userSession)
+    : OrganizationControllerBase(adminApi, userSession)
 {
     [HttpGet("")]
     public async Task<IActionResult> Index(CancellationToken cancellationToken) =>
-        await ListViewAsync(await adminApi.ListMyOrganizationsAsync(cancellationToken));
+        await ListViewAsync(await AdminApi.ListMyOrganizationsAsync(cancellationToken));
 
     [HttpPost(OrganizationRoutes.Leave)]
     public async Task<IActionResult> Leave(Guid organizationId, CancellationToken cancellationToken)
     {
-        var result = await adminApi.LeaveOrganizationAsync(organizationId, cancellationToken);
+        var result = await AdminApi.LeaveOrganizationAsync(organizationId, cancellationToken);
         return await RedirectWithOutcomeAsync(result, Messages.OrganizationLeft, nameof(Index), ControllerNames.MyOrganizations);
     }
 
@@ -29,14 +28,10 @@ public class MyOrganizationsController(IAdminApiClient adminApi, IUserSessionSer
     [HttpGet(OrganizationRoutes.Members)]
     public async Task<IActionResult> Members(Guid organizationId, CancellationToken cancellationToken)
     {
-        var members = await adminApi.ListMembersAsync(organizationId, cancellationToken);
-        if (!members.IsSuccess)
-            return await RedirectWithOutcomeAsync(members, string.Empty, nameof(Index), ControllerNames.MyOrganizations);
+        var members = await AdminApi.ListMembersAsync(organizationId, cancellationToken);
+        if (!members.IsSuccess) return await BackToMyOrganizationsAsync(members);
 
-        var organizations = await adminApi.ListMyOrganizationsAsync(cancellationToken);
-        var organizationName = organizations.Value?
-            .FirstOrDefault(organization => organization.OrganizationId == organizationId)?
-            .OrganizationName;
+        var organizationName = await OrganizationNameAsync(organizationId, cancellationToken);
         return View(new MembersViewModel(organizationId, organizationName, members.Value!, SignedInUserId()));
     }
 
@@ -51,7 +46,7 @@ public class MyOrganizationsController(IAdminApiClient adminApi, IUserSessionSer
     {
         if (!ModelState.IsValid) return await AddMemberViewAsync(organizationId, model, cancellationToken);
 
-        var user = await adminApi.FindUserByEmailAsync(organizationId, model.Email.Trim(), cancellationToken);
+        var user = await AdminApi.FindUserByEmailAsync(organizationId, model.Email.Trim(), cancellationToken);
         if (!user.IsSuccess) return await AddMemberFailedAsync(organizationId, user, model, cancellationToken);
 
         var found = user.Value!;
@@ -62,7 +57,7 @@ public class MyOrganizationsController(IAdminApiClient adminApi, IUserSessionSer
             return await AddMemberViewAsync(organizationId, model, cancellationToken);
         }
 
-        var added = await adminApi.AddMemberAsync(organizationId, found.UserId, model.Role, cancellationToken);
+        var added = await AdminApi.AddMemberAsync(organizationId, found.UserId, model.Role, cancellationToken);
         if (!added.IsSuccess) return await AddMemberFailedAsync(organizationId, added, model, cancellationToken);
 
         var message = string.Format(Messages.MemberAdded, found.Email, MembershipRoles.LabelOf(model.Role));
@@ -74,7 +69,7 @@ public class MyOrganizationsController(IAdminApiClient adminApi, IUserSessionSer
         Guid organizationId, Guid userId, [FromForm] string role, CancellationToken cancellationToken)
     {
         var result = ModelState.IsValid
-            ? await adminApi.ChangeMemberRoleAsync(organizationId, userId, role, cancellationToken)
+            ? await AdminApi.ChangeMemberRoleAsync(organizationId, userId, role, cancellationToken)
             : ApiResult<bool>.Failure(Messages.RequestFailed);
 
         var message = string.Format(Messages.MemberRoleChanged, MembershipRoles.LabelOf(role));
@@ -84,7 +79,7 @@ public class MyOrganizationsController(IAdminApiClient adminApi, IUserSessionSer
     [HttpPost(OrganizationRoutes.RemoveMember)]
     public async Task<IActionResult> RemoveMember(Guid organizationId, Guid userId, CancellationToken cancellationToken)
     {
-        var result = await adminApi.RemoveMemberAsync(organizationId, userId, cancellationToken);
+        var result = await AdminApi.RemoveMemberAsync(organizationId, userId, cancellationToken);
         return await RedirectAfterMemberChangeAsync(result, Messages.MemberRemoved, organizationId, userId);
     }
 
@@ -93,19 +88,11 @@ public class MyOrganizationsController(IAdminApiClient adminApi, IUserSessionSer
     private async Task<IActionResult> AddMemberViewAsync(
         Guid organizationId, AddMemberViewModel model, CancellationToken cancellationToken)
     {
-        var organizations = await adminApi.ListMyOrganizationsAsync(cancellationToken);
-        if (organizations.IsUnauthorized) return await SessionExpiredAsync();
-
-        var organization = organizations.Value?.FirstOrDefault(o =>
-            o.OrganizationId == organizationId && o.Role == MembershipRoles.OrgAdmin);
-        if (organization is null)
-        {
-            TempData[TempDataKeys.Warning] = organizations.ErrorMessage ?? Messages.OrganizationNotFound;
-            return RedirectToAction(nameof(Index));
-        }
+        var organization = await AdministeredOrganizationAsync(organizationId, cancellationToken);
+        if (!organization.IsSuccess) return await BackToMyOrganizationsAsync(organization);
 
         model.OrganizationId = organizationId;
-        model.OrganizationName = organization.OrganizationName;
+        model.OrganizationName = organization.Value!.OrganizationName;
         return View(nameof(AddMember), model);
     }
 
@@ -127,8 +114,4 @@ public class MyOrganizationsController(IAdminApiClient adminApi, IUserSessionSer
             : RedirectWithOutcomeAsync(result, successMessage, nameof(Members), ControllerNames.MyOrganizations, new { organizationId });
 
     private bool IsSignedInUser(Guid userId) => SignedInUserId() == userId;
-
-    // The user id from the API token's subject, kept in the session cookie
-    private Guid? SignedInUserId() =>
-        Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var signedInUserId) ? signedInUserId : null;
 }

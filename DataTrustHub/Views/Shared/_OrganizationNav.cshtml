@@ -1,0 +1,22 @@
+@using DataTrustHub.Controllers
+@model OrganizationNavModel
+@* Tabs shared by an organization admin's pages of one organization *@
+@{
+    var tabs = new[]
+    {
+        (Controller: ControllerNames.MyOrganizations, Action: nameof(MyOrganizationsController.Members), Label: "Members", Icon: "bi-people"),
+        (Controller: ControllerNames.OrganizationPolicies, Action: nameof(OrganizationPoliciesController.Index), Label: "Policies", Icon: "bi-journal-text"),
+        (Controller: ControllerNames.OrganizationClearances, Action: nameof(OrganizationClearancesController.Index), Label: "Clearances", Icon: "bi-shield-lock")
+    };
+}
+<ul class="nav nav-tabs mb-4">
+    @foreach (var tab in tabs)
+    {
+        <li class="nav-item">
+            <a class="nav-link @(tab.Controller == Model.ActiveController ? "active" : "")"
+               asp-controller="@tab.Controller" asp-action="@tab.Action" asp-route-organizationId="@Model.OrganizationId">
+                <i class="bi @tab.Icon"></i> @tab.Label
+            </a>
+        </li>
+    }
+</ul>

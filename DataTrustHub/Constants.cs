@@ -43,6 +43,14 @@ internal static class ApiRoutes
     internal const string OrganizationMember = "organizations/{0}/members/{1}";
     internal const string OrganizationMemberRole = "organizations/{0}/members/{1}/role";
     internal const string OrganizationFindUserByEmail = "organizations/{0}/users/find-by-email";
+    internal const string OrganizationPolicies = "organizations/{0}/policies";
+    internal const string OrganizationPolicy = "organizations/{0}/policies/{1}";
+    internal const string OrganizationClearances = "organizations/{0}/clearances";
+    internal const string OrganizationClearance = "organizations/{0}/clearances/{1}";
+
+    // Optional filters of the clearance list; ids only, never personal data (ADR-0019)
+    internal const string UserIdParameter = "userId";
+    internal const string PolicyIdParameter = "policyId";
 }
 
 // Attribute routes of the administration pages, under /Admin/<section>
@@ -64,6 +72,25 @@ internal static class OrganizationRoutes
     internal const string AddMember = "{organizationId:guid}/Members/Add";
     internal const string ChangeRole = "{organizationId:guid}/Members/{userId:guid}/Role";
     internal const string RemoveMember = "{organizationId:guid}/Members/{userId:guid}/Remove";
+    internal const string Policies = "{organizationId:guid}/Policies";
+    internal const string CreatePolicy = "{organizationId:guid}/Policies/Create";
+    internal const string DeletePolicy = "{organizationId:guid}/Policies/{policyId:guid}/Delete";
+    internal const string Clearances = "{organizationId:guid}/Clearances";
+    internal const string GrantClearance = "{organizationId:guid}/Clearances/Grant";
+    internal const string RevokeClearance = "{organizationId:guid}/Clearances/{clearanceId:guid}/Revoke";
+}
+
+// The standard classification levels offered when granting a clearance; a higher priority sees more
+internal static class ClassificationLevels
+{
+    internal static readonly IReadOnlyList<(string Name, int Priority)> All =
+    [
+        ("Public", 0),
+        ("Internal", 1),
+        ("Confidential", 2),
+        ("Secret", 3),
+        ("Top Secret", 4)
+    ];
 }
 
 // Membership roles as the API names them (ADR-0014); the UI shows them through LabelOf
@@ -97,6 +124,8 @@ internal static class ControllerNames
     internal const string Users = "Users";
     internal const string Organizations = "Organizations";
     internal const string MyOrganizations = "MyOrganizations";
+    internal const string OrganizationPolicies = "OrganizationPolicies";
+    internal const string OrganizationClearances = "OrganizationClearances";
 }
 
 internal static class TempDataKeys
@@ -131,6 +160,16 @@ internal static class Messages
     internal const string MemberAdded = "{0} added as {1}.";
     internal const string MemberRoleChanged = "Role changed to {0}.";
     internal const string MemberRemoved = "Member removed. Their clearances in this organization were revoked.";
+    internal const string PolicyCreated = "Policy \"{0}\" created.";
+    internal const string PolicyDeleted = "Policy deleted.";
+    internal const string ClearanceGranted = "Clearance granted to {0}.";
+    internal const string ClearanceRevoked = "Clearance revoked.";
+    internal const string DefaultClearanceName = "{0} on {1}";
+    internal const string MemberRequired = "Select a member.";
+    internal const string PolicyRequired = "Select a policy.";
+    internal const string LevelRequired = "Select a classification level.";
+    internal const string UnknownMember = "(former member)";
+    internal const string UnknownPolicy = "(deleted policy)";
     internal const string FileRequired = "Select a file to upload.";
     internal const string FileTooLarge = "The file exceeds the maximum size of 100 MB.";
 }

@@ -4,6 +4,8 @@
     ViewData["Title"] = "Members";
 }
 
+<partial name="_OrganizationNav" model="@(new OrganizationNavModel(Model.OrganizationId, ControllerNames.MyOrganizations))" />
+
 <div class="d-flex justify-content-between align-items-center mb-1">
     <h1 class="h3 m-0">Members@(Model.OrganizationName is null ? "" : $" of {Model.OrganizationName}")</h1>
     <a class="btn btn-primary" asp-action="@nameof(MyOrganizationsController.AddMember)" asp-route-organizationId="@Model.OrganizationId">

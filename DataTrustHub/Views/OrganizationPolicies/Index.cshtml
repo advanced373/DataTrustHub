@@ -1,0 +1,58 @@
+@using DataTrustHub.Controllers
+@model PoliciesViewModel
+@{
+    ViewData["Title"] = "Policies";
+}
+
+<partial name="_OrganizationNav" model="@(new OrganizationNavModel(Model.OrganizationId, ControllerNames.OrganizationPolicies))" />
+
+<div class="d-flex justify-content-between align-items-center mb-1">
+    <h1 class="h3 m-0">Policies@(Model.OrganizationName is null ? "" : $" of {Model.OrganizationName}")</h1>
+    <a class="btn btn-primary" asp-action="@nameof(OrganizationPoliciesController.Create)" asp-route-organizationId="@Model.OrganizationId">
+        <i class="bi bi-plus-lg"></i> New policy
+    </a>
+</div>
+<p class="text-muted mb-4">
+    Classified data is placed under a policy, and clearances give access to it. A policy with clearances cannot be deleted.
+    <a asp-controller="@ControllerNames.MyOrganizations" asp-action="@nameof(MyOrganizationsController.Index)">Back to my organizations</a>
+</p>
+
+@if (Model.Policies.Count == 0)
+{
+    <div class="card shadow-sm">
+        <div class="card-body text-center py-5">
+            <i class="bi bi-journal-text display-5 text-muted"></i>
+            <p class="mt-3 mb-0 text-muted">This organization has no policies yet. Create one to classify data under it.</p>
+        </div>
+    </div>
+}
+else
+{
+    <div class="card shadow-sm">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Name</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var policy in Model.Policies)
+                {
+                    <tr>
+                        <td>@policy.Name</td>
+                        <td class="text-end text-nowrap">
+                            <form asp-action="@nameof(OrganizationPoliciesController.Delete)" asp-route-organizationId="@Model.OrganizationId" asp-route-policyId="@policy.Id"
+                                  method="post" class="d-inline" onsubmit="return confirm(this.dataset.confirm);"
+                                  data-confirm="@($"Delete the policy \"{policy.Name}\"?")">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                                    <i class="bi bi-trash"></i> Delete
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

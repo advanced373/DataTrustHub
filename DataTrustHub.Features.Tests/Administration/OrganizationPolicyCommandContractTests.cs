@@ -49,12 +49,11 @@ public class OrganizationPolicyCommandContractTests(ApiFactory factory) : IClass
     [Fact]
     public async Task DeletePolicy_WithClearances_KeepsPolicy()
     {
-        const string holderEmail = "contract_policy_holder@example.com";
         var admin = await CreateAdminAsync("contract_policy_delete_blocked@example.com");
-        await TestUsers.CreateClientAsync(factory, holderEmail);
+        var (_, holderId) = await CreateUserAsync(factory, "contract_policy_holder");
         var (organizationId, orgAdmin) = await CreateOrganizationWithOrgAdminAsync(factory, admin, "Contract cleared organization");
         var policyId = await CreatePolicyAsync(orgAdmin, "Contract cleared policy", organizationId);
-        await CreateClearanceAsync(admin, await TestUsers.GetIdAsync(factory, holderEmail), policyId);
+        await AddMemberAndGrantClearanceAsync(orgAdmin, organizationId, holderId, policyId, DefaultLevelName, DefaultLevelPriority);
 
         var response = await orgAdmin.DeleteAsync(PolicyEndpoint(organizationId, policyId));
 

@@ -8,7 +8,8 @@ using Xunit;
 
 namespace DataTrustHub.Features.Tests.DataManagement;
 
-// The read rule of #5: owner, or a clearance on the item's policy at least at the item's level
+// The read rule of #5: owner, or a clearance on the item's policy at least at the item's level. Since #95 step 3b the
+// clearances are granted by an organization admin of the policy's organization to a member (AC9: the rule is unchanged)
 public class DataVisibilityTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
     private const string UploadEndpoint = "/data/upload";
@@ -46,8 +47,10 @@ public class DataVisibilityTests(ApiFactory factory) : IClassFixture<ApiFactory>
     public async Task ClearedOnAnotherPolicy_DoesNotSeeItem()
     {
         var setup = await ArrangeAsync("vis_other");
-        var otherPolicy = await AdminSetup.CreatePolicyAsync(factory, setup.Admin, "vis_other second policy");
-        var reader = await CreateClearedUserAsync(setup with { PolicyId = otherPolicy }, "vis_other_reader", Secret);
+        var (otherOrganizationId, otherOrgAdmin, otherPolicy) =
+            await AdminSetup.CreatePolicyWithOrgAdminAsync(factory, setup.Admin, "vis_other second policy");
+        var reader = await CreateClearedUserAsync(
+            setup with { OrganizationId = otherOrganizationId, OrgAdmin = otherOrgAdmin, PolicyId = otherPolicy }, "vis_other_reader", Secret);
 
         Assert.Empty((await reader.GetFromJsonAsync<List<SummaryResponse>>(ListEndpoint))!);
         Assert.Equal(HttpStatusCode.NotFound, (await reader.GetAsync($"/data/{setup.ItemId}")).StatusCode);
@@ -77,24 +80,28 @@ public class DataVisibilityTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
     // --- helpers ---
 
-    private sealed record Setup(HttpClient Admin, HttpClient Owner, Guid PolicyId, Guid ItemId);
+    // Admin is the platform admin; OrgAdmin is the organization admin of the policy's organization
+    private sealed record Setup(HttpClient Admin, Guid OrganizationId, HttpClient OrgAdmin, HttpClient Owner, Guid PolicyId, Guid ItemId);
 
     // An owner cleared Secret on a policy uploads one Confidential item under it
     private async Task<Setup> ArrangeAsync(string prefix)
     {
         var admin = await TestUsers.CreateClientAsync(factory, $"{prefix}_admin@example.com", UserRoles.Admin);
-        var policyId = await AdminSetup.CreatePolicyAsync(factory, admin, $"{prefix} policy");
-        var owner = await CreateClearedUserAsync(new Setup(admin, admin, policyId, Guid.Empty), $"{prefix}_owner", Secret);
+        var (organizationId, orgAdmin, policyId) = await AdminSetup.CreatePolicyWithOrgAdminAsync(factory, admin, $"{prefix} policy");
+        var owner = await CreateClearedUserAsync(
+            new Setup(admin, organizationId, orgAdmin, admin, policyId, Guid.Empty), $"{prefix}_owner", Secret);
         var itemId = await UploadAsync(owner, policyId, Confidential);
-        return new Setup(admin, owner, policyId, itemId);
+        return new Setup(admin, organizationId, orgAdmin, owner, policyId, itemId);
     }
 
+    // The organization admin adds the user as a member and grants the clearance (C5, C6)
     private async Task<HttpClient> CreateClearedUserAsync(Setup setup, string name, int priority)
     {
         var email = $"{name}@example.com";
         var client = await TestUsers.CreateClientAsync(factory, email);
         var userId = await TestUsers.GetIdAsync(factory, email);
-        await AdminSetup.PostClearanceAsync(setup.Admin, userId, setup.PolicyId, $"Level {priority}", priority);
+        await AdminSetup.AddMemberAndGrantClearanceAsync(
+            setup.OrgAdmin, setup.OrganizationId, userId, setup.PolicyId, $"Level {priority}", priority);
         return client;
     }
 

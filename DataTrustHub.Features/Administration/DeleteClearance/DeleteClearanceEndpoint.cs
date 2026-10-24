@@ -5,19 +5,39 @@ using DataTrustHub.SharedKernel;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 
 namespace DataTrustHub.Features.Administration.DeleteClearance;
 
+// Any authenticated user may call; the handler checks that the caller is an organization admin there
 public class DeleteClearanceEndpoint : ICarterModule
 {
     public void AddRoutes(IEndpointRouteBuilder app) =>
         app.MapDelete(Constants.EndpointRoute, Handle)
            .WithTags(Constants.EndpointTag)
-           .RequireAuthorization(policy => policy.RequireRole(UserRoles.Admin));
+           .RequireAuthorization();
 
-    private static async Task<IResult> Handle(Guid id, ICommandHandler<DeleteClearanceCommand, Result<Guid>> handler, CancellationToken cancellationToken)
+    private static async Task<IResult> Handle(
+        Guid organizationId,
+        Guid clearanceId,
+        ICommandHandler<DeleteClearanceCommand, Result<Guid>> handler,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
     {
-        var result = await handler.Handle(new DeleteClearanceCommand(id), cancellationToken);
+        var callerId = ExtractUserId(httpContext.User);
+        if (callerId is null) return Results.Unauthorized();
+
+        var command = new DeleteClearanceCommand(organizationId, callerId.Value, clearanceId);
+        var result = await handler.Handle(command, cancellationToken);
         return result.ToHttpResult(_ => Results.NoContent());
+    }
+
+    private static Guid? ExtractUserId(ClaimsPrincipal user)
+    {
+        var sub = user.FindFirstValue(JwtRegisteredClaimNames.Sub)
+               ?? user.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        return Guid.TryParse(sub, out var id) ? id : null;
     }
 }

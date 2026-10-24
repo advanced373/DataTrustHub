@@ -26,7 +26,9 @@ The access rules:
    - A **personal** data item is private to the user who uploaded it.
    - A **classified** data item is placed under one policy, at one **classification level**, from
      *Public* up to *Top Secret*.
-4. An admin gives a user a **clearance**: access to one policy, up to one classification level.
+4. An organization admin gives a member, guest or organization admin of the organization a
+   **clearance**: access to one of its policies, up to one classification level. An organization admin
+   never grants a clearance to themselves; another organization admin does.
 5. A user may read a classified data item only if they hold a clearance on its policy at that level or
    higher. The owner can always read their own data item.
 6. **Need-to-know:** being an admin does not give access to data. If you may not read a data item,
@@ -44,22 +46,26 @@ The rules are recorded in ADR-0011. The architecture that implements them is in 
 | Term | Meaning | In code |
 |---|---|---|
 | **User** | A person with an account. Their role is `User` or `Admin` | `User` |
-| **Admin** | A user who manages organizations, users and clearances; policies are now managed by organization admins. Admins have no automatic access to data (need-to-know). Under ADR-0014 this role becomes the *platform admin* | `User.Role` |
+| **Admin** | A user who manages organizations and users; policies and clearances are now managed by organization admins. Admins have no automatic access to data (need-to-know). Under ADR-0014 this role becomes the *platform admin* | `User.Role` |
 | **Platform admin** | A user with the `Admin` role. Under ADR-0014 they manage tenants only: create and delete organizations and appoint their first organization admin. Not to be confused with an organization admin | `UserRoles.Admin`, `User.IsAdmin` |
 | **Membership** | A user's membership in one organization, with a role there. A user can be a member of several organizations, with at most one membership in each | `Membership` |
 | **Membership role** | The role of a membership: member, guest or organization admin | `MembershipRole` |
 | **Member** | A membership role: holds clearances, reads and uploads data in the organization | `MembershipRole.Member` |
 | **Guest** | A membership role for an external person, added explicitly. Works like a member, but never manages the organization. The guest role is fixed: a guest never changes role, and no member or organization admin becomes a guest; the membership is ended and the person added again instead | `MembershipRole.Guest` |
-| **Organization admin** | A membership role that manages one organization: its members, policies and clearances (clearances from #95 step 3b). Write *OrgAdmin* in code only | `MembershipRole.OrgAdmin` |
+| **Organization admin** | A membership role that manages one organization: its members, policies and clearances. Write *OrgAdmin* in code only | `MembershipRole.OrgAdmin` |
 | **Appoint an organization admin** | The platform admin makes a user the first organization admin of one organization: a new membership, or a member's role changed. Only the first one: when the organization already has an organization admin, its own admins appoint the others, by changing a member's role. The platform admin never appoints themselves, and a guest cannot be appointed (the guest role is fixed). It gives the platform admin no access to the organization | `AppointOrganizationAdmin`, `Membership.AppointOrgAdmin` |
 | **Add a member** | An organization admin adds a user to their organization as a member or a guest. A user already in the organization cannot be added again | `AddMember`, `Membership.AddMember`, `Membership.AddGuest` |
 | **Change a member's role** | An organization admin makes a member an organization admin, or an organization admin a member; this is how further organization admins are appointed. The guest role is fixed, and the last organization admin cannot be demoted | `ChangeMemberRole`, `Membership.ChangeRole` |
 | **Remove a member** | An organization admin ends another user's membership in their organization. It revokes the user's clearances on the organization's policies. The last organization admin cannot be removed | `RemoveMember` |
 | **Leave an organization** | A member, guest or organization admin ends their own membership. It revokes their clearances on the organization's policies. The last organization admin cannot leave | `LeaveOrganization` |
+| **My organizations** | The organizations the signed-in user belongs to, each with the role of their membership there. A user sees only their own memberships | `ListMyOrganizations` |
+| **Find a user by email** | An organization admin looks up a user by their exact email address, to add them as a member or guest. Only an exact match: an organization admin can confirm an address they already know, but cannot list or search the users of the platform. The answer says whether the user already has a membership in the organization, and its role | `FindUserByEmail` |
 | **Organization** | A tenant: the company that policies, clearances and classified data belong to. The word is never *group*. The old *Group* names in the API and the UI are being renamed (#91) | `Organization` |
 | **Policy** | A named area of access inside one organization. Every classified data item belongs to one policy | `Policy` |
 | **Classification level** | A named sensitivity level with a priority: Public (0), Internal, Confidential, Secret, Top Secret (4) | `ClassificationLevel` |
 | **Clearance** | Grants a user access to one policy at one classification level, and to every level below it | `Clearance`, `Clearance.Allows` |
+| **Grant a clearance** | An organization admin gives a clearance on one of the organization's policies to a member, guest or organization admin of that organization. Never to themselves: another organization admin of the organization must grant it (four-eyes). A user holds at most one clearance per policy | `CreateClearance`, `Clearance.Grant` |
+| **Revoke a clearance** | An organization admin removes a clearance on one of the organization's policies. Revoking their own clearance is allowed, because it only removes access. Ending a membership also revokes the user's clearances there | `DeleteClearance` |
 | **Data item** | A stored file. Today it is always a document | `DataItem` |
 | **Owner** | The user who uploaded a data item. Don't use *uploader* in code | `DataItem.OwnerUserId` |
 | **Personal data item** | A data item with no policy, readable by its owner only. Its marking is `UNCLASSIFIED` | `DataItem.CreatePersonal` |

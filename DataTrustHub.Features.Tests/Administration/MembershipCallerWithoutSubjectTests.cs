@@ -6,7 +6,7 @@ using static DataTrustHub.Features.Tests.Administration.Helpers.MembershipSetup;
 
 namespace DataTrustHub.Features.Tests.Administration;
 
-// AC1 and AC5 of #95 step 2a, AC8 of step 2b, AC1 of step 3a (policies): the caller id comes from the JWT sub claim; an authenticated caller without one
+// AC1 and AC5 of #95 step 2a, AC8 of step 2b, AC1 of steps 3a (policies) and 3b (clearances), AC1 and AC2 of step 5a (organization pages): the caller id comes from the JWT sub claim; an authenticated caller without one
 // gets 401 from the endpoint, even when they pass the route's role check
 public class MembershipCallerWithoutSubjectTests(NoSubjectApiFactory factory) : IClassFixture<NoSubjectApiFactory>
 {
@@ -122,6 +122,70 @@ public class MembershipCallerWithoutSubjectTests(NoSubjectApiFactory factory) : 
         var client = factory.CreateClient();
 
         var response = await client.DeleteAsync(PolicyEndpoint(Guid.NewGuid(), Guid.NewGuid()));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    // --- clearances (#95 step 3b) ---
+
+    [Fact]
+    public async Task CreateClearance_CallerWithoutSubject_Returns401()
+    {
+        var client = factory.CreateClient();
+
+        var response = await PostClearanceAsync(client, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ListClearances_CallerWithoutSubject_Returns401()
+    {
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync(ClearancesEndpoint(Guid.NewGuid()));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetClearance_CallerWithoutSubject_Returns401()
+    {
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync(ClearanceEndpoint(Guid.NewGuid(), Guid.NewGuid()));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteClearance_CallerWithoutSubject_Returns401()
+    {
+        var client = factory.CreateClient();
+
+        var response = await client.DeleteAsync(ClearanceEndpoint(Guid.NewGuid(), Guid.NewGuid()));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    // --- organization pages (#95 step 5a) ---
+
+    [Fact]
+    public async Task ListMyOrganizations_CallerWithoutSubject_Returns401()
+    {
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync(MyOrganizationsEndpoint);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task FindUserByEmail_CallerWithoutSubject_Returns401()
+    {
+        var client = factory.CreateClient();
+
+        var response = await PostFindUserByEmailAsync(client, Guid.NewGuid(), "nosubject_target@example.com");
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }

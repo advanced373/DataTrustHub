@@ -1,4 +1,5 @@
 using DataTrustHub.Domain.Memberships;
+using DataTrustHub.Domain.Users;
 using DataTrustHub.Features.Administration.CreateAccount;
 using DataTrustHub.Features.Administration.CreateClearance;
 using DataTrustHub.Features.Administration.DeleteAccount;
@@ -26,6 +27,10 @@ public class AccountClearanceCommandHandlerTests
     private readonly FakeMembershipRepository _memberships = new();
     private readonly FakePasswordHasher _hasher = new();
     private readonly CountingUnitOfWork _unitOfWork = new();
+
+    // The clearance commands run for an organization admin of the organization (#95 step 3b, C6)
+    private static readonly Guid OrganizationId = Guid.NewGuid();
+    private readonly Guid _callerId = Guid.NewGuid();
 
     // --- CreateAccount ---
 
@@ -148,13 +153,13 @@ public class AccountClearanceCommandHandlerTests
         Assert.Equal(0, _unitOfWork.SaveChangesCalls);
     }
 
-    // --- CreateClearance ---
+    // --- CreateClearance (since #95 step 3b: an organization admin grants on a policy of their organization) ---
 
     [Fact]
     public async Task CreateClearance_KnownUserAndPolicy_AddsClearanceAndCommitsOnce()
     {
-        var user = _users.Seed(Email);
-        var policy = _policies.Seed("Handler policy", Guid.NewGuid());
+        var user = SeedMemberUser();
+        var policy = _policies.Seed("Handler policy", OrganizationId);
 
         var result = await CreateClearanceHandler().Handle(ClearanceCommand(user.Id, policy.Id), default);
 
@@ -166,13 +171,13 @@ public class AccountClearanceCommandHandlerTests
         Assert.Equal(1, _unitOfWork.SaveChangesCalls);
     }
 
-    // Both user and policy are unknown: the user check must win
+    // Both user and policy are unknown: since #95 step 3b the policy check comes first (AC2 order)
     [Fact]
-    public async Task CreateClearance_UnknownUserAndPolicy_ReportsUserFirst()
+    public async Task CreateClearance_UnknownUserAndPolicy_ReportsPolicyFirst()
     {
         var result = await CreateClearanceHandler().Handle(ClearanceCommand(Guid.NewGuid(), Guid.NewGuid()), default);
 
-        AssertClearanceNotCreated(result, AdminErrorCodes.ClearanceUserNotFound);
+        AssertClearanceNotCreated(result, AdminErrorCodes.ClearancePolicyNotFound);
     }
 
     // The user is unknown but a clearance already links the ids: the user check must still win
@@ -180,7 +185,7 @@ public class AccountClearanceCommandHandlerTests
     public async Task CreateClearance_UnknownUserAlreadyGranted_ReportsUserFirst()
     {
         var unknownUserId = Guid.NewGuid();
-        var policy = _policies.Seed("Handler policy", Guid.NewGuid());
+        var policy = _policies.Seed("Handler policy", OrganizationId);
         _clearances.Seed(unknownUserId, policy.Id);
 
         var result = await CreateClearanceHandler().Handle(ClearanceCommand(unknownUserId, policy.Id), default);
@@ -192,7 +197,7 @@ public class AccountClearanceCommandHandlerTests
     [Fact]
     public async Task CreateClearance_UnknownPolicyAlreadyGranted_ReportsPolicyBeforeGranted()
     {
-        var user = _users.Seed(Email);
+        var user = SeedMemberUser();
         var unknownPolicyId = Guid.NewGuid();
         _clearances.Seed(user.Id, unknownPolicyId);
 
@@ -204,8 +209,8 @@ public class AccountClearanceCommandHandlerTests
     [Fact]
     public async Task CreateClearance_AlreadyGranted_FailsWithoutCommit()
     {
-        var user = _users.Seed(Email);
-        var policy = _policies.Seed("Handler policy", Guid.NewGuid());
+        var user = SeedMemberUser();
+        var policy = _policies.Seed("Handler policy", OrganizationId);
         _clearances.Seed(user.Id, policy.Id);
 
         var result = await CreateClearanceHandler().Handle(ClearanceCommand(user.Id, policy.Id), default);
@@ -218,9 +223,10 @@ public class AccountClearanceCommandHandlerTests
     [Fact]
     public async Task DeleteClearance_Existing_RemovesClearanceAndCommitsOnce()
     {
-        var clearance = _clearances.Seed(Guid.NewGuid(), Guid.NewGuid());
+        var policy = _policies.Seed("Handler policy", OrganizationId);
+        var clearance = _clearances.Seed(Guid.NewGuid(), policy.Id);
 
-        var result = await DeleteClearanceHandler().Handle(new DeleteClearanceCommand(clearance.Id), default);
+        var result = await DeleteClearanceHandler().Handle(DeleteCommand(clearance.Id), default);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(clearance.Id, Assert.Single(_clearances.Removed).Id);
@@ -230,7 +236,7 @@ public class AccountClearanceCommandHandlerTests
     [Fact]
     public async Task DeleteClearance_Unknown_FailsWithoutCommit()
     {
-        var result = await DeleteClearanceHandler().Handle(new DeleteClearanceCommand(Guid.NewGuid()), default);
+        var result = await DeleteClearanceHandler().Handle(DeleteCommand(Guid.NewGuid()), default);
 
         Assert.Equal(AdminErrorCodes.ClearanceNotFound, result.Error.Code);
         Assert.Empty(_clearances.Removed);
@@ -239,8 +245,18 @@ public class AccountClearanceCommandHandlerTests
 
     // --- helpers ---
 
-    private static CreateClearanceCommand ClearanceCommand(Guid userId, Guid policyId) =>
-        new(userId, policyId, ClearanceName, LevelName, LevelPriority);
+    private CreateClearanceCommand ClearanceCommand(Guid userId, Guid policyId) =>
+        new(OrganizationId, _callerId, userId, policyId, ClearanceName, LevelName, LevelPriority);
+
+    private DeleteClearanceCommand DeleteCommand(Guid clearanceId) => new(OrganizationId, _callerId, clearanceId);
+
+    // A registered user with a membership in the organization (C5)
+    private User SeedMemberUser()
+    {
+        var user = _users.Seed(Email);
+        _memberships.Seed(Membership.AddMember(user.Id, OrganizationId));
+        return user;
+    }
 
     private void AssertNothingStagedForAccountDelete()
     {
@@ -262,7 +278,17 @@ public class AccountClearanceCommandHandlerTests
 
     private DeleteAccountHandler DeleteAccountHandler() => new(_users, _clearances, _dataItems, _memberships, _unitOfWork);
 
-    private CreateClearanceHandler CreateClearanceHandler() => new(_users, _policies, _clearances, _unitOfWork);
+    private CreateClearanceHandler CreateClearanceHandler()
+    {
+        SeedCallerAsOrgAdmin();
+        return new(_memberships, _users, _policies, _clearances, _unitOfWork);
+    }
 
-    private DeleteClearanceHandler DeleteClearanceHandler() => new(_clearances, _unitOfWork);
+    private DeleteClearanceHandler DeleteClearanceHandler()
+    {
+        SeedCallerAsOrgAdmin();
+        return new(_memberships, _policies, _clearances, _unitOfWork);
+    }
+
+    private void SeedCallerAsOrgAdmin() => _memberships.Seed(Membership.AppointOrgAdmin(_callerId, OrganizationId));
 }

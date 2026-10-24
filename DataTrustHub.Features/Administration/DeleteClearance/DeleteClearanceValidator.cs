@@ -6,6 +6,8 @@ internal class DeleteClearanceValidator : AbstractValidator<DeleteClearanceComma
 {
     public DeleteClearanceValidator()
     {
+        RuleFor(x => x.OrganizationId).NotEmpty();
+        RuleFor(x => x.CallerId).NotEmpty();
         RuleFor(x => x.ClearanceId).NotEmpty();
     }
 }

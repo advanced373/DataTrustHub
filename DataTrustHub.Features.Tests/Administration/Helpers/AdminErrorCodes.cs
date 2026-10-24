@@ -16,6 +16,8 @@ internal static class AdminErrorCodes
     internal const string ClearancePolicyNotFound = "Clearance.PolicyNotFound";
     internal const string ClearanceAlreadyGranted = "Clearance.AlreadyGranted";
     internal const string ClearanceNotFound = "Clearance.NotFound";
+    internal const string ClearanceUserNotMember = "Clearance.UserNotMember";
+    internal const string ClearanceCannotGrantSelf = "Clearance.CannotGrantSelf";
     internal const string MembershipUserNotFound = "Membership.UserNotFound";
     internal const string MembershipAlreadyMember = "Membership.AlreadyMember";
     internal const string MembershipGuestRoleIsFixed = "Membership.GuestRoleIsFixed";
@@ -24,6 +26,7 @@ internal static class AdminErrorCodes
     internal const string MembershipNotFound = "Membership.NotFound";
     internal const string MembershipLastOrgAdmin = "Membership.LastOrgAdmin";
     internal const string MembershipUnknownRole = "Membership.UnknownRole";
+    internal const string UserNotFound = "User.NotFound";
     internal const string ValidationGeneral = "Validation.General";
 }
 
@@ -42,6 +45,9 @@ internal static class AdminErrorMessages
     internal const string ClearancePolicyNotFound = "The specified policy does not exist.";
     internal const string ClearanceAlreadyGranted = "The user already has a clearance for this policy.";
     internal const string ClearanceNotFound = "The clearance was not found.";
+    internal const string ClearanceUserNotMember = "The user is not a member or guest of this organization.";
+    internal const string ClearanceCannotGrantSelf =
+        "An organization admin cannot grant a clearance to themselves. Another organization admin must grant it.";
     internal const string MembershipUserNotFound = "The specified user does not exist.";
     internal const string MembershipAlreadyMember = "The user is already a member of this organization.";
     internal const string MembershipCannotAppointSelf = "You cannot appoint yourself as organization admin.";
@@ -49,5 +55,6 @@ internal static class AdminErrorMessages
     internal const string MembershipGuestRoleIsFixed = "A guest stays a guest. End the membership and add the person again to change it.";
     internal const string MembershipNotFound = "The user is not a member of this organization.";
     internal const string MembershipLastOrgAdmin = "The organization must keep at least one organization admin. Appoint another one first.";
+    internal const string UserNotFound = "No user has this email address.";
     internal const string ValidationGeneral = "One or more validation errors occurred";
 }

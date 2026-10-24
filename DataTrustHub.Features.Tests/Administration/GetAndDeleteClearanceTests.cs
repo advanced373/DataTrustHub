@@ -1,57 +1,83 @@
 using System.Net;
 using System.Net.Http.Json;
+using DataTrustHub.Domain.Memberships;
 using DataTrustHub.Features.Tests.Administration.Helpers;
 using DataTrustHub.Features.Tests.Helpers;
 using DataTrustHub.Infrastructure.Persistance;
-using DataTrustHub.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 using static DataTrustHub.Features.Tests.Administration.Helpers.AdminSetup;
+using static DataTrustHub.Features.Tests.Administration.Helpers.ClearanceSetup;
+using static DataTrustHub.Features.Tests.Administration.Helpers.MembershipSetup;
 
 namespace DataTrustHub.Features.Tests.Administration;
 
+// AC4 of #95 step 3b (ADR-0014, C6): an organization admin reads and revokes the clearances on the policies of
+// their organization; a clearance that is missing or on a policy of another organization is not found.
+// Who may call (AC1) is covered in ClearanceAccessTests.
 public class GetAndDeleteClearanceTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
     [Fact]
     public async Task GetClearance_Existing_ReturnsIt()
     {
-        var (admin, userId) = await CreateAdminAndUserAsync("clearance_get");
-        var policyId = await CreatePolicyAsync(factory, admin, "Clearance get policy");
-        var clearanceId = await CreateClearanceAsync(admin, userId, policyId);
+        var grant = await CreateGrantScenarioAsync(factory, "clearance_get");
+        var clearanceId = await CreateClearanceAsync(grant.OrgAdmin, grant.OrganizationId, grant.MemberId, grant.PolicyId);
 
-        var clearance = await admin.GetFromJsonAsync<ClearanceResponse>($"{ClearancesEndpoint}/{clearanceId}");
+        var clearance = await grant.OrgAdmin.GetFromJsonAsync<ClearanceResponse>(ClearanceEndpoint(grant.OrganizationId, clearanceId));
 
-        Assert.Equal((clearanceId, userId, policyId), (clearance!.Id, clearance.UserId, clearance.PolicyId));
+        Assert.Equal(
+            new ClearanceResponse(
+                clearanceId, $"{DefaultLevelName} clearance", grant.MemberId, grant.PolicyId, DefaultLevelName, DefaultLevelPriority),
+            clearance);
     }
 
     [Fact]
-    public async Task GetAndDeleteClearance_Missing_Return404()
+    public async Task GetAndDeleteClearance_Missing_Return404ClearanceNotFound()
     {
-        var (admin, _) = await CreateAdminAndUserAsync("clearance_missing");
-        var missingRoute = $"{ClearancesEndpoint}/{Guid.NewGuid()}";
+        var grant = await CreateGrantScenarioAsync(factory, "clearance_missing");
+        var missingRoute = ClearanceEndpoint(grant.OrganizationId, Guid.NewGuid());
 
-        Assert.Equal(HttpStatusCode.NotFound, (await admin.GetAsync(missingRoute)).StatusCode);
-        await ErrorAssert.HasErrorAsync(
-            await admin.DeleteAsync(missingRoute), HttpStatusCode.NotFound,
-            AdminErrorCodes.ClearanceNotFound, AdminErrorMessages.ClearanceNotFound);
+        await AssertClearanceNotFoundAsync(await grant.OrgAdmin.GetAsync(missingRoute));
+        await AssertClearanceNotFoundAsync(await grant.OrgAdmin.DeleteAsync(missingRoute));
+    }
+
+    // The caller is an organization admin of both organizations, so only the scope of the route can refuse
+    [Fact]
+    public async Task GetClearance_ClearanceOfAnotherOrganizationThroughMyRoute_Returns404ClearanceNotFound()
+    {
+        var (grant, foreignClearanceId) = await ArrangeForeignClearanceAsync("clearance_get_foreign");
+
+        var response = await grant.OrgAdmin.GetAsync(ClearanceEndpoint(grant.OrganizationId, foreignClearanceId));
+
+        await AssertClearanceNotFoundAsync(response);
+    }
+
+    [Fact]
+    public async Task DeleteClearance_ClearanceOfAnotherOrganizationThroughMyRoute_Returns404AndKeepsIt()
+    {
+        var (grant, foreignClearanceId) = await ArrangeForeignClearanceAsync("clearance_delete_foreign");
+
+        var response = await grant.OrgAdmin.DeleteAsync(ClearanceEndpoint(grant.OrganizationId, foreignClearanceId));
+
+        await AssertClearanceNotFoundAsync(response);
+        Assert.Contains(await StoredClearancesAsync(factory), c => c.Id == foreignClearanceId);
     }
 
     [Fact]
     public async Task DeleteClearance_Existing_Returns204_AndUnblocksPolicyDeletion()
     {
-        var (admin, userId) = await CreateAdminAndUserAsync("clearance_delete");
-        var (organizationId, orgAdmin) = await CreateOrganizationWithOrgAdminAsync(factory, admin, "Clearance delete organization");
-        var policyId = await CreatePolicyAsync(orgAdmin, "Clearance delete policy", organizationId);
-        var clearanceId = await CreateClearanceAsync(admin, userId, policyId);
-        var blocked = await orgAdmin.DeleteAsync(PolicyEndpoint(organizationId, policyId));
+        var grant = await CreateGrantScenarioAsync(factory, "clearance_delete");
+        var clearanceId = await CreateClearanceAsync(grant.OrgAdmin, grant.OrganizationId, grant.MemberId, grant.PolicyId);
+        var policyRoute = PolicyEndpoint(grant.OrganizationId, grant.PolicyId);
+        var blocked = await grant.OrgAdmin.DeleteAsync(policyRoute);
 
-        var response = await admin.DeleteAsync($"{ClearancesEndpoint}/{clearanceId}");
+        var response = await grant.OrgAdmin.DeleteAsync(ClearanceEndpoint(grant.OrganizationId, clearanceId));
 
         Assert.Equal(HttpStatusCode.Conflict, blocked.StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await admin.GetAsync($"{ClearancesEndpoint}/{clearanceId}")).StatusCode);
-        Assert.Equal(HttpStatusCode.NoContent, (await orgAdmin.DeleteAsync(PolicyEndpoint(organizationId, policyId))).StatusCode);
+        await AssertClearanceNotFoundAsync(await grant.OrgAdmin.GetAsync(ClearanceEndpoint(grant.OrganizationId, clearanceId)));
+        Assert.Equal(HttpStatusCode.NoContent, (await grant.OrgAdmin.DeleteAsync(policyRoute)).StatusCode);
     }
 
     [Fact]
@@ -59,12 +85,11 @@ public class GetAndDeleteClearanceTests(ApiFactory factory) : IClassFixture<ApiF
     {
         const string levelName = "KeptAfterDelete";
         const int levelPriority = 9;
-        var (admin, userId) = await CreateAdminAndUserAsync("clearance_keep_level");
-        var policyId = await CreatePolicyAsync(factory, admin, "Clearance keep level policy");
-        var created = await PostClearanceAsync(admin, userId, policyId, levelName, levelPriority);
-        var clearanceId = (await created.Content.ReadFromJsonAsync<CreateClearanceResponse>())!.ClearanceId;
+        var grant = await CreateGrantScenarioAsync(factory, "clearance_keep_level");
+        var clearanceId = await CreateClearanceAsync(
+            grant.OrgAdmin, grant.OrganizationId, grant.MemberId, grant.PolicyId, levelName, levelPriority);
 
-        var response = await admin.DeleteAsync($"{ClearancesEndpoint}/{clearanceId}");
+        var response = await grant.OrgAdmin.DeleteAsync(ClearanceEndpoint(grant.OrganizationId, clearanceId));
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
         using var scope = factory.Services.CreateScope();
@@ -73,34 +98,49 @@ public class GetAndDeleteClearanceTests(ApiFactory factory) : IClassFixture<ApiF
         Assert.True(await db.ClassificationLevels.AnyAsync(l => l.Name == levelName && l.Priority == levelPriority));
     }
 
+    // Revoking one's own clearance only removes access (ADR-0014); it was granted by another organization admin (C8)
     [Fact]
-    public async Task DeleteClearance_Anonymous_Returns401()
+    public async Task DeleteClearance_OwnClearance_Returns204AndRemovesIt()
     {
-        var anonymous = factory.CreateClient();
+        var grant = await CreateGrantScenarioAsync(factory, "clearance_delete_own");
+        var (second, _) = await OrganizationCallers.AddSecondOrgAdminAsync(factory, grant.Organization, "clearance_delete_own_second");
+        var ownClearanceId = await CreateClearanceAsync(second, grant.OrganizationId, grant.Organization.OrgAdminId, grant.PolicyId);
 
-        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.DeleteAsync($"{ClearancesEndpoint}/{Guid.NewGuid()}")).StatusCode);
+        var response = await grant.OrgAdmin.DeleteAsync(ClearanceEndpoint(grant.OrganizationId, ownClearanceId));
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.DoesNotContain(await StoredClearancesAsync(factory), c => c.Id == ownClearanceId);
     }
 
+    // Another organization admin of the same organization reads and revokes a clearance they did not grant
     [Fact]
-    public async Task ClearanceEndpoints_RegularUser_Return403()
+    public async Task GetAndDeleteClearance_ByAnotherOrgAdminOfTheOrganization_Succeed()
     {
-        var user = await TestUsers.CreateClientAsync(factory, "clearance_get_regular@example.com");
-        var route = $"{ClearancesEndpoint}/{Guid.NewGuid()}";
+        var grant = await CreateGrantScenarioAsync(factory, "clearance_other_admin");
+        var (second, _) = await OrganizationCallers.AddSecondOrgAdminAsync(factory, grant.Organization, "clearance_other_admin_second");
+        var clearanceId = await CreateClearanceAsync(grant.OrgAdmin, grant.OrganizationId, grant.MemberId, grant.PolicyId);
+        var route = ClearanceEndpoint(grant.OrganizationId, clearanceId);
 
-        Assert.Equal(HttpStatusCode.Forbidden, (await user.GetAsync(route)).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await user.DeleteAsync(route)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await second.GetAsync(route)).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await second.DeleteAsync(route)).StatusCode);
     }
 
     // --- helpers ---
 
-    private async Task<(HttpClient Admin, Guid UserId)> CreateAdminAndUserAsync(string prefix)
+    // The caller is organization admin of the scenario's organization and of another one, where the member holds a clearance
+    private async Task<(GrantScenario Grant, Guid ForeignClearanceId)> ArrangeForeignClearanceAsync(string prefix)
     {
-        var admin = await TestUsers.CreateClientAsync(factory, $"{prefix}_admin@example.com", UserRoles.Admin);
-        await TestUsers.CreateClientAsync(factory, $"{prefix}_user@example.com");
-        return (admin, await TestUsers.GetIdAsync(factory, $"{prefix}_user@example.com"));
+        var grant = await CreateGrantScenarioAsync(factory, prefix);
+        var other = await CreateOrganizationWithOrgAdminAsync(factory, $"{prefix}_other");
+        var foreignPolicyId = await CreatePolicyAsync(other.OrgAdmin, $"{prefix} other policy", other.OrganizationId);
+        var foreignClearanceId = await AddMemberAndGrantClearanceAsync(
+            other.OrgAdmin, other.OrganizationId, grant.MemberId, foreignPolicyId, DefaultLevelName, DefaultLevelPriority);
+        await SeedMembershipAsync(factory, Membership.AppointOrgAdmin(grant.Organization.OrgAdminId, other.OrganizationId));
+        return (grant, foreignClearanceId);
     }
 
-    private record CreateClearanceResponse(Guid ClearanceId);
+    private static Task AssertClearanceNotFoundAsync(HttpResponseMessage response) =>
+        ErrorAssert.HasErrorAsync(response, HttpStatusCode.NotFound, AdminErrorCodes.ClearanceNotFound, AdminErrorMessages.ClearanceNotFound);
 
     private record ClearanceResponse(
         Guid Id, string Name, Guid UserId, Guid PolicyId, string ClassificationLevelName, int ClassificationLevelPriority);

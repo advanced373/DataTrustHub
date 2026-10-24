@@ -6,7 +6,8 @@ namespace DataTrustHub.Domain.DataItems;
 // A stored file. Personal items have no policy and only their owner reads them; classified items
 // belong to a policy and a level, and are read only by holders of a clearance on that policy at or
 // above the level. The owner has no special right on a classified item (ADR-0014, D3'). The SQL form
-// of the read rule lives in the read side; a test keeps both forms in line (ADR-0012).
+// of the read rule lives in the read side; a test keeps both forms in line (ADR-0012). The delete rule
+// (D5') also has an SQL form in the read side, for the list's "can delete" flag.
 public sealed class DataItem
 {
     public const string PersonalMarking = "UNCLASSIFIED";
@@ -84,12 +85,23 @@ public sealed class DataItem
         return userClearances.Any(c => c.UserId == userId && c.Allows(policyId, ClassificationPriority!.Value));
     }
 
-    // Only the owner deletes; anyone else, or a second delete, sees "not found" so nothing is revealed
-    public Result MarkDeleted(Guid requesterId)
+    // Anyone without the right to delete, or a second delete, sees "not found" so nothing is revealed (D5')
+    public Result MarkDeleted(Guid requesterId, DeletionRights requesterRights)
     {
-        if (IsDeleted || requesterId != OwnerUserId) return Result.Failure(DataItemErrors.NotFound);
+        if (IsDeleted || !IsDeletableBy(requesterId, requesterRights)) return Result.Failure(DataItemErrors.NotFound);
 
         IsDeleted = true;
         return Result.Success();
+    }
+
+    // A personal item is deleted by its owner only. A classified item belongs to its organization: its
+    // owner deletes it while a member there (any role), and an organization admin there deletes it even
+    // without being able to read it. With no organization left (policy gone), only its owner may
+    private bool IsDeletableBy(Guid requesterId, DeletionRights requesterRights)
+    {
+        var isOwner = requesterId == OwnerUserId;
+        if (!IsClassified || !requesterRights.ItsOrganizationExists) return isOwner;
+
+        return (isOwner && requesterRights.IsMemberOfItsOrganization) || requesterRights.IsOrgAdminOfItsOrganization;
     }
 }

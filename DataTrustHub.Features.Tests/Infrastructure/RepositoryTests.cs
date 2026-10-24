@@ -90,7 +90,7 @@ public class RepositoryTests(ApiFactory factory) : IClassFixture<ApiFactory>
         await InScopeAsync<IDataItemRepository>(async (repo, uow) =>
         {
             var stored = (await repo.GetByIdAsync(item.Id, default))!;
-            stored.MarkDeleted(owner);
+            stored.MarkDeleted(owner, DeletionRights.WithoutOrganization);
             await repo.UpdateAsync(stored, default);
             await uow.SaveChangesAsync(default);
         });

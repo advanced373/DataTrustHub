@@ -17,6 +17,7 @@ public class ListDataItemsHandler(DContext db)
         ListDataItemsQuery query,
         CancellationToken cancellationToken)
     {
+        var deletable = _db.DataItems.DeletableBy(_db, query.RequesterId);
         var items = await (
                 from item in _db.DataItems.AsNoTracking().VisibleTo(_db, query.RequesterId)
                 join owner in _db.Users on item.OwnerUserId equals owner.Id into owners
@@ -33,7 +34,8 @@ public class ListDataItemsHandler(DContext db)
                     item.PolicyId,
                     policy == null ? null : policy.Name,
                     owner == null ? null : owner.Email,
-                    item.OwnerUserId == query.RequesterId))
+                    item.OwnerUserId == query.RequesterId,
+                    deletable.Any(candidate => candidate.Id == item.Id)))
             .ToListAsync(cancellationToken);
 
         return Result.Success<IReadOnlyList<DataItemSummary>>(items);

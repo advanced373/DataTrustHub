@@ -27,7 +27,8 @@ internal sealed record UserCreatedResponse(Guid UserId);
 
 internal sealed record DataItemCreatedResponse(Guid DataItemId);
 
-// A data item the user may read; policy fields are null for a personal item
+// A data item the user may read; policy fields are null for a personal item. CanDelete says whether the
+// user may delete it (D5'), IsOwner whether they uploaded it
 public sealed record DataItemResponse(
     Guid Id,
     string Name,
@@ -37,7 +38,8 @@ public sealed record DataItemResponse(
     Guid? PolicyId,
     string? PolicyName,
     string? OwnerEmail,
-    bool IsOwner);
+    bool IsOwner,
+    bool CanDelete);
 
 // What the user may classify an upload as: all levels, and the policies they are cleared on
 public sealed record ClassificationOptionsResponse(

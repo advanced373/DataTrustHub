@@ -73,6 +73,7 @@ architecture that implements them is in ADR-0012 and [the architecture overview]
 | **Classified data item** | A data item with a policy and a classification level | `DataItem.CreateClassified` |
 | **Security marking** | The label shown on a data item, e.g. `SECRET` | `DataItem.SecurityMarking` |
 | **Read rule** | A user may read a classified data item only if they hold a clearance on its policy at or above its level; its owner has no special right on it. A personal data item is read by its owner only. A deleted data item is read by no one (ADR-0014, D3′) | `DataItem.IsReadableBy` |
+| **Delete rule** | A personal data item is deleted by its owner only. A classified data item belongs to its organization (its policy's organization): it is deleted by its owner while they are a member there (any role), or by an organization admin there, even one who cannot read it. A classified data item whose policy no longer exists is deleted by its owner only (ADR-0014, D5′) | `DataItem.MarkDeleted`, `DeletionRights` |
 | **Need-to-know** | An admin cannot bypass the read rule. A data item the user may not read answers 404, so its existence is not revealed | — |
 
 ## Building blocks (DDD / Clean Architecture)
@@ -87,7 +88,7 @@ These are the words for how the code is structured (ADR-0012).
 | **Presentation layer** | `DataTrustHub.API` (Carter endpoints) and the WebApp |
 | **Entity** | A domain object with an identity and behaviour: `User`, `Organization`, `Policy`, `Clearance`, `Membership`, `DataItem` |
 | **Aggregate root** | An entity that is loaded and saved as a whole, through its own repository. Today every entity is its own aggregate root |
-| **Value object** | An immutable object defined by its values: `ClassificationLevel`, `MembershipRole` |
+| **Value object** | An immutable object defined by its values: `ClassificationLevel`, `MembershipRole`, `DeletionRights` |
 | **Invariant / business rule** | A rule that must always hold. A rule of one aggregate lives in an entity method (`IsReadableBy`, `MarkDeleted`, `CheckCanBeDeletedBy`). A rule that needs other aggregates or the whole set (uniqueness, references, deletion guards) is checked in the use case through repositories. Never in validators. The full list is in [aggregates.md](aggregates.md) |
 | **Factory method** | The only way to create a new entity. It applies the entity's rules: `User.Register`, `Policy.Create`, `Clearance.Grant`, `DataItem.CreateClassified` |
 | **Rehydration** | Rebuilding a stored entity without running its creation rules, through an `internal` constructor that only the persistence mappers can see |

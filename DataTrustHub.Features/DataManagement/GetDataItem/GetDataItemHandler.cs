@@ -16,6 +16,7 @@ public class GetDataItemHandler(DContext db) : IQueryHandler<GetDataItemQuery, R
         GetDataItemQuery query,
         CancellationToken cancellationToken)
     {
+        var deletable = _db.DataItems.DeletableBy(_db, query.RequesterId);
         var item = await (
                 from candidate in _db.DataItems.AsNoTracking().VisibleTo(_db, query.RequesterId)
                 where candidate.Id == query.DataItemId
@@ -29,7 +30,8 @@ public class GetDataItemHandler(DContext db) : IQueryHandler<GetDataItemQuery, R
                     candidate.Content,
                     candidate.ClassificationPriority,
                     policy == null ? null : policy.Name,
-                    candidate.OwnerUserId == query.RequesterId))
+                    candidate.OwnerUserId == query.RequesterId,
+                    deletable.Any(other => other.Id == candidate.Id)))
             .FirstOrDefaultAsync(cancellationToken);
 
         return item is null

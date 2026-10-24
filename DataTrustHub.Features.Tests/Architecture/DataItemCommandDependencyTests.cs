@@ -1,6 +1,8 @@
 using DataTrustHub.Domain.Abstractions;
 using DataTrustHub.Domain.Clearances;
 using DataTrustHub.Domain.DataItems;
+using DataTrustHub.Domain.Memberships;
+using DataTrustHub.Domain.Policies;
 using DataTrustHub.Domain.Users;
 using DataTrustHub.Features.DataManagement.AddDataItem;
 using DataTrustHub.Features.DataManagement.DeleteDataItem;
@@ -39,10 +41,12 @@ public class DataItemCommandDependencyTests
         Assert.Equal(expected.ToHashSet(), ConstructorDependencies(typeof(AddDataItemHandler)));
     }
 
+    // D5' (#95 step 4b): the use case also reads the item's policy and the requester's membership there
     [Fact]
-    public void DeleteDataItemHandler_DependsOnlyOnRepositoryAndUnitOfWork()
+    public void DeleteDataItemHandler_DependsOnlyOnRepositoriesAndUnitOfWork()
     {
-        Type[] expected = [typeof(IDataItemRepository), typeof(IUnitOfWork)];
+        Type[] expected =
+            [typeof(IDataItemRepository), typeof(IPolicyRepository), typeof(IMembershipRepository), typeof(IUnitOfWork)];
 
         Assert.Equal(expected.ToHashSet(), ConstructorDependencies(typeof(DeleteDataItemHandler)));
     }

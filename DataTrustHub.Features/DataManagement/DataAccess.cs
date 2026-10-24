@@ -1,3 +1,4 @@
+using DataTrustHub.Domain.Memberships;
 using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.Infrastructure.Persistance.Model;
 
@@ -17,4 +18,26 @@ public static class DataAccess
                     clearance.UserId == userId
                     && clearance.PolicyId == item.PolicyId
                     && clearance.ClassificationLevel.Priority >= item.ClassificationPriority)));
+
+    // The delete rule in its SQL form (ADR-0014, D5'), the same as DataItem.MarkDeleted: a personal item,
+    // or a classified one whose policy no longer exists, is deletable by its owner only; a classified item
+    // by its owner while a member (any role) of its policy's organization, or by an organization admin there
+    public static IQueryable<DbDataItem> DeletableBy(this IQueryable<DbDataItem> items, DContext db, Guid userId)
+    {
+        var orgAdminRole = MembershipRole.OrgAdmin.Name;
+
+        return items.Where(item => !item.IsDeleted
+            && ((item.OwnerUserId == userId
+                    && (item.PolicyId == null
+                        || !db.Policies.Any(policy => policy.Id == item.PolicyId)
+                        || db.Memberships.Any(membership =>
+                            membership.UserId == userId
+                            && db.Policies.Any(policy =>
+                                policy.Id == item.PolicyId && policy.OrganizationId == membership.OrganizationId))))
+                || db.Memberships.Any(membership =>
+                    membership.UserId == userId
+                    && membership.Role == orgAdminRole
+                    && db.Policies.Any(policy =>
+                        policy.Id == item.PolicyId && policy.OrganizationId == membership.OrganizationId))));
+    }
 }

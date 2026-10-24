@@ -47,7 +47,7 @@ else if (Model.Items.Count > 0)
                             <a class="btn btn-sm btn-outline-secondary" asp-action="Download" asp-route-id="@item.Id">
                                 <i class="bi bi-download"></i> Download
                             </a>
-                            @if (item.IsOwner)
+                            @if (item.CanDelete)
                             {
                                 <partial name="_DeleteButton" model="@(new DeleteButtonModel(item.Id, $"Delete \"{item.Name}\"? Nobody will be able to see it any more."))" />
                             }

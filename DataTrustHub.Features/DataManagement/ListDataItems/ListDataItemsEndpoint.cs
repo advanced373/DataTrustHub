@@ -10,7 +10,8 @@ using System.Security.Claims;
 
 namespace DataTrustHub.Features.DataManagement.ListDataItems;
 
-// Policy fields are null for a personal item; IsOwner tells the client whether it may delete the item
+// Policy fields are null for a personal item; CanDelete tells the client whether the requester may delete
+// the item (D5'), IsOwner whether they uploaded it
 public record DataItemSummary(
     Guid Id,
     string Name,
@@ -20,7 +21,8 @@ public record DataItemSummary(
     Guid? PolicyId,
     string? PolicyName,
     string? OwnerEmail,
-    bool IsOwner);
+    bool IsOwner,
+    bool CanDelete);
 
 public class ListDataItemsEndpoint : ICarterModule
 {

@@ -61,8 +61,8 @@ It will become a context, or a part of one, when it is designed.
 The audit trail (ADR-0016, #24) is not a context of its own: it crosses all of them. Every command of
 every context is recorded by `AuditCommandDecorator`, the outermost decorator of every command handler,
 as an `AuditRecord` (`Domain/Auditing`) appended through the `IAuditLog` port, in its own save. A record
-names users, organizations and targets by id only, without foreign keys, so it outlives them. Data
-access auditing comes in a next step of #24. The trail is read in Access Governance: an organization admin
+names users, organizations and targets by id only, without foreign keys, so it outlives them.
+`GetDataItem` records downloads and denied reads. The trail is read in Access Governance: an organization admin
 reads their organization's records, the platform admin the tenant-level actions (`AuditRecord`, A9, A10).
 
 ## Context map

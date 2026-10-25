@@ -1,0 +1,19 @@
+@using DataTrustHub.Controllers
+@model AuditTrailViewModel
+@{
+    ViewData["Title"] = "Audit trail";
+}
+
+<partial name="_AdminNav" model="@ControllerNames.Audit" />
+
+<h1 class="h3 mb-1">Audit trail</h1>
+<p class="text-muted mb-4">
+    The platform's own actions: organizations, organization admins, accounts, registration and sign-in. Times are in UTC.
+    Actions inside an organization are in that organization's audit trail.
+</p>
+
+<form method="get" asp-action="@nameof(AuditController.Index)">
+    <partial name="_AuditFilters" model="Model" />
+</form>
+
+<partial name="_AuditTable" model="Model" />

@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.AspNetCore.WebUtilities;
 
 namespace DataTrustHub.Services.Api;
@@ -20,6 +21,10 @@ public interface IAdminApiClient
 
     // The platform admin appoints an organization's first organization admin
     Task<ApiResult<Guid>> AppointOrganizationAdminAsync(Guid organizationId, Guid userId, CancellationToken cancellationToken);
+
+    // The tenant-level audit trail, newest first; only ids, action names and times go in the query string (ADR-0019)
+    Task<ApiResult<IReadOnlyList<AuditRecordResponse>>> ListAuditRecordsAsync(
+        AuditRecordFilter filter, CancellationToken cancellationToken);
 
     // Organization-scoped calls: any signed-in user may make them, the API checks the caller's membership
 
@@ -51,6 +56,10 @@ public interface IAdminApiClient
     Task<ApiResult<Guid>> GrantClearanceAsync(Guid organizationId, ClearanceGrant grant, CancellationToken cancellationToken);
 
     Task<ApiResult<bool>> RevokeClearanceAsync(Guid organizationId, Guid clearanceId, CancellationToken cancellationToken);
+
+    // The organization's audit trail, newest first; only ids, action names and times go in the query string (ADR-0019)
+    Task<ApiResult<IReadOnlyList<AuditRecordResponse>>> ListOrganizationAuditRecordsAsync(
+        Guid organizationId, AuditRecordFilter filter, CancellationToken cancellationToken);
 }
 
 internal sealed class AdminApiClient(HttpClient httpClient) : IAdminApiClient
@@ -97,6 +106,10 @@ internal sealed class AdminApiClient(HttpClient httpClient) : IAdminApiClient
 
         return result.Map(response => response.MembershipId);
     }
+
+    public Task<ApiResult<IReadOnlyList<AuditRecordResponse>>> ListAuditRecordsAsync(
+        AuditRecordFilter filter, CancellationToken cancellationToken) =>
+        GetAsync<IReadOnlyList<AuditRecordResponse>>(WithAuditFilter(ApiRoutes.AdminAuditRecords, filter), cancellationToken);
 
     // Organization-scoped calls (ADR-0014): the API answers 404 Organization.NotFound to a caller without
     // the needed membership in the organization
@@ -185,6 +198,26 @@ internal sealed class AdminApiClient(HttpClient httpClient) : IAdminApiClient
 
     public Task<ApiResult<bool>> RevokeClearanceAsync(Guid organizationId, Guid clearanceId, CancellationToken cancellationToken) =>
         DeleteAsync(string.Format(ApiRoutes.OrganizationClearance, organizationId, clearanceId), cancellationToken);
+
+    public Task<ApiResult<IReadOnlyList<AuditRecordResponse>>> ListOrganizationAuditRecordsAsync(
+        Guid organizationId, AuditRecordFilter filter, CancellationToken cancellationToken) =>
+        GetAsync<IReadOnlyList<AuditRecordResponse>>(
+            WithAuditFilter(string.Format(ApiRoutes.OrganizationAuditRecords, organizationId), filter),
+            cancellationToken);
+
+    // The filters that are set, as query parameters; times in the round-trip format, in UTC
+    private static string WithAuditFilter(string route, AuditRecordFilter filter)
+    {
+        var filters = new Dictionary<string, string?>
+        {
+            [ApiRoutes.UserIdParameter] = filter.UserId?.ToString(),
+            [ApiRoutes.ActionParameter] = filter.Action,
+            [ApiRoutes.FromParameter] = filter.From?.ToUniversalTime().ToString(ApiRoutes.TimeFormat, CultureInfo.InvariantCulture),
+            [ApiRoutes.ToParameter] = filter.To?.ToUniversalTime().ToString(ApiRoutes.TimeFormat, CultureInfo.InvariantCulture)
+        };
+
+        return QueryHelpers.AddQueryString(route, filters.Where(parameter => parameter.Value is not null));
+    }
 
     private Task<ApiResult<TResponse>> GetAsync<TResponse>(string route, CancellationToken cancellationToken) =>
         ApiRequest.SendAsync<TResponse>(token => httpClient.GetAsync(route, token), cancellationToken);

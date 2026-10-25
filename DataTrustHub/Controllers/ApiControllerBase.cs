@@ -47,6 +47,17 @@ public abstract class ApiControllerBase(IUserSessionService userSession) : Contr
         return View(model);
     }
 
+    // A list loaded with filters: the API's validation messages, such as a range that ends before it starts,
+    // are shown as form errors above the filters; any other failure is returned for the page's list error
+    protected string? ListErrorOf<T>(ApiResult<T> result)
+    {
+        if (result.IsSuccess) return null;
+        if (result.Details.Count == 0) return result.ErrorMessage;
+
+        AddApiErrors(result);
+        return null;
+    }
+
     // For actions without a form, such as deletes: the outcome is shown as an alert after the redirect
     protected async Task<IActionResult> RedirectWithOutcomeAsync<T>(
         ApiResult<T> result, string successMessage, string action, string controller, object? routeValues = null)

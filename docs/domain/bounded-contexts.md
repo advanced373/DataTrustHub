@@ -35,8 +35,8 @@ It is about who may see what: the structure of access.
 | | |
 |---|---|
 | **Owns** | `Organization`, `Policy`, `Clearance`, `Membership`, the value objects `ClassificationLevel` and `MembershipRole` |
-| **Use cases** | platform admin: create, list, get and delete organizations, appoint an organization's first organization admin; organization admin: create, list, get and delete the organization's policies, grant, list, get and revoke clearances on them, find a user by their exact email address, add a member or guest, list the members, change a member's role, remove a member; any user: list my organizations; any member or guest: leave an organization |
-| **Code today** | `Features/Administration` (`*Organization*` / `*Group*`, `*Policy*`, `*Clearance*`, `FindUserByEmail`, `AddMember`, `ListMembers`, `ListMyOrganizations`, `ChangeMemberRole`, `RemoveMember`, `LeaveOrganization`, `Authorization` for the organization admin check, and `MembershipRules` for M2 and C7) |
+| **Use cases** | platform admin: create, list, get and delete organizations, appoint an organization's first organization admin, read the tenant-level audit trail; organization admin: create, list, get and delete the organization's policies, grant, list, get and revoke clearances on them, find a user by their exact email address, add a member or guest, list the members, change a member's role, remove a member, read the organization's audit trail; any user: list my organizations; any member or guest: leave an organization |
+| **Code today** | `Features/Administration` (`*Organization*` / `*Group*`, `*Policy*`, `*Clearance*`, `FindUserByEmail`, `AddMember`, `ListMembers`, `ListMyOrganizations`, `ChangeMemberRole`, `RemoveMember`, `LeaveOrganization`, `ListOrganizationAuditRecords`, `ListAuditRecords`, `Authorization` for the organization admin check, and `MembershipRules` for M2 and C7) |
 | **Publishes** | a user's clearances, read by Data Management |
 
 ### 3. Data Management
@@ -62,7 +62,8 @@ The audit trail (ADR-0016, #24) is not a context of its own: it crosses all of t
 every context is recorded by `AuditCommandDecorator`, the outermost decorator of every command handler,
 as an `AuditRecord` (`Domain/Auditing`) appended through the `IAuditLog` port, in its own save. A record
 names users, organizations and targets by id only, without foreign keys, so it outlives them.
-`GetDataItem` records downloads and denied reads; reading the trail comes in a later step.
+`GetDataItem` records downloads and denied reads. The trail is read in Access Governance: an organization admin
+reads their organization's records, the platform admin the tenant-level actions (`AuditRecord`, A9, A10).
 
 ## Context map
 

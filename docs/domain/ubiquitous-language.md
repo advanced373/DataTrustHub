@@ -80,6 +80,7 @@ architecture that implements them is in ADR-0012 and [the architecture overview]
 | **Audit trail** | The append-only record of who did what and who read what: every command, also a rejected or failed one, every download and every denied read (ADR-0016). Nothing in it is updated or deleted | `IAuditLog`, `AuditCommandDecorator`, `GetDataItem` |
 | **Audit record** | One entry of the audit trail: when, who (or anonymous), the action, the target, the organization and the outcome. Never a payload, file content, email, password, hash or token | `AuditRecord` |
 | **Outcome** | How an audited action ended: *Succeeded*; *Rejected* by validation or a domain error, with its error code; *Denied*, a read the user may not make; *Failed*, an exception | `AuditOutcome` |
+| **Tenant-level action** | One of the platform's own use cases: `CreateOrganization`, `DeleteOrganization`, `AppointOrganizationAdmin`, `CreateAccount`, `DeleteAccount`, `RegisterUser`, `LoginUser`. Their records are the only ones the platform admin sees in the audit trail. An action inside an organization (members, policies, clearances, data items) is not tenant-level | `TenantLevelActions` (`ListAuditRecords`) |
 
 ## Building blocks (DDD / Clean Architecture)
 

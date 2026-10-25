@@ -232,7 +232,8 @@ name.
 
 *Cross-cutting: the audit trail (ADR-0016).* One entry of the audit trail: who did what, on which
 target, in which organization, with which outcome. Source: `Domain/Auditing/AuditRecord.cs`. It is not
-loaded or changed by any use case; it is only appended through the `IAuditLog` port.
+changed by any use case; it is only appended through the `IAuditLog` port, and read by the two audit
+trail queries (A9).
 
 | Attribute | Notes |
 |---|---|
@@ -258,6 +259,8 @@ outcome, errorCode)`. Its arguments come from code, not from user input, so a br
 | A6 | No foreign keys: a record outlives the users, organizations and data items it names | Database: table `AuditRecords`, indexed on `OccurredAt` and on (`OrganizationId`, `OccurredAt`) |
 | A7 | **Data access is audited by the read use case:** every download, and every denied read (an item that exists, deleted or not, but the read rule hides), leaves a `DataItem.Download` record on the `DataItem`, with the organization of its policy when that policy exists. A denied read records `Denied` with `DataItem.NotFound`; the answer stays the same 404, so existence is not revealed. A missing item is not an access and leaves no record. Lists are not audited | Use case: `GetDataItem` (the download), through `IAuditLog` |
 | A8 | **Downloads fail closed:** the record is appended before the content is returned; if the audit write fails, the request fails and no content leaves. A denied read whose record cannot be written is logged (action, outcome, target, actor and exception type only) and still answers 404, so a failing audit store does not reveal existence. Commands differ: their change is already saved, so a failed audit write is only logged (A4) | Use case: `GetDataItem` |
+| A9 | **Who sees what:** an organization admin sees their organization's records (`OrganizationId` is the organization); the platform admin sees the tenant-level actions only (`CreateOrganization`, `DeleteOrganization`, `AppointOrganizationAdmin`, `CreateAccount`, `DeleteAccount`, `RegisterUser`, `LoginUser`), never a tenant's trail. Anyone else gets `404 Organization.NotFound` (organization trail) or `403` (platform trail). Both list the newest 200 records first, filtered by actor, action and date range; the only thing returned about a user is the actor's email | Use cases: `ListOrganizationAuditRecords` (`IsOrgAdminAsync` first), `ListAuditRecords` (`/admin`, platform admin role) |
+| A10 | A user never sees their own records through these routes: no route lists a user's records for that user, only for an organization admin or the platform admin, because a record of a refused read can name the organization of an item the user may not read (need-to-know, ADR-0011) | Use cases: no "my records" route; each route is scoped by role, not by actor |
 
 The organization and the target come from the command, when it declares them (`IOrganizationScopedCommand`,
 `ITargetedCommand`). When only the use case learns them while it runs, its handler fills the request's

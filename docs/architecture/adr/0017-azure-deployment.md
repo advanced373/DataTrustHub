@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-10-22
-- **Related:** #22, #26; amended by [ADR-0018](0018-staging-and-production-with-migrations-in-ci-cd.md); [ADR-0007](0007-local-secrets-in-user-secrets.md),
+- **Related:** #22, #26; amended by [ADR-0018](0018-staging-and-production-with-migrations-in-ci-cd.md) and [ADR-0020](0020-target-dotnet-10-lts.md); [ADR-0007](0007-local-secrets-in-user-secrets.md),
   [ADR-0009](0009-gitflow-and-small-stacked-prs.md)
 
 ## Context

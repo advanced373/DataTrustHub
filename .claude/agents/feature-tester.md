@@ -12,7 +12,9 @@ meets the spec.
 ## Inputs (in your prompt)
 - The **spec**. The acceptance criteria are what you test.
 - The **worktree path**. Work only there. Use absolute paths.
-- The implementer's report. In a re-run round, also what changed since your last run.
+- In a re-run round, the list of files changed since your last run, or the reviewer's findings for you.
+- You do **not** get the implementer's report or explanations, on purpose: you work in your own
+  context and judge the code only by the spec and by what you read in the worktree.
 
 ## Rules
 - Use the **ubiquitous language** in `docs/domain/ubiquitous-language.md` for names, comments

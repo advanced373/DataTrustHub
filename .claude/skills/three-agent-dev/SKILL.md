@@ -42,20 +42,45 @@ rest of the [domain handbook](../../../docs/domain/README.md) in the same PR.
    mean concurrent builds and edits in the same tree.
 4. **Split large work** into small PRs first (workflow skill §1). Each PR runs the full three-agent loop.
 
-## 2. The loop
+## 2. Separate contexts
 
-Start each agent with the Agent tool and its `subagent_type`. Pass the **full spec**, the
-**worktree path** and the round number. Agents start cold, so everything they need goes into
-the prompt.
+Each agent works in **its own context**, so that no agent is influenced by another agent's
+reasoning. The tester must judge the code by the spec, not by the implementer's explanation of it;
+the reviewer must form its own opinion of the diff, not adopt the others' conclusions.
+
+- **A new spawn for every call.** Start each agent with the Agent tool and its own `subagent_type`,
+  in every round. Never use `subagent_type: "fork"` (a fork inherits the orchestrator's whole
+  context) and never continue an agent with `SendMessage`, neither across roles nor across rounds.
+- **Facts cross between agents, reasoning does not.** The orchestrator passes on only what an agent
+  can check for itself: the spec, the worktree, test names and their raw output, the reviewer's
+  findings. It does not pass on an agent's explanations, self-assessments, suspected causes or
+  "why I did it this way".
+- **The orchestrator adds no opinion.** It does not hint at a solution beyond the spec, and does not
+  tell an agent what it thinks of another agent's work.
+- **Each agent reads the code itself.** The worktree is the shared source of truth; the reports are
+  for the orchestrator and the PR body, not inputs to the other agents.
+
+What each agent receives:
+
+| Agent | Receives | Never receives |
+|---|---|---|
+| Implementer | spec, worktree; in a fix round: the failing tests with their acceptance criterion and raw output, or the reviewer's findings for code | the tester's suspected causes, the reviewer's reasoning beyond the finding itself |
+| Tester | spec, worktree; in a re-run round: the list of files changed since its last run, or the reviewer's findings for tests | the implementer's report or explanations |
+| Reviewer | spec, worktree, the tester's acceptance-criterion → test mapping and suite result; in a re-review round: its own previous findings and any dispute, stated as an argument | the implementer's summary or self-assessment, the tester's suspected causes |
+
+## 3. The loop
+
+Pass every agent the **full spec**, the **worktree path** and the round number. Agents start
+cold, so everything they need (and only that, see §2) goes into the prompt.
 
 ```
 round = 1
 implementer(spec)                                  → implementation report
-tester(spec, implementation report)                → test report
+tester(spec)                                       → test report
 while test report has IMPLEMENTATION failures and round ≤ 3:
-    implementer(spec, failing tests + output)      → fix report
-    tester(re-run)                                 → test report
-reviewer(spec, worktree, reports)                  → APPROVE | CHANGES_REQUESTED
+    implementer(spec, failing tests + raw output)  → fix report
+    tester(spec, files changed)                    → test report
+reviewer(spec, worktree, AC → test mapping)        → APPROVE | CHANGES_REQUESTED
 while CHANGES_REQUESTED and round ≤ 3:
     route each finding: code → implementer, tests → tester
     tester(re-run full suite)
@@ -70,12 +95,12 @@ while CHANGES_REQUESTED and round ≤ 3:
   The implementer never edits tests to make them pass.
 - **After 3 rounds without approval, stop** and ask the user. Show the open findings and what was
   tried. Do not loop further, and do not override the reviewer.
-- **Disagreement.** If the implementer or tester disputes a finding, pass the argument to the
-  reviewer in the next round. The reviewer decides, or escalates it to the user.
+- **Disagreement.** If the implementer or tester disputes a finding, pass the argument (not who
+  made it or how sure they were) to the reviewer in the next round. The reviewer decides, or escalates it to the user.
 - **The spec is wrong or incomplete.** If an agent reports this, the orchestrator fixes the spec,
   asks the user if a decision is needed, and restarts the affected step.
 
-## 3. Orchestrator: finish
+## 4. Orchestrator: finish
 
 1. Run the checks yourself in the worktree: `dotnet build DataTrustHub.sln` and
    `dotnet test DataTrustHub.Features.Tests/`. Smoke-test against LocalDB when the change affects SQL
@@ -91,7 +116,9 @@ while CHANGES_REQUESTED and round ≤ 3:
 
 ## Hand-off contracts
 
-Every agent ends with a report in this shape. The orchestrator relays it, and does not re-derive it.
+Every agent ends with a report in this shape, addressed to the orchestrator. The orchestrator uses
+it for the loop and the PR body, does not re-derive it, and relays to the other agents only the
+facts listed in §2.
 
 - **Implementer:**
   - files changed, with one line each;

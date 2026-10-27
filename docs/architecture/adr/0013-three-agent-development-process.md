@@ -1,8 +1,8 @@
 # ADR-0013: Three-agent development process: implementer, tester, reviewer
 
 - **Status:** Accepted
-- **Date:** 2026-10-21
-- **Related:** #81, #82; [ADR-0009](0009-gitflow-and-small-stacked-prs.md)
+- **Date:** 2026-10-21; amended 2026-10-27 (each agent in its own context)
+- **Related:** #81, #82, #137; [ADR-0009](0009-gitflow-and-small-stacked-prs.md)
 
 ## Context
 
@@ -40,6 +40,21 @@ The agents work in one worktree, one after another, never in parallel. The loop 
 - the reviewer's verdict and how each finding was resolved.
 
 Docs-only, ADR-only and catch-up PRs are exempt.
+
+## Amendments (2026-10-27, #137)
+
+5. **Each agent works in its own context**, so that no agent is influenced by another agent's
+   reasoning: the tester judges the code by the spec, not by the implementer's explanation of it,
+   and the reviewer forms its own opinion of the diff.
+   - Every call is a new spawn of the agent's own type. No fork (a fork inherits the orchestrator's
+     whole context) and no continuation of an earlier agent with `SendMessage`.
+   - Only facts cross between agents: the spec, the worktree, test names with their raw output, the
+     reviewer's findings, and a dispute stated as an argument. Explanations, self-assessments and
+     suspected causes stay in the reports, which go to the orchestrator and the PR body only.
+   - The tester no longer receives the implementer's report; the reviewer no longer receives the
+     implementer's summary or the tester's suspected causes; the implementer diagnoses failing
+     tests itself.
+   - The orchestrator adds no opinion of its own beyond the spec.
 
 ## Alternatives considered
 

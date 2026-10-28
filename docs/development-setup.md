@@ -6,7 +6,7 @@ take them from the environment or Key Vault, never from committed files.
 
 ## Prerequisites
 
-- .NET 9 SDK
+- .NET 10 SDK
 - SQL Server, e.g. LocalDB (`(localdb)\MSSQLLocalDB`)
 
 ## User Secrets of the API

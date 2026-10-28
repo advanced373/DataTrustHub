@@ -36,10 +36,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up .NET 9
+      - name: Set up .NET 10
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 9.0.x
+          dotnet-version: 10.0.x
 
       # No packages.lock.json in the repo, so the cache is keyed on the csproj files
       - name: Cache NuGet packages
@@ -84,10 +84,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up .NET 9
+      - name: Set up .NET 10
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 9.0.x
+          dotnet-version: 10.0.x
 
       # Same cache as build-and-test
       - name: Cache NuGet packages
@@ -153,7 +153,7 @@ jobs:
           if-no-files-found: error
 
       # The same kind of bundle that CD builds and runs (ADR-0018 §2). Framework-dependent: a
-      # self-contained single-file bundle cannot discover Carter's assemblies; the runner has .NET 9.
+      # self-contained single-file bundle cannot discover Carter's assemblies; the runner has .NET 10.
       - name: Build migration bundle
         run: dotnet dotnet-ef migrations bundle $EF_PROJECTS -r linux-x64 -o efbundle
 

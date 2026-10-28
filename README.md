@@ -6,7 +6,8 @@ by security level.
 
 ## Getting started
 
-See [docs/development-setup.md](docs/development-setup.md) for the User Secrets (connection string,
+The solution targets .NET 10 (LTS), so you need the .NET 10 SDK. See
+[docs/development-setup.md](docs/development-setup.md) for the User Secrets (connection string,
 JWT signing key, admin seed), the local database, and how to build and test.
 
 ## Documentation

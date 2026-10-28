@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using DataTrustHub.Features.Tests.Administration.Helpers;
+using DataTrustHub.Features.Tests.Auditing.Helpers;
 using DataTrustHub.Features.Tests.Helpers;
 using Xunit;
 using static DataTrustHub.Features.Tests.Administration.Helpers.MembershipSetup;
@@ -92,7 +93,9 @@ public class DataAccessAuditTests(ApiFactory factory) : IClassFixture<ApiFactory
     public async Task DeniedRead_ClearanceBelowLevel_RecordsDenied()
     {
         var scenario = await ArrangeClassifiedAsync(factory, "deny_below");
-        var (reader, readerId) = await CreateReaderAsync(factory, scenario, "deny_below_reader", Internal);
+        // Qualified: since the .NET 10 package upgrade a namespace named Internal hides the static import
+        var (reader, readerId) = await CreateReaderAsync(
+            factory, scenario, "deny_below_reader", DataAccessAuditSetup.Internal);
 
         var records = await RecordsAddedByAsync(factory, () => reader.GetAsync(ItemEndpoint(scenario.ItemId)));
 

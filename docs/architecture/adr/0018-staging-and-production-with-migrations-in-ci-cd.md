@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-10-22
-- **Related:** #101, #102, #108, #98; amends [ADR-0017](0017-azure-deployment.md); amended by [ADR-0020](0020-target-dotnet-10-lts.md) (.NET 10);
+- **Related:** #101, #102, #108, #98; amends [ADR-0017](0017-azure-deployment.md); amended by [ADR-0020](0020-target-dotnet-10-lts.md) (.NET 10) and [ADR-0021](0021-production-only-scripted-azure-setup.md) (production only);
   [ADR-0003](0003-single-database-owner-for-migrations.md),
   [ADR-0009](0009-gitflow-and-small-stacked-prs.md)
 

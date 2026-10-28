@@ -8,13 +8,13 @@ DataItems are files classified by security level.
 
 ## Tech stack
 
-- .NET 9, ASP.NET Core Minimal API
+- .NET 10 (LTS), ASP.NET Core Minimal API
 - Carter (endpoint auto-discovery via ICarterModule)
 - Own handler interfaces, no MediatR (ADR-0012): `ICommandHandler<TCommand, TResult>` for writes and
   `IQueryHandler<TQuery, TResult>` for reads, in `Features/_Shared/Messaging`; endpoints inject the handler
   they call. Scrutor registers the handlers and wraps them in decorators (validation; later auditing)
 - FluentValidation 12 (validated by the validation decorators before the handler runs)
-- Entity Framework Core 9 with SQL Server
+- Entity Framework Core 10 with SQL Server
 - DataTrustHub.SharedKernel: Result<T>, Error, ErrorType, Entity base classes
 
 ## Architecture: Clean Architecture with vertical slices (ADR-0012)

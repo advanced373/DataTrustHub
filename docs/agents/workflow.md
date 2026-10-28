@@ -15,7 +15,7 @@ a separate branch in a separate worktree. They do not communicate.
 ## Prerequisites
 
 - Git 2.5+ (for worktrees)
-- .NET 9 SDK
+- .NET 10 SDK
 - SQL Server instance (for running the app; tests use InMemory)
 - Read CLAUDE.md — it is the agent's primary context
 
@@ -107,7 +107,7 @@ When agents need schema changes:
 3. Database Owner runs: dotnet dotnet-ef migrations add <MigrationName> --project DataTrustHub.Infrastructure --startup-project DataTrustHub.API
 4. Database Owner commits the migration files
 
-The `dotnet-ef` version is pinned to 9.0.11 in the local tool manifest `.config/dotnet-tools.json`.
+The `dotnet-ef` version is pinned to 10.0.14 in the local tool manifest `.config/dotnet-tools.json`.
 Run `dotnet tool restore` once per clone or worktree, then call the tool as `dotnet dotnet-ef ...`
 (for example `dotnet dotnet-ef migrations add <MigrationName> --project DataTrustHub.Infrastructure
 --startup-project DataTrustHub.API`), so the pinned version is used and not a global `dotnet-ef`

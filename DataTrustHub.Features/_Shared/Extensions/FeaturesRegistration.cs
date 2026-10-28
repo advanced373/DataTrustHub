@@ -63,13 +63,17 @@ public static class FeaturesRegistration
         services.AddScoped<AuditScope>();
     }
 
+    // The signing key comes from User Secrets or the environment, never from appsettings.json (ADR-0007);
+    // a missing or too short key stops the host here, before any token is issued or validated
     private static void RegisterJwt(IServiceCollection services, IConfiguration configuration)
     {
+        JwtSecretGuard.EnsureValid(configuration);
+
         services.Configure<JwtConfig>(configuration.GetSection(JwtConfig.SectionName));
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 
         var jwtConfig = configuration.GetSection(JwtConfig.SectionName).Get<JwtConfig>()
-            ?? throw new InvalidOperationException("Jwt configuration section is missing.");
+            ?? throw new InvalidOperationException(JwtConstants.SectionMissingMessage);
 
         services
             .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

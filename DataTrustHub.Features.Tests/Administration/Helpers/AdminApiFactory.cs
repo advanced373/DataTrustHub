@@ -1,3 +1,4 @@
+using DataTrustHub.Features.Tests.Helpers;
 using DataTrustHub.Infrastructure.Persistance;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
@@ -19,6 +20,8 @@ public class AdminApiFactory : WebApplicationFactory<Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        TestJwt.SupplySigningKey(builder);
+
         builder.ConfigureServices(services =>
         {
             RemoveDbContextRegistrations(services);

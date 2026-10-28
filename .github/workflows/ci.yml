@@ -4,7 +4,8 @@
 # - "migrations" checks the EF Core migrations against a real SQL Server 2022 (ADR-0018 §3): no
 #   pending model changes, every migration applied from an empty database with the same kind of
 #   migration bundle that CD runs, and the idempotent SQL script uploaded for review.
-# No deployment and no repository secrets here; the SQL Server password is generated in each run.
+# No deployment and no repository secrets here; the SQL Server password and the JWT signing key
+# are generated in each run.
 name: CI
 
 on:
@@ -100,8 +101,8 @@ jobs:
       # A new SA password for every run, masked before any later step can print it. The fixed
       # prefix meets the SQL Server complexity policy (upper case, lower case, symbol; the hex adds
       # digits). The connection string built from it reaches the later steps through GITHUB_ENV;
-      # ConnectionStrings__DefaultConnection makes the design-time host of DataTrustHub.API use the
-      # CI database instead of the developer connection in appsettings.json.
+      # ConnectionStrings__DefaultConnection gives the design-time host of DataTrustHub.API the CI
+      # database (appsettings.json holds no connection string, ADR-0007).
       - name: Generate SQL Server password
         run: |
           password="Ci-$(openssl rand -hex 24)"
@@ -110,6 +111,16 @@ jobs:
           echo "MSSQL_SA_PASSWORD=$password" >> "$GITHUB_ENV"
           echo "CI_CONNECTION_STRING=$connection" >> "$GITHUB_ENV"
           echo "ConnectionStrings__DefaultConnection=$connection" >> "$GITHUB_ENV"
+
+      # The API host refuses to start without a JWT signing key of at least 32 bytes, and the EF
+      # Core tools and the bundle build that host. A new random key for every run, masked before any
+      # later step can print it, reaching the later steps through GITHUB_ENV as Jwt__Secret; it signs
+      # nothing here and is never committed (ADR-0007).
+      - name: Generate JWT signing key
+        run: |
+          key="$(openssl rand -base64 48)"
+          echo "::add-mask::$key"
+          echo "Jwt__Secret=$key" >> "$GITHUB_ENV"
 
       # docker run instead of a services block, which cannot take a value generated in the job.
       # The password reaches the container from the environment, not from the command line.
@@ -167,7 +178,8 @@ jobs:
 
       # Applies every migration to a new, empty database; fails the job if one fails. Runs from the
       # API folder because the bundle builds the API host, which reads the committed appsettings.json
-      # (the Jwt section) from the working directory; the connection comes from --connection.
+      # (the Jwt issuer and audience) from the working directory; the JWT signing key comes from
+      # Jwt__Secret in the environment and the connection from --connection.
       - name: Apply migrations to an empty database
         working-directory: DataTrustHub.API
         run: ../efbundle --connection "$CI_CONNECTION_STRING"

@@ -464,7 +464,7 @@ Add after the `ConnectionStrings` block:
 
 ```json
 "Jwt": {
-  "Secret": "DataTrustHub-dev-secret-key-minimum-32-characters-required",
+  "Secret": "<from User Secrets, see docs/development-setup.md>",
   "Issuer": "DataTrustHub",
   "Audience": "DataTrustHub",
   "ExpiryMinutes": 60

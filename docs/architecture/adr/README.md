@@ -33,7 +33,7 @@ Status values: `Proposed`, `Accepted`, `Superseded by ADR-NNNN`, `Deprecated`.
 | [0015](0015-sharing-data-items.md) | Sharing data items without breaking need-to-know | Accepted | 2026-10-22 |
 | [0016](0016-audit-trail-for-commands-and-data-access.md) | Audit trail for commands and data access | Accepted | 2026-10-22, amended 2026-10-24 |
 | [0017](0017-azure-deployment.md) | Deploy the MVP to Azure with GitHub Actions | Accepted | 2026-10-22 |
-| [0018](0018-staging-and-production-with-migrations-in-ci-cd.md) | Staging and production environments, and database migrations in CI/CD | Accepted | 2026-10-22 |
+| [0018](0018-staging-and-production-with-migrations-in-ci-cd.md) | Staging and production environments, and database migrations in CI/CD | Accepted | 2026-10-22, amended 2026-10-28 |
 | [0019](0019-no-personal-data-in-urls.md) | Personal data stays out of URLs | Accepted | 2026-10-24 |
 | [0020](0020-target-dotnet-10-lts.md) | Target .NET 10 (LTS) before the first release | Accepted | 2026-10-27 |
 | [0021](0021-production-only-scripted-azure-setup.md) | Production only, in Poland Central, set up by script instead of Bicep and Key Vault | Accepted | 2026-10-28 |

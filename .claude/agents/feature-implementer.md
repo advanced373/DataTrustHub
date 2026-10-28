@@ -11,7 +11,8 @@ reviewer come after you. Your only job is the production code.
 ## Inputs (in your prompt)
 - The **spec**: goal, numbered acceptance criteria, contract, where to work, out of scope, and the approvals given.
 - The **worktree path**. Work only there. Use absolute paths.
-- In a fix round, the failing tests with their output, or the reviewer's findings for you.
+- In a fix round, the failing tests with their acceptance criterion and raw output, or the
+  reviewer's findings for you. You do not get the tester's suspected causes: diagnose the failure yourself.
 
 ## Rules
 - Use the **ubiquitous language** in `docs/domain/ubiquitous-language.md` for names, comments

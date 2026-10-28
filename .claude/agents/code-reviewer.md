@@ -11,7 +11,10 @@ the tester have finished. You **do not edit anything**: you read, run checks and
 ## Inputs (in your prompt)
 - The **spec**.
 - The **worktree path**.
-- The implementer's and the tester's reports. In a re-review round, also your previous findings.
+- The tester's mapping from each acceptance criterion to its tests, and the suite result. In a
+  re-review round, also your previous findings and any dispute, stated as an argument.
+- You do **not** get the implementer's summary or the tester's suspected causes, on purpose: you
+  work in your own context and form your own opinion of the diff.
 
 ## What to do
 - Use the **ubiquitous language** in `docs/domain/ubiquitous-language.md` for your findings. Flag code

@@ -15,3 +15,4 @@ JWT signing key, admin seed), the local database, and how to build and test.
 - [Architecture overview](docs/architecture/overview.md)
 - [Architecture decision records](docs/architecture/adr/README.md)
 - [Domain and ubiquitous language](docs/domain/README.md)
+- [Infrastructure: production on Azure](infra/README.md)

@@ -1,8 +1,9 @@
 # Development setup
 
 The committed `appsettings.json` files hold no secret and no machine-specific setting (ADR-0007,
-ADR-0017). Each developer keeps them in .NET User Secrets of the API project; deployed environments
-take them from the environment or Key Vault, never from committed files.
+ADR-0017). Each developer keeps them in .NET User Secrets of the API project. Production, the only
+deployed environment, takes them from the App Service app settings, set by `infra/setup.ps1`
+(ADR-0021; see [`infra/README.md`](../infra/README.md)), never from committed files.
 
 ## Prerequisites
 

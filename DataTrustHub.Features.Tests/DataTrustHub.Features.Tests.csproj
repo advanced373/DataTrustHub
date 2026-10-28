@@ -23,6 +23,9 @@
   <ItemGroup>
     <ProjectReference Include="..\DataTrustHub.API\DataTrustHub.API.csproj" />
     <ProjectReference Include="..\DataTrustHub.Features\DataTrustHub.Features.csproj" />
+    <!-- The WebApp is hosted for its health endpoint (#146). Both apps have a top-level Program class in
+         the global namespace, so the WebApp's is reached only through this extern alias -->
+    <ProjectReference Include="..\DataTrustHub\DataTrustHub.WebApp.csproj" Aliases="WebApp" />
   </ItemGroup>
 
 </Project>

@@ -10,7 +10,6 @@ using DataTrustHub.SharedKernel;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Xunit;
@@ -26,6 +25,8 @@ public class AdminSeedTests(AdminSeedTests.SeededApiFactory factory) : IClassFix
     [Fact]
     public async Task Startup_WithAdminSeedConfigured_CreatesAdminWhoCanSignIn()
     {
+        await SeederRuns.WaitForStartupSeedAsync(factory.Services);
+
         var response = await factory.CreateClient().PostAsJsonAsync(
             LoginEndpoint, new { Email = AdminEmail, Password = AdminPassword });
 
@@ -36,9 +37,10 @@ public class AdminSeedTests(AdminSeedTests.SeededApiFactory factory) : IClassFix
     [Fact]
     public async Task Seeder_ExistingUserWithoutAdminRole_IsPromotedToAdmin()
     {
+        await SeederRuns.WaitForStartupSeedAsync(factory.Services);
         await SetRoleAsync(AdminEmail, UserRoles.User);
 
-        await GetSeeder(factory.Services).StartAsync(CancellationToken.None);
+        await SeederRuns.StartupSeeder(factory.Services).RunToCompletionAsync();
 
         Assert.Equal(UserRoles.Admin, await ReadRoleAsync(AdminEmail));
     }
@@ -48,6 +50,7 @@ public class AdminSeedTests(AdminSeedTests.SeededApiFactory factory) : IClassFix
     {
         using var unseededFactory = new ApiFactory();
         unseededFactory.CreateClient();
+        await SeederRuns.WaitForStartupSeedAsync(unseededFactory.Services);
 
         using var scope = unseededFactory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DContext>();
@@ -61,7 +64,7 @@ public class AdminSeedTests(AdminSeedTests.SeededApiFactory factory) : IClassFix
     {
         var fakes = new SeederFakes();
 
-        await fakes.CreateSeeder(AdminEmail, AdminPassword).StartAsync(CancellationToken.None);
+        await fakes.CreateSeeder(AdminEmail, AdminPassword).RunToCompletionAsync();
 
         var added = Assert.Single(fakes.Users.Added);
         Assert.Equal((AdminEmail, UserRoles.Admin), (added.Email, added.Role));
@@ -77,7 +80,7 @@ public class AdminSeedTests(AdminSeedTests.SeededApiFactory factory) : IClassFix
         var user = fakes.Users.Seed(AdminEmail);
         var originalHash = user.HashedPassword;
 
-        await fakes.CreateSeeder(AdminEmail, AdminPassword).StartAsync(CancellationToken.None);
+        await fakes.CreateSeeder(AdminEmail, AdminPassword).RunToCompletionAsync();
 
         Assert.Same(user, Assert.Single(fakes.Users.Updated));
         Assert.Equal((UserRoles.Admin, originalHash), (user.Role, user.HashedPassword));
@@ -92,7 +95,7 @@ public class AdminSeedTests(AdminSeedTests.SeededApiFactory factory) : IClassFix
         var admin = fakes.Users.SeedAdmin(AdminEmail);
         var originalHash = admin.HashedPassword;
 
-        await fakes.CreateSeeder(AdminEmail, AdminPassword).StartAsync(CancellationToken.None);
+        await fakes.CreateSeeder(AdminEmail, AdminPassword).RunToCompletionAsync();
 
         Assert.Equal((UserRoles.Admin, originalHash), (admin.Role, admin.HashedPassword));
         Assert.Empty(fakes.Users.Added);
@@ -108,15 +111,12 @@ public class AdminSeedTests(AdminSeedTests.SeededApiFactory factory) : IClassFix
     {
         var fakes = new SeederFakes();
 
-        await fakes.CreateSeeder(email, password).StartAsync(CancellationToken.None);
+        await fakes.CreateSeeder(email, password).RunToCompletionAsync();
 
         Assert.Empty(fakes.Users.Added);
         Assert.Empty(fakes.Users.Updated);
         Assert.Equal(0, fakes.UnitOfWork.SaveChangesCalls);
     }
-
-    private static AdminSeeder GetSeeder(IServiceProvider services) =>
-        services.GetServices<IHostedService>().OfType<AdminSeeder>().Single();
 
     private async Task<string> ReadRoleAsync(string email)
     {

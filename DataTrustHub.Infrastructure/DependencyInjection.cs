@@ -23,9 +23,15 @@ namespace DataTrustHub.Infrastructure
         /// <returns>An <see cref="IServiceCollection"/>.</returns>
         public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
         {
+            // The audit log builds its own context from these same options, so it retries too (ADR-0016)
             services.AddDbContext<DContext>(options =>
             {
-                options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"));
+                options.UseSqlServer(
+                    configuration.GetConnectionString("DefaultConnection"),
+                    sqlServer => sqlServer.EnableRetryOnFailure(
+                        SqlServerRetryPolicy.MaxRetryCount,
+                        SqlServerRetryPolicy.MaxRetryDelay,
+                        errorNumbersToAdd: null));
             });
 
             services.AddSingleton<IPasswordHasher, PasswordHasher>();

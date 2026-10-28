@@ -9,26 +9,46 @@ namespace DataTrustHub.Features._Shared.Seeding;
 
 // Ensures the configured admin account exists at startup: creates it, or promotes an existing user.
 // An existing user's password is never changed.
+// Runs as a background service so the host starts listening (and /health answers) while the seed waits
+// for a database that is still resuming or unreachable (ADR-0021).
 public sealed class AdminSeeder(
     IServiceScopeFactory scopeFactory,
     IPasswordHasher hasher,
     IOptions<AdminSeedOptions> options,
-    ILogger<AdminSeeder> logger) : IHostedService
+    ILogger<AdminSeeder> logger) : BackgroundService
 {
     private const string SkippedLog = "Admin seeding skipped: {Section} is not configured.";
     private const string CreatedLog = "Admin account {Email} created.";
     private const string PromotedLog = "User {Email} promoted to admin.";
+    private const string FailedLog = "Admin seeding failed; it is tried again at the next start.";
 
     private readonly AdminSeedOptions _options = options.Value;
 
-    public async Task StartAsync(CancellationToken cancellationToken)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // Yield first, so the host's StartAsync does not wait for the seed and the server starts listening
+        await Task.Yield();
+
         if (!_options.IsConfigured)
         {
             logger.LogInformation(SkippedLog, AdminSeedOptions.SectionName);
             return;
         }
 
+        // An unreachable database (e.g. a paused serverless database, ADR-0021) must not stop the application;
+        // the exception carries no admin password and the log message adds no secret
+        try
+        {
+            await SeedAsync(stoppingToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            logger.LogError(exception, FailedLog);
+        }
+    }
+
+    private async Task SeedAsync(CancellationToken cancellationToken)
+    {
         // Hosted services are singletons, so the scoped repository and unit of work need their own scope
         using var scope = scopeFactory.CreateScope();
         var users = scope.ServiceProvider.GetRequiredService<IUserRepository>();
@@ -42,8 +62,6 @@ public sealed class AdminSeeder(
         if (changed)
             await unitOfWork.SaveChangesAsync(cancellationToken);
     }
-
-    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
     private bool CreateAdmin(IUserRepository users)
     {

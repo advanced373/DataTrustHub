@@ -18,6 +18,7 @@ public class ApiFactory : WebApplicationFactory<Program>
             ["AdminSeed:Email"] = string.Empty,
             ["AdminSeed:Password"] = string.Empty
         });
+        TestJwt.SupplySigningKey(builder);
 
         builder.ConfigureServices(services =>
         {

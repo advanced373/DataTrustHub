@@ -1,0 +1,22 @@
+@{
+    ViewData["Title"] = "Administration";
+}
+
+<partial name="_AdminNav" model="@ControllerNames.Admin" />
+
+<h1 class="h3 mb-4">Administration</h1>
+
+<div class="list-group shadow-sm">
+    <a class="list-group-item list-group-item-action py-3" asp-controller="Users" asp-action="Index">
+        <i class="bi bi-person"></i> Users
+        <div class="small text-muted">Accounts that can sign in to DataTrustHub. List, create and delete them.</div>
+    </a>
+    <a class="list-group-item list-group-item-action py-3" asp-controller="Organizations" asp-action="Index">
+        <i class="bi bi-people"></i> Organizations
+        <div class="small text-muted">The tenants of the platform. List, create and delete them, and appoint their first organization admin.</div>
+    </a>
+    <a class="list-group-item list-group-item-action py-3" asp-controller="@ControllerNames.Audit" asp-action="Index">
+        <i class="bi bi-journal-check"></i> Audit
+        <div class="small text-muted">The audit trail of the platform's own actions. Filter it by user, action and date range.</div>
+    </a>
+</div>

@@ -1,0 +1,66 @@
+@using DataTrustHub.Controllers
+@model ListViewModel<DataTrustHub.Services.Api.MyOrganizationResponse>
+@{
+    ViewData["Title"] = "My organizations";
+}
+
+<h1 class="h3 mb-1">My organizations</h1>
+<p class="text-muted mb-4">The organizations you belong to, and your role in each.</p>
+
+<partial name="_ListError" model="Model.ErrorMessage" />
+
+@if (Model.Items.Count == 0 && Model.ErrorMessage is null)
+{
+    <div class="card shadow-sm">
+        <div class="card-body text-center py-5">
+            <i class="bi bi-building display-5 text-muted"></i>
+            <p class="mt-3 mb-0 text-muted">You are not in any organization yet. An organization admin can add you.</p>
+        </div>
+    </div>
+}
+else if (Model.Items.Count > 0)
+{
+    <div class="card shadow-sm">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Organization</th>
+                    <th>Role</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var organization in Model.Items)
+                {
+                    var isOrgAdmin = organization.Role == MembershipRoles.OrgAdmin;
+                    <tr>
+                        <td>@organization.OrganizationName</td>
+                        <td>
+                            <span class="badge @(isOrgAdmin ? "text-bg-primary" : "text-bg-secondary")">@MembershipRoles.LabelOf(organization.Role)</span>
+                        </td>
+                        <td class="text-end text-nowrap">
+                            @if (isOrgAdmin)
+                            {
+                                <a class="btn btn-sm btn-outline-secondary" asp-action="@nameof(MyOrganizationsController.Members)" asp-route-organizationId="@organization.OrganizationId">
+                                    <i class="bi bi-people"></i> Members
+                                </a>
+                                <a class="btn btn-sm btn-outline-secondary" asp-controller="@ControllerNames.OrganizationPolicies" asp-action="@nameof(OrganizationPoliciesController.Index)" asp-route-organizationId="@organization.OrganizationId">
+                                    <i class="bi bi-journal-text"></i> Policies
+                                </a>
+                                <a class="btn btn-sm btn-outline-secondary" asp-controller="@ControllerNames.OrganizationClearances" asp-action="@nameof(OrganizationClearancesController.Index)" asp-route-organizationId="@organization.OrganizationId">
+                                    <i class="bi bi-shield-lock"></i> Clearances
+                                </a>
+                            }
+                            <form asp-action="@nameof(MyOrganizationsController.Leave)" asp-route-organizationId="@organization.OrganizationId" method="post" class="d-inline"
+                                  onsubmit="return confirm(this.dataset.confirm);" data-confirm="@($"Leave \"{organization.OrganizationName}\"? Your clearances there are revoked.")">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Leave">
+                                    <i class="bi bi-box-arrow-right"></i> Leave
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

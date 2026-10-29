@@ -1,0 +1,77 @@
+@using DataTrustHub.Controllers
+@model MembersViewModel
+@{
+    ViewData["Title"] = "Members";
+}
+
+<partial name="_OrganizationNav" model="@(new OrganizationNavModel(Model.OrganizationId, ControllerNames.MyOrganizations))" />
+
+<div class="d-flex justify-content-between align-items-center mb-1">
+    <h1 class="h3 m-0">Members@(Model.OrganizationName is null ? "" : $" of {Model.OrganizationName}")</h1>
+    <a class="btn btn-primary" asp-action="@nameof(MyOrganizationsController.AddMember)" asp-route-organizationId="@Model.OrganizationId">
+        <i class="bi bi-person-plus"></i> Add member or guest
+    </a>
+</div>
+<p class="text-muted mb-4">
+    Removing a member revokes their clearances in this organization. The guest role is fixed.
+    <a asp-action="@nameof(MyOrganizationsController.Index)">Back to my organizations</a>
+</p>
+
+<div class="card shadow-sm">
+    <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+            <tr>
+                <th>Email</th>
+                <th>Role</th>
+                <th class="text-end">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var member in Model.Members)
+            {
+                var isCurrentUser = member.UserId == Model.SignedInUserId;
+                var isOrgAdmin = member.Role == MembershipRoles.OrgAdmin;
+                var newRole = isOrgAdmin ? MembershipRoles.Member : MembershipRoles.OrgAdmin;
+                <tr>
+                    <td>
+                        @member.Email
+                        @if (isCurrentUser)
+                        {
+                            <span class="badge text-bg-light border ms-1">you</span>
+                        }
+                    </td>
+                    <td>
+                        <span class="badge @(isOrgAdmin ? "text-bg-primary" : "text-bg-secondary")">@MembershipRoles.LabelOf(member.Role)</span>
+                    </td>
+                    <td class="text-end text-nowrap">
+                        @* The guest role is fixed, so a guest's role cannot be changed *@
+                        @if (member.Role != MembershipRoles.Guest)
+                        {
+                            var confirmMessage = isCurrentUser
+                                ? "Make yourself a member? You will no longer manage this organization."
+                                : $"Make {member.Email} {MembershipRoles.LabelOf(newRole).ToLowerInvariant()}?";
+                            <form asp-action="@nameof(MyOrganizationsController.ChangeRole)" asp-route-organizationId="@Model.OrganizationId" asp-route-userId="@member.UserId"
+                                  method="post" class="d-inline" onsubmit="return confirm(this.dataset.confirm);" data-confirm="@confirmMessage">
+                                <input type="hidden" name="role" value="@newRole" />
+                                <button type="submit" class="btn btn-sm btn-outline-secondary">
+                                    <i class="bi @(isOrgAdmin ? "bi-person" : "bi-person-gear")"></i> Make @MembershipRoles.LabelOf(newRole).ToLowerInvariant()
+                                </button>
+                            </form>
+                        }
+                        @* You leave an organization from My organizations instead of removing yourself *@
+                        @if (!isCurrentUser)
+                        {
+                            <form asp-action="@nameof(MyOrganizationsController.RemoveMember)" asp-route-organizationId="@Model.OrganizationId" asp-route-userId="@member.UserId"
+                                  method="post" class="d-inline" onsubmit="return confirm(this.dataset.confirm);"
+                                  data-confirm="@($"Remove {member.Email} from the organization? Their clearances here are revoked.")">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Remove">
+                                    <i class="bi bi-person-dash"></i> Remove
+                                </button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

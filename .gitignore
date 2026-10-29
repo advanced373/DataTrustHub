@@ -426,3 +426,7 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# Claude Code: personal settings and agent worktrees
+.claude/settings.local.json
+worktrees/

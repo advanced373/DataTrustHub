@@ -1,0 +1,185 @@
+# Runs two jobs in parallel on every pull request and push to develop and main (ADR-0017, ADR-0018):
+# - "build-and-test" builds the solution and runs the test suite on the EF Core InMemory and SQLite
+#   providers; it is the check that branch protection requires;
+# - "migrations" checks the EF Core migrations against a real SQL Server 2022 (ADR-0018 §3): no
+#   pending model changes, every migration applied from an empty database with the same kind of
+#   migration bundle that CD runs, and the idempotent SQL script uploaded for review.
+# No deployment and no repository secrets here; the SQL Server password and the JWT signing key
+# are generated in each run.
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+# A new push to a pull request cancels the run it supersedes; pushes to develop/main are never
+# cancelled, so every merge commit gets its own result
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      # No packages.lock.json in the repo, so the cache is keyed on the csproj files
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore DataTrustHub.sln
+
+      - name: Build
+        run: dotnet build DataTrustHub.sln --no-restore -c Release
+
+      - name: Test
+        run: >
+          dotnet test DataTrustHub.Features.Tests/ --no-build -c Release
+          --logger "trx;LogFileName=test-results.trx"
+          --results-directory TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults/*.trx
+          if-no-files-found: warn
+
+  migrations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      SQL_SERVER_IMAGE: mcr.microsoft.com/mssql/server:2022-latest
+      SQL_CONTAINER_NAME: ci-sqlserver
+      CI_DATABASE_NAME: DataTrustHubCi
+      EF_PROJECTS: --project DataTrustHub.Infrastructure --startup-project DataTrustHub.API --configuration Release
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      # Same cache as build-and-test
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      # A new SA password for every run, masked before any later step can print it. The fixed
+      # prefix meets the SQL Server complexity policy (upper case, lower case, symbol; the hex adds
+      # digits). The connection string built from it reaches the later steps through GITHUB_ENV;
+      # ConnectionStrings__DefaultConnection gives the design-time host of DataTrustHub.API the CI
+      # database (appsettings.json holds no connection string, ADR-0007).
+      - name: Generate SQL Server password
+        run: |
+          password="Ci-$(openssl rand -hex 24)"
+          echo "::add-mask::$password"
+          connection="Server=localhost,1433;Database=$CI_DATABASE_NAME;User Id=sa;Password=$password;TrustServerCertificate=True"
+          echo "MSSQL_SA_PASSWORD=$password" >> "$GITHUB_ENV"
+          echo "CI_CONNECTION_STRING=$connection" >> "$GITHUB_ENV"
+          echo "ConnectionStrings__DefaultConnection=$connection" >> "$GITHUB_ENV"
+
+      # The API host refuses to start without a JWT signing key of at least 32 bytes, and the EF
+      # Core tools and the bundle build that host. A new random key for every run, masked before any
+      # later step can print it, reaching the later steps through GITHUB_ENV as Jwt__Secret; it signs
+      # nothing here and is never committed (ADR-0007).
+      - name: Generate JWT signing key
+        run: |
+          key="$(openssl rand -base64 48)"
+          echo "::add-mask::$key"
+          echo "Jwt__Secret=$key" >> "$GITHUB_ENV"
+
+      # docker run instead of a services block, which cannot take a value generated in the job.
+      # The password reaches the container from the environment, not from the command line.
+      - name: Start SQL Server 2022
+        run: >
+          docker run -d --name "$SQL_CONTAINER_NAME"
+          -e ACCEPT_EULA=Y -e MSSQL_SA_PASSWORD
+          -p 1433:1433 "$SQL_SERVER_IMAGE"
+
+      - name: Restore
+        run: |
+          dotnet restore DataTrustHub.sln
+          dotnet tool restore
+
+      - name: Build
+        run: dotnet build DataTrustHub.sln --no-restore -c Release
+
+      # Fails when the model has changes that no migration covers
+      - name: Check for pending model changes
+        run: dotnet dotnet-ef migrations has-pending-model-changes $EF_PROJECTS --no-build
+
+      - name: Generate idempotent SQL script
+        run: dotnet dotnet-ef migrations script --idempotent $EF_PROJECTS --no-build -o migrations.sql
+
+      - name: Upload SQL script
+        uses: actions/upload-artifact@v4
+        with:
+          name: migrations-sql
+          path: migrations.sql
+          if-no-files-found: error
+
+      # The same kind of bundle that CD builds and runs (ADR-0018 §2). Framework-dependent: a
+      # self-contained single-file bundle cannot discover Carter's assemblies; the runner has .NET 10.
+      - name: Build migration bundle
+        run: dotnet dotnet-ef migrations bundle $EF_PROJECTS -r linux-x64 -o efbundle
+
+      # Bounded retry: 24 x (5 s login timeout + 5 s pause), about four minutes, then the job fails.
+      # sqlcmd reads the password from SQLCMDPASSWORD, passed from the environment, so it is not on
+      # any command line.
+      - name: Wait for SQL Server
+        env:
+          SQLCMDPASSWORD: ${{ env.MSSQL_SA_PASSWORD }}
+        run: |
+          for attempt in $(seq 1 24); do
+            if docker exec -e SQLCMDPASSWORD "$SQL_CONTAINER_NAME" \
+              /opt/mssql-tools18/bin/sqlcmd -C -l 5 -S localhost -U sa -Q "SELECT 1" > /dev/null 2>&1; then
+              echo "SQL Server is ready after $attempt attempt(s)"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::SQL Server did not accept connections in time"
+          docker logs "$SQL_CONTAINER_NAME"
+          exit 1
+
+      # Applies every migration to a new, empty database; fails the job if one fails. Runs from the
+      # API folder because the bundle builds the API host, which reads the committed appsettings.json
+      # (the Jwt issuer and audience) from the working directory; the JWT signing key comes from
+      # Jwt__Secret in the environment and the connection from --connection.
+      - name: Apply migrations to an empty database
+        working-directory: DataTrustHub.API
+        run: ../efbundle --connection "$CI_CONNECTION_STRING"

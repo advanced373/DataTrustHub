@@ -1,0 +1,74 @@
+@using DataTrustHub.Controllers
+@using DataTrustHub.Services.Api
+@using Microsoft.AspNetCore.Mvc.Rendering
+@model GrantClearanceViewModel
+@{
+    ViewData["Title"] = "Grant clearance";
+    var grantees = Model.Grantees.Select(member => new SelectListItem(
+        member.Role == MembershipRoles.Member ? member.Email : $"{member.Email} ({MembershipRoles.LabelOf(member.Role)})",
+        member.UserId.ToString()));
+    var policies = new SelectList(Model.Policies, nameof(PolicyResponse.Id), nameof(PolicyResponse.Name));
+    var levels = ClassificationLevels.All.Select(level => new SelectListItem($"{level.Name} ({level.Priority})", level.Priority.ToString()));
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-7 col-lg-6">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <h1 class="h3 mb-1">Grant clearance</h1>
+                <p class="text-muted mb-4">
+                    In @Model.OrganizationName. The member gets this classification level on the policy, and every level below it.
+                    You cannot grant yourself a clearance; another organization admin does.
+                </p>
+                @if (Model.Policies.Count == 0)
+                {
+                    <div class="alert alert-info">
+                        A clearance is granted on a policy. <a asp-controller="@ControllerNames.OrganizationPolicies" asp-action="@nameof(OrganizationPoliciesController.Create)" asp-route-organizationId="@Model.OrganizationId">Create a policy</a> first.
+                    </div>
+                }
+                @if (Model.Grantees.Count == 0)
+                {
+                    <div class="alert alert-info">
+                        There is no one else in this organization to grant a clearance to. <a asp-controller="@ControllerNames.MyOrganizations" asp-action="@nameof(MyOrganizationsController.AddMember)" asp-route-organizationId="@Model.OrganizationId">Add a member or guest</a> first.
+                    </div>
+                }
+                <form asp-action="@nameof(OrganizationClearancesController.Grant)" asp-route-organizationId="@Model.OrganizationId" method="post">
+                    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+                    <div class="form-floating mb-3">
+                        <select asp-for="UserId" class="form-select" asp-items="grantees">
+                            <option value="">Select a member</option>
+                        </select>
+                        <label asp-for="UserId"></label>
+                        <span asp-validation-for="UserId" class="text-danger"></span>
+                    </div>
+                    <div class="form-floating mb-3">
+                        <select asp-for="PolicyId" class="form-select" asp-items="policies">
+                            <option value="">Select a policy</option>
+                        </select>
+                        <label asp-for="PolicyId"></label>
+                        <span asp-validation-for="PolicyId" class="text-danger"></span>
+                    </div>
+                    <div class="form-floating mb-3">
+                        <select asp-for="LevelPriority" class="form-select" asp-items="levels">
+                            <option value="">Select a classification level</option>
+                        </select>
+                        <label asp-for="LevelPriority"></label>
+                        <span asp-validation-for="LevelPriority" class="text-danger"></span>
+                    </div>
+                    <div class="form-floating mb-3">
+                        <input asp-for="Name" class="form-control" autocomplete="off" placeholder="Name" />
+                        <label asp-for="Name"></label>
+                        <div class="form-text">Leave empty to name it after the level and the policy, such as "Secret on Project Apollo".</div>
+                        <span asp-validation-for="Name" class="text-danger"></span>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Grant</button>
+                    <a class="btn btn-link" asp-action="@nameof(OrganizationClearancesController.Index)" asp-route-organizationId="@Model.OrganizationId">Cancel</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

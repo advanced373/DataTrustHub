@@ -21,7 +21,7 @@ Status values: `Proposed`, `Accepted`, `Superseded by ADR-NNNN`, `Deprecated`.
 | [0003](0003-single-database-owner-for-migrations.md) | One designated Database Owner creates EF migrations | Accepted | 2026-05-30 |
 | [0004](0004-owner-only-soft-delete.md) | Owner-only soft delete for data items | Accepted | 2026-06-16 |
 | [0005](0005-mvc-webapp-as-api-client.md) | MVC WebApp as a client of the API, JWT in the auth cookie | Accepted | 2026-10-19 |
-| [0006](0006-roles-in-jwt-and-admin-seeding.md) | User roles in the JWT, first admin seeded from configuration | Accepted | 2026-10-19 |
+| [0006](0006-roles-in-jwt-and-admin-seeding.md) | User roles in the JWT, first admin seeded from configuration | Accepted | 2026-10-19, amended by ADR-0022 |
 | [0007](0007-local-secrets-in-user-secrets.md) | Local configuration and secrets in User Secrets | Accepted | 2026-10-19 |
 | [0008](0008-secure-legacy-controllers-until-replaced.md) | Secure the legacy API controllers until VSA slices replace them | Superseded by [0010](0010-port-legacy-endpoints-and-remove-the-layered-code.md) | 2026-10-19 |
 | [0009](0009-gitflow-and-small-stacked-prs.md) | GitFlow with small, stacked PRs and explicit issue tracking | Accepted | 2026-10-19 |
@@ -36,4 +36,5 @@ Status values: `Proposed`, `Accepted`, `Superseded by ADR-NNNN`, `Deprecated`.
 | [0018](0018-staging-and-production-with-migrations-in-ci-cd.md) | Staging and production environments, and database migrations in CI/CD | Accepted | 2026-10-22, amended 2026-10-28 |
 | [0019](0019-no-personal-data-in-urls.md) | Personal data stays out of URLs | Accepted | 2026-10-24 |
 | [0020](0020-target-dotnet-10-lts.md) | Target .NET 10 (LTS) before the first release | Accepted | 2026-10-27 |
-| [0021](0021-production-only-scripted-azure-setup.md) | Production only, in Poland Central, set up by script instead of Bicep and Key Vault | Accepted | 2026-10-28 |
+| [0021](0021-production-only-scripted-azure-setup.md) | Production only, in Poland Central, set up by script instead of Bicep and Key Vault | Accepted | 2026-10-28, amended by ADR-0022 |
+| [0022](0022-seed-the-production-admin-once.md) | Seed the production admin once, then remove the seed settings | Accepted | 2026-10-29 |

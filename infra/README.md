@@ -89,9 +89,12 @@ The script shows the subscription and asks for confirmation (`-Force` skips it).
 It is idempotent: each step reads the current state first and changes only what differs, so a
 second run reports nothing to change. If a read fails (for example a missing permission), the
 script stops with an error naming the step instead of taking the failure for a missing setting,
-so it never generates a new JWT signing key or asks for the admin seed by mistake. The settings are passed to `az` in a temporary JSON file,
-deleted right after, so that no secret is on a command line and `az.cmd` cannot mangle special
-characters in a password.
+so it never generates a new JWT signing key or asks for the admin seed by mistake. The settings
+are passed to `az` in a temporary JSON file, deleted right after, so that no secret is on a
+command line and `az.cmd` cannot mangle special characters in a password.
+
+**Known gap (#150):** on the first real run the health check path was not applied to either web
+app, although `az` reported no error; a second dry run still plans it.
 
 Its parameters default to the resource names above: `-ResourceGroup`, `-ApiAppName`,
 `-WebAppName`, `-SqlServerName`, `-DatabaseName`.
@@ -103,9 +106,9 @@ to the database `datatrusthub` (not `master`), for example from the query editor
 in the portal. The variables at the top name the principals:
 - `@ApiPrincipal`: the display name of the API's managed identity, which is the web app's name,
   `datatrusthubapi` by default;
-- `@DeployPrincipal`: the display name of the deploy identity. It does not exist yet, so leave the
-  placeholder: the script then grants the API user only and prints that the deploy user was
-  skipped.
+- `@DeployPrincipal`: the display name of the deploy identity, `DataTrustHub-Deploy`. While it is
+  empty or still the placeholder, the script grants the API user only and prints that the deploy
+  user was skipped.
 
 It creates the contained users `FROM EXTERNAL PROVIDER` and their roles (ADR-0018 §4):
 
@@ -119,15 +122,35 @@ again changes nothing that is already in place.
 
 ### 3. The deploy identity
 
-Created by hand, with the GitHub environment `production`, in #102: an app registration or a
-user-assigned managed identity with a federated credential for the environment `production`. The
-SQL script needs its display name.
+Created by hand once (done on 2026-10-28). The release workflow signs in to Azure as this identity
+through GitHub OIDC, with no stored secret.
+
+1. **App registration** `DataTrustHub-Deploy` in Microsoft Entra ID, with its service principal.
+   Do not give it the name of a web app: the SQL script finds principals by display name, and a
+   web app's managed identity carries the web app's name.
+2. **Federated credential**, issuer `https://token.actions.githubusercontent.com`, subject
+   `repo:advanced373/DataTrustHub:environment:production`, audience `api://AzureADTokenExchange`.
+   Only jobs running in the GitHub environment `production` can sign in as this identity.
+3. **Azure role:** `Website Contributor` on each of the two web apps, scoped to the app, nothing
+   else. It needs no right on the SQL server's firewall (ADR-0018, amendment of 2026-10-28): the
+   rule `AllowAllWindowsAzureIps` already lets the GitHub-hosted runners in.
+4. **GitHub environment `production`:** the owner as required reviewer, deployments from `main`
+   only, and three environment **variables** (not secrets, the values are not secret):
+   `AZURE_CLIENT_ID` (the app registration's application id), `AZURE_TENANT_ID`,
+   `AZURE_SUBSCRIPTION_ID`. They are not written in this repository.
+
+From Git Bash, the Azure CLI turns arguments that start with `/` into Windows paths: set
+`MSYS_NO_PATHCONV=1` before `az role assignment create --scope /subscriptions/...`.
 
 ### 4. The SQL script again, for the deploy user
 
 Run [`sql/grant-roles.sql`](sql/grant-roles.sql) again the same way, with `@DeployPrincipal` set
-to the display name of the deploy identity. The API user is already in place and stays as it is;
-the script adds the deploy user and its roles.
+to `DataTrustHub-Deploy`. The API user is already in place and stays as it is; the script adds
+the deploy user and its roles. The query editor runs only the selected text when there is a
+selection: run the whole script, after editing the variable in the editor itself.
+
+To check, the database should show five memberships: `DataTrustHub-Deploy` in `db_datareader`,
+`db_datawriter`, `db_ddladmin`, and `datatrusthubapi` in `db_datareader`, `db_datawriter`.
 
 ### 5. The first release
 
@@ -139,8 +162,8 @@ The release workflow of #102 applies the migrations as the deploy identity and d
   Insights. They are created once, in the portal (ADR-0021 §3).
 - The deploy identity, its OIDC federated credential and the GitHub environment `production`
   with the owner as required reviewer (#102).
-- The release workflow's own firewall rule for the runner's address, which it opens and removes
-  on each run (ADR-0018 §4); it is not created here.
+- No firewall rule for the release workflow: the GitHub-hosted runners reach the SQL server
+  through `AllowAllWindowsAzureIps` (ADR-0018, amendment of 2026-10-28).
 
 ## Free-tier limits (ADR-0021 §6)
 

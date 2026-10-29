@@ -9,9 +9,9 @@
       - the deploy identity (GitHub OIDC federated credential, #102): db_ddladmin, db_datareader,
         db_datawriter, to apply migrations.
 
-    The deploy identity is created later, in #102, so it is optional: while @DeployPrincipal is
-    empty or still the placeholder, the script grants the API user only and says the deploy user
-    was skipped. Run it once now, and again after #102 with @DeployPrincipal filled in.
+    The deploy user is optional: while @DeployPrincipal is empty or still the placeholder, the
+    script grants the API user only and says the deploy user was skipped. The deploy identity is
+    DataTrustHub-Deploy (infra/README.md, step 3).
 
     Idempotent: every user and role membership is guarded, so a second run changes nothing.
     One batch, no GO, so the variables below stay in scope.
@@ -23,7 +23,8 @@
 -- Display name of the API's system-assigned managed identity: the name of the API web app.
 DECLARE @ApiPrincipal sysname = N'datatrusthubapi';
 -- Display name of the deploy identity (the app registration or user-assigned managed identity
--- that holds the GitHub OIDC federated credential). Leave the placeholder until #102 creates it.
+-- that holds the GitHub OIDC federated credential): DataTrustHub-Deploy. Edit it here, in the
+-- query editor, not in the repository.
 DECLARE @DeployPrincipal sysname = N'<deploy identity name>';
 
 -- ---------------------------------------------------------------------------------------------
@@ -57,7 +58,7 @@ IF @IncludeDeployPrincipal = 1
            (@DeployPrincipal, N'db_datareader'),
            (@DeployPrincipal, N'db_datawriter');
 ELSE
-    PRINT N'Skipped the deploy user: @DeployPrincipal is not filled in. Run this script again after #102.';
+    PRINT N'Skipped the deploy user: @DeployPrincipal is still the placeholder. Set it to the deploy identity''s display name and run the whole script again.';
 
 DECLARE @GrantId int = 1;
 DECLARE @GrantCount int = (SELECT COUNT(*) FROM @Grants);

@@ -154,7 +154,49 @@ To check, the database should show five memberships: `DataTrustHub-Deploy` in `d
 
 ### 5. The first release
 
-The release workflow of #102 applies the migrations as the deploy identity and deploys the code.
+The release workflow, [`.github/workflows/release.yml`](../.github/workflows/release.yml), applies
+the migrations as the deploy identity and deploys the code (ADR-0018 §2, ADR-0021 §5). It needs
+steps 1 to 4 done first; the first release applies every migration to the empty database.
+
+**How a release runs.** Every push to `main`, which is the merge of a release (ADR-0009), starts
+it; it can also be started by hand from the Actions tab (*Release*, *Run workflow*, branch
+`main`). One release runs at a time, and a running release is never cancelled; of the runs
+waiting for it, only the newest is kept.
+1. **build**, without any Azure access: builds and tests the commit once, then uploads the API
+   and WebApp packages, the migration bundle and the idempotent SQL script (`migrations-sql`).
+   Nothing is rebuilt after this job.
+2. **release**, in the GitHub environment `production`: it waits for the owner's approval, then
+   signs in to Azure as `DataTrustHub-Deploy` through OIDC, applies the migrations, deploys the
+   API, then the WebApp, and checks that both answer `/health`.
+
+**Approving.** While the release job waits, the run's page in the Actions tab shows *Review
+deployments*. Before approving, download the `migrations-sql` artifact of the same run to see what
+the migrations will do to the production database. *Approve and deploy* starts the job; *Reject*
+ends the run without touching Azure.
+
+**When it fails.** The failed step's log says what went wrong; no secret is printed.
+- **Apply migrations, the database is paused.** The free-offer database pauses when idle and
+  takes up to about a minute to resume. The step retries for about three and a half minutes, and
+  an attempt still running when that time is up is stopped; if the database was still resuming,
+  re-run the job.
+- **Apply migrations, firewall error** (a message such as *Client with IP address ... is not
+  allowed to access the server*). The workflow opens no firewall rule: it relies on
+  `AllowAllWindowsAzureIps` letting the GitHub-hosted runners in (ADR-0018, amendment of
+  2026-10-28). Check that the rule still exists on the SQL server. If it does and the error
+  stays, the rule-per-run of ADR-0018 §4 comes back, with a custom role limited to
+  `Microsoft.Sql/servers/firewallRules/*` on the server: a change to the workflow and to the
+  deploy identity, not something to work around by hand.
+- **Apply migrations, login failed** (*Login failed for user '&lt;token-identified principal&gt;'*):
+  the deploy user is missing in the database; run step 4.
+- **Smoke check.** An F1 app can take minutes to cold start, and stops when the plan's daily CPU
+  quota is used up. Look at the app's log stream in the portal, then re-run the job.
+
+The migrations already applied stay recorded in the database, so a new attempt applies only what
+is missing. A broken migration is fixed forward, in a new release (ADR-0018 §5).
+
+**Re-running.** On the run's page, *Re-run jobs*, then *Re-run failed jobs*: the release job runs
+again with the artifacts of the same run, after a new approval, so what reaches production is
+still what that run built and tested.
 
 ## Deliberately manual
 

@@ -38,3 +38,4 @@ Status values: `Proposed`, `Accepted`, `Superseded by ADR-NNNN`, `Deprecated`.
 | [0020](0020-target-dotnet-10-lts.md) | Target .NET 10 (LTS) before the first release | Accepted | 2026-10-27 |
 | [0021](0021-production-only-scripted-azure-setup.md) | Production only, in Poland Central, set up by script instead of Bicep and Key Vault | Accepted | 2026-10-28, amended by ADR-0022 |
 | [0022](0022-seed-the-production-admin-once.md) | Seed the production admin once, then remove the seed settings | Accepted | 2026-10-29 |
+| [0023](0023-normalize-email-addresses.md) | Email addresses are trimmed and lower-cased as a whole | Accepted | 2026-10-29 |

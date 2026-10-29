@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-10-19
-- **Related:** #27, #39, #40; amended by [ADR-0014](0014-organizations-as-tenants-with-memberships.md)
+- **Related:** #27, #39, #40; amended by [ADR-0014](0014-organizations-as-tenants-with-memberships.md), [ADR-0022](0022-seed-the-production-admin-once.md) (production seeding)
 
 ## Context
 

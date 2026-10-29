@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-10-28
 - **Related:** #101, #98, #102; amends [ADR-0017](0017-azure-deployment.md) and
-  [ADR-0018](0018-staging-and-production-with-migrations-in-ci-cd.md)
+  [ADR-0018](0018-staging-and-production-with-migrations-in-ci-cd.md); amended by [ADR-0022](0022-seed-the-production-admin-once.md) (admin seeding)
 
 ## Context
 

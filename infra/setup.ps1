@@ -5,8 +5,11 @@
 .DESCRIPTION
     Finishes what the portal did not set on the existing production resources, with the Azure CLI only:
       - a system-assigned managed identity on the API (the WebApp holds no secret);
-      - the API's app settings: SQL connection string (managed identity, no password), JWT signing key,
-        admin seed; existing settings, such as the Application Insights ones, are kept;
+      - the API's app settings: SQL connection string (managed identity, no password), JWT signing key;
+        existing settings, such as the Application Insights ones, are kept;
+      - the admin seed (AdminSeed__Email, AdminSeed__Password), only when asked for with -SeedAdmin:
+        the first admin is seeded once, then the owner removes both settings (ADR-0022). Without
+        -SeedAdmin the admin seed is neither asked for nor written, and existing values are kept;
       - the WebApp's Api__BaseUrl, read from the API's default host name;
       - FTP and basic publishing credentials (SCM and FTP) disabled on both apps;
       - the health check path on both apps;
@@ -23,12 +26,18 @@
 .PARAMETER RotateJwtSecret
     Generates a new JWT signing key even if one exists. This signs out every user.
 
-.PARAMETER OverwriteAdminSeed
-    Asks for the admin seed e-mail address and password even if they are already set.
+.PARAMETER SeedAdmin
+    Asks for the admin seed e-mail address and password and writes both settings, overwriting
+    existing values: for the first admin, or to recover access (ADR-0022). In a dry run both are
+    planned masked and nothing is asked.
 
 .EXAMPLE
     .\infra\setup.ps1 -WhatIf
     .\infra\setup.ps1
+
+.EXAMPLE
+    .\infra\setup.ps1 -SeedAdmin
+    Seeds the first admin; after the API has seeded it, delete both AdminSeed settings (infra/README.md).
 #>
 [CmdletBinding()]
 param(
@@ -40,7 +49,7 @@ param(
     [switch] $WhatIf,
     [switch] $Force,
     [switch] $RotateJwtSecret,
-    [switch] $OverwriteAdminSeed
+    [switch] $SeedAdmin
 )
 
 Set-StrictMode -Version Latest
@@ -237,22 +246,19 @@ function Add-JwtSecretSetting {
     $Settings[$JwtSecretSetting] = New-JwtSecret
 }
 
-# Adds the admin seed to the settings, reading each missing value from the owner.
+# Adds the admin seed to the settings, only when -SeedAdmin asks for it (ADR-0022): both values are
+# read from the owner and overwrite existing ones. Without -SeedAdmin the admin seed is left as it is.
 # The password is read as a secure string and never echoed.
 function Add-AdminSeedSettings {
-    param([hashtable] $Settings, [string[]] $ExistingNames)
-    $needsEmail = $OverwriteAdminSeed -or ($ExistingNames -notcontains $AdminSeedEmailSetting)
-    $needsPassword = $OverwriteAdminSeed -or ($ExistingNames -notcontains $AdminSeedPasswordSetting)
-    if (-not $OverwriteAdminSeed -and ($needsEmail -or $needsPassword)) {
-        Assert-SettingNamesRead $AdminSeedEmailSetting
-    }
+    param([hashtable] $Settings)
+    if (-not $SeedAdmin) { return }
     if ($WhatIf) {
-        if ($needsEmail) { $Settings[$AdminSeedEmailSetting] = $MaskedValue }
-        if ($needsPassword) { $Settings[$AdminSeedPasswordSetting] = $MaskedValue }
+        $Settings[$AdminSeedEmailSetting] = $MaskedValue
+        $Settings[$AdminSeedPasswordSetting] = $MaskedValue
         return
     }
-    if ($needsEmail) { $Settings[$AdminSeedEmailSetting] = Read-AdminSeedEmail }
-    if ($needsPassword) { $Settings[$AdminSeedPasswordSetting] = Read-AdminSeedPassword }
+    $Settings[$AdminSeedEmailSetting] = Read-AdminSeedEmail
+    $Settings[$AdminSeedPasswordSetting] = Read-AdminSeedPassword
 }
 
 # Reads the admin seed e-mail address from the owner, asking again while it is empty or malformed.
@@ -328,7 +334,8 @@ function Write-SettingsPreview {
     }
 }
 
-# Sets the API's connection string, JWT signing key and admin seed; keeps every other setting.
+# Sets the API's connection string, JWT signing key and, with -SeedAdmin, the admin seed;
+# keeps every other setting.
 function Set-ApiAppSettings {
     $existingNames = Get-AppSettingNames $ApiAppName
     $settings = @{}
@@ -337,7 +344,7 @@ function Set-ApiAppSettings {
         $settings[$ConnectionStringSetting] = $connectionString
     }
     Add-JwtSecretSetting $settings $existingNames
-    Add-AdminSeedSettings $settings $existingNames
+    Add-AdminSeedSettings $settings
     Set-AppSettings $ApiAppName $settings
 }
 

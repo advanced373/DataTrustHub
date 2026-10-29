@@ -20,7 +20,7 @@ reference each other **by id only**.
 | Attribute | Notes |
 |---|---|
 | `Id` | |
-| `Email` | Used to log in. Unique |
+| `Email` | Used to log in. Unique. Always the normalized form of an `EmailAddress` (U7) |
 | `HashedPassword` | Never the plain password (`IPasswordHasher`) |
 | `Role` | `User` or `Admin` (`UserRoles`) |
 
@@ -28,18 +28,26 @@ reference each other **by id only**.
 - `Register(email, hashedPassword)` creates a `User`.
 - `CreateAdmin(email, hashedPassword)` creates an `Admin`.
 
+Both store the normalized address (U7). Rehydration keeps the stored email as it is.
+
 **Behaviour:**
 - `PromoteToAdmin()` returns `false` if the user was already an admin.
 - `CheckCanBeDeletedBy(requesterId)`.
 
 | # | Invariant / rule | Enforced in |
 |---|---|---|
-| U1 | An email belongs to at most one user | Use case: `RegisterUser`, `CreateAccount` (`EmailExistsAsync`) |
-| U2 | An email is at most 256 characters; a password is at least 8 | Validator: `RegisterUser` |
+| U1 | An email belongs to at most one user, case-insensitive, ignoring surrounding spaces | Use case: `RegisterUser`, `CreateAccount` (`EmailExistsAsync`, which compares the normalized address, U7) |
+| U2 | An email is at most 256 characters, counted on the trimmed address; a password is at least 8 | Validator: `RegisterUser`, `CreateAccount` |
 | U3 | A user cannot delete their own account, so an admin cannot lock everyone out | Entity: `CheckCanBeDeletedBy` → `Account.CannotDeleteOwnAccount` |
 | U4 | Login gives the same error for an unknown email and a wrong password, so it does not reveal which emails exist | Use case: `LoginUser` → `User.InvalidCredentials` |
 | U5′ | Deleting a user also removes their clearances and memberships and soft-deletes their personal data items, all in one transaction. Their classified data items are not touched: they stay with their organization, whose organization admins can delete them (ADR-0014) | Use case: `DeleteAccount` |
 | U6 | Startup makes sure the configured admin exists, and promotes that user if needed | Use case: `AdminSeeder` |
+| U7 | An email address is normalized: surrounding whitespace trimmed and the whole address lower-cased with the invariant culture, so `" Ion@Firma.RO "` and `"ion@firma.ro"` are the same address and the same account. The normalized form is what is stored, compared, put in the token and returned. Surrounding whitespace alone does not make a request invalid | Value object: `EmailAddress`, used by `User.Register`, `User.CreateAdmin`, `IUserRepository.GetByEmailAsync` / `EmailExistsAsync`, `FindUserByEmail` and the email validators. The migration `NormalizeUserEmails` normalized the emails stored before; it fails, changing nothing, if two users would share an address |
+
+### Value object: EmailAddress
+
+Source: `Domain/Users/EmailAddress.cs`. It is an immutable `record (Value)`; `EmailAddress.From(email)`
+applies the rule U7 and is the only place that implements it. `User.Email` holds its `Value`.
 
 ## Organization
 

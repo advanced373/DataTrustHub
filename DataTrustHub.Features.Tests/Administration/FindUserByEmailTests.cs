@@ -100,7 +100,8 @@ public class FindUserByEmailTests(ApiFactory factory) : IClassFixture<ApiFactory
 
         var found = await FindAsync(scenario, $"find_found_{role}_target{EmailDomain}");
 
-        Assert.Equal(new FoundUser(userId, $"find_found_{role}_target{EmailDomain}", true, role), found);
+        // The response carries the stored, normalized email (U7, #123)
+        Assert.Equal(new FoundUser(userId, $"find_found_{role.ToLowerInvariant()}_target{EmailDomain}", true, role), found);
     }
 
     [Fact]
@@ -173,8 +174,6 @@ public class FindUserByEmailTests(ApiFactory factory) : IClassFixture<ApiFactory
     [InlineData("find_exact_target@example.co")]
     [InlineData("exact_target@example.com")]
     [InlineData("find_exact@example.com")]
-    [InlineData("find_exact_target@example.com ")]
-    [InlineData(" find_exact_target@example.com")]
     [InlineData("find_exact%@example.com")]
     [InlineData("%@%")]
     [InlineData("*@*")]

@@ -23,11 +23,12 @@ public sealed class User
 
     public bool IsAdmin => Role == UserRoles.Admin;
 
+    // The factory methods store the normalized address (U7); rehydration keeps what is stored
     public static User Register(string email, string hashedPassword) =>
-        new(Guid.NewGuid(), email, hashedPassword, UserRoles.User);
+        new(Guid.NewGuid(), EmailAddress.From(email).Value, hashedPassword, UserRoles.User);
 
     public static User CreateAdmin(string email, string hashedPassword) =>
-        new(Guid.NewGuid(), email, hashedPassword, UserRoles.Admin);
+        new(Guid.NewGuid(), EmailAddress.From(email).Value, hashedPassword, UserRoles.Admin);
 
     // Returns false when the user already was an admin
     public bool PromoteToAdmin()

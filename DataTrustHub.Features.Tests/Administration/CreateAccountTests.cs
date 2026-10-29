@@ -31,9 +31,10 @@ public class CreateAccountTests(AdminApiFactory factory) : IClassFixture<AdminAp
     }
 
     [Fact]
-    public async Task CreateAccount_WithValidData_StoresRegularUserWithExactEmailAndHashedPassword()
+    public async Task CreateAccount_WithValidData_StoresRegularUserWithNormalizedEmailAndHashedPassword()
     {
         const string mixedCaseEmail = "Mixed.Case.Account@Example.com";
+        const string normalizedEmail = "mixed.case.account@example.com";
 
         var response = await _client.PostAsJsonAsync(
             CreateAccountEndpoint,
@@ -43,7 +44,7 @@ public class CreateAccountTests(AdminApiFactory factory) : IClassFixture<AdminAp
         using var scope = factory.Services.CreateScope();
         var stored = await scope.ServiceProvider.GetRequiredService<DContext>().Users.SingleAsync(u => u.Id == userId);
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
-        Assert.Equal((mixedCaseEmail, UserRoles.User), (stored.Email, stored.Role));
+        Assert.Equal((normalizedEmail, UserRoles.User), (stored.Email, stored.Role));
         Assert.NotEqual(ValidPassword, stored.HashedPassword);
         Assert.True(hasher.VerifyHashedPassword(stored.HashedPassword, ValidPassword));
     }

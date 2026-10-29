@@ -13,6 +13,9 @@ namespace DataTrustHub.Features.Tests.Authentication;
 public class AuthenticationHandlerTests
 {
     private const string Email = "Handler.Auth@Example.com";
+    private const string NormalizedEmail = "handler.auth@example.com";
+    private const string VariantEmail = " HANDLER.Auth@Example.com ";
+    private const string UnknownVariantEmail = " Nobody@Example.COM ";
     private const string Password = "Password1!";
     private const string WrongPassword = "WrongPassword1!";
     private const string UnknownEmail = "nobody@example.com";
@@ -25,13 +28,13 @@ public class AuthenticationHandlerTests
     // --- RegisterUser ---
 
     [Fact]
-    public async Task RegisterUser_NewEmail_AddsUserAsSentWithHashedPasswordAndCommitsOnce()
+    public async Task RegisterUser_NewEmail_AddsUserWithNormalizedEmailAndHashedPasswordAndCommitsOnce()
     {
         var result = await RegisterHandler().Handle(new RegisterUserCommand(Email, Password), default);
 
         Assert.True(result.IsSuccess);
         var added = Assert.Single(_users.Added);
-        Assert.Equal((result.Value, Email, UserRoles.User), (added.Id, added.Email, added.Role));
+        Assert.Equal((result.Value, NormalizedEmail, UserRoles.User), (added.Id, added.Email, added.Role));
         Assert.NotEqual(Password, added.HashedPassword);
         Assert.True(_hasher.VerifyHashedPassword(added.HashedPassword, Password));
         Assert.Equal(1, _unitOfWork.SaveChangesCalls);
@@ -83,6 +86,48 @@ public class AuthenticationHandlerTests
             (wrongPassword.Error.Type, wrongPassword.Error.Code, wrongPassword.Error.Description));
         Assert.Empty(_jwtGenerator.Calls);
         Assert.Equal(0, _unitOfWork.SaveChangesCalls);
+    }
+
+    // --- AC2 and AC4 of #123: a case or space variant is the same address (U7) ---
+
+    [Fact]
+    public async Task RegisterUser_VariantOfAnExistingEmail_FailsWithConflictWithoutCommit()
+    {
+        _users.Seed(NormalizedEmail);
+
+        var result = await RegisterHandler().Handle(new RegisterUserCommand(VariantEmail, Password), default);
+
+        Assert.Equal((ErrorType.Conflict, AuthErrorCodes.EmailAlreadyInUse), (result.Error.Type, result.Error.Code));
+        Assert.Empty(_users.Added);
+        Assert.Equal(0, _unitOfWork.SaveChangesCalls);
+    }
+
+    [Fact]
+    public async Task LoginUser_VariantOfTheEmail_IssuesTokenWithTheNormalizedEmail()
+    {
+        var user = _users.Seed(NormalizedEmail);
+
+        var result = await LoginHandler().Handle(new LoginUserCommand(VariantEmail, NormalizedEmail), default);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal((user.Id, NormalizedEmail, user.Role), Assert.Single(_jwtGenerator.Calls));
+    }
+
+    [Fact]
+    public async Task LoginUser_UnknownVariantAndWrongPasswordOnAVariant_FailWithInvalidCredentials()
+    {
+        _users.Seed(NormalizedEmail);
+
+        var unknown = await LoginHandler().Handle(new LoginUserCommand(UnknownVariantEmail, Password), default);
+        var wrongPassword = await LoginHandler().Handle(new LoginUserCommand(VariantEmail, WrongPassword), default);
+
+        Assert.Equal(
+            (AuthErrorCodes.InvalidCredentials, AuthErrorMessages.InvalidCredentials),
+            (unknown.Error.Code, unknown.Error.Description));
+        Assert.Equal(
+            (unknown.Error.Type, unknown.Error.Code, unknown.Error.Description),
+            (wrongPassword.Error.Type, wrongPassword.Error.Code, wrongPassword.Error.Description));
+        Assert.Empty(_jwtGenerator.Calls);
     }
 
     private RegisterUserHandler RegisterHandler() => new(_users, _hasher, _unitOfWork);

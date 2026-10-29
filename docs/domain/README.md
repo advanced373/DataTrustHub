@@ -30,7 +30,8 @@ They nest like this: a **bounded context** contains **aggregates**. An **aggrega
 ```
 Identity and Access                     (bounded context)
 └── User aggregate
-    └── User                            (entity, aggregate root)
+    ├── User                            (entity, aggregate root)
+    └── EmailAddress                    (value object; User.Email holds its normalized value)
 
 Access Governance                       (bounded context)
 ├── Organization aggregate
@@ -54,7 +55,7 @@ Data Management                         (bounded context)
 
 | Bounded context | Aggregate | Aggregate root (entity) | Value objects | Repository |
 |---|---|---|---|---|
-| Identity and Access | User | `User` | — | `IUserRepository` |
+| Identity and Access | User | `User` | `EmailAddress` | `IUserRepository` |
 | Access Governance | Organization | `Organization` | — | `IOrganizationRepository` |
 | Access Governance | Policy | `Policy` | — | `IPolicyRepository` |
 | Access Governance | Clearance | `Clearance` | `ClassificationLevel` | `IClearanceRepository` |
@@ -64,7 +65,7 @@ Data Management                         (bounded context)
 So today:
 - There are **6 entities**, and each is the root of its own aggregate (**6 aggregates**). None of
   them contains another entity.
-- There are **2 value objects**: `ClassificationLevel` and `MembershipRole`.
+- There are **3 value objects**: `EmailAddress`, `ClassificationLevel` and `MembershipRole`.
 - There are **3 bounded contexts**. They are still a proposal; see
   [bounded-contexts.md](bounded-contexts.md).
 
@@ -80,7 +81,6 @@ the use case (rule O2 in [aggregates.md](aggregates.md)).
 ### Candidates, not modelled yet
 
 These would become value objects if they grew rules:
-- `Email` (format, normalisation);
 - `SecurityMarking`;
 - `FileContent` (size limit).
 

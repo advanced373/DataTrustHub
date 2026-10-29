@@ -1,4 +1,5 @@
 using DataTrustHub.Domain.Memberships;
+using DataTrustHub.Domain.Users;
 using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Features.Administration.Authorization;
 using DataTrustHub.Infrastructure.Persistance;
@@ -25,10 +26,12 @@ public class FindUserByEmailHandler(IMembershipRepository memberships, DContext 
         if (!await _memberships.IsOrgAdminAsync(query.CallerId, query.OrganizationId, cancellationToken))
             return Result.Failure<FindUserByEmailResponse>(Errors.OrganizationNotFound);
 
-        // The same comparison as log in (IUserRepository.GetByEmailAsync): equality in the database
+        // The same comparison as log in (IUserRepository.GetByEmailAsync): the normalized address (U7),
+        // by equality in the database
+        var normalizedEmail = EmailAddress.From(query.Email).Value;
         var user = await _db.Users
             .AsNoTracking()
-            .Where(u => u.Email == query.Email)
+            .Where(u => u.Email == normalizedEmail)
             .Select(u => new { u.Id, u.Email })
             .FirstOrDefaultAsync(cancellationToken);
         if (user is null) return Result.Failure<FindUserByEmailResponse>(Errors.UserNotFound);

@@ -36,7 +36,7 @@ platform, never in the repository or in CI (ADR-0021 §4). Their values are not 
 | both | `APPLICATIONINSIGHTS_CONNECTION_STRING`, `ApplicationInsightsAgent_EXTENSION_VERSION`, `XDT_MicrosoftApplicationInsights_Mode` | Application Insights | the portal; kept by the setup script |
 | API | `ConnectionStrings__DefaultConnection` | `Server=tcp:<server>.database.windows.net,1433;Database=<database>;Authentication=Active Directory Managed Identity;Encrypt=True;Connect Timeout=60`: the API reaches SQL with its managed identity, so no password exists | setup script |
 | API | `Jwt__Secret` | random 48-byte key, base64 | setup script, generated only when missing |
-| API | `AdminSeed__Email`, `AdminSeed__Password` | the first platform admin (ADR-0006) | setup script, asked from the owner when missing |
+| API | `AdminSeed__Email`, `AdminSeed__Password` | the first platform admin (ADR-0006) | setup script, only with `-SeedAdmin`; removed by the owner after the first seed ([ADR-0022](../docs/architecture/adr/0022-seed-the-production-admin-once.md), see [Seeding the first admin](#6-seeding-the-first-admin)) |
 | WebApp | `Api__BaseUrl` | `https://<API default host name>` | setup script |
 
 ## Prerequisites
@@ -54,12 +54,14 @@ platform, never in the repository or in CI (ADR-0021 §4). Their values are not 
 3. **The deploy identity** of ADR-0018 §4, created by hand with its OIDC federated credential (#102).
 4. **The SQL script again**, with the deploy identity filled in, for the deploy user.
 5. **The first release** (#102).
+6. **Seeding the first admin**, once, with `setup.ps1 -SeedAdmin`, then removing the seed settings
+   (ADR-0022).
 
 ### 1. The setup script
 
 A PowerShell script, not bash: the owner works on Windows, and Windows PowerShell 5.1 is always
-there. It reads the admin seed password as a secure string, which it never echoes. It uses the
-Azure CLI only.
+there. With `-SeedAdmin` it reads the admin seed password as a secure string, which it never
+echoes. It uses the Azure CLI only.
 
 Run a dry run first. It prints every `az` command that would change Azure, with secrets masked,
 and changes nothing. If the CLI is signed in, it reads the current state and prints only what
@@ -77,9 +79,12 @@ The script shows the subscription and asks for confirmation (`-Force` skips it).
    - the connection string, with managed identity authentication;
    - `Jwt__Secret`, a new random key, **only if it does not exist yet**. Re-running does not
      rotate it, because rotating signs out every user. `-RotateJwtSecret` rotates it on purpose;
-   - `AdminSeed__Email` and `AdminSeed__Password`, asked from the owner only if missing.
-     The password is asked twice; an empty or malformed entry is asked again, up to three times.
-     `-OverwriteAdminSeed` asks for them again and overwrites them;
+   - `AdminSeed__Email` and `AdminSeed__Password`, **only with `-SeedAdmin`** (ADR-0022): the
+     script asks the owner for both and writes them, overwriting existing values. The password is
+     asked twice; an empty or malformed entry is asked again, up to three times. In a dry run both
+     are planned masked and nothing is asked. Without `-SeedAdmin` the admin seed is neither asked
+     for nor written, whether it is set or not, and existing values are kept (see
+     [Seeding the first admin](#6-seeding-the-first-admin));
 3. sets the WebApp's `Api__BaseUrl` from the API's default host name;
 4. disables FTP and basic publishing credentials (SCM and FTP) on both apps;
 5. sets the health check path to `/health` on both apps;
@@ -89,7 +94,7 @@ The script shows the subscription and asks for confirmation (`-Force` skips it).
 It is idempotent: each step reads the current state first and changes only what differs, so a
 second run reports nothing to change. If a read fails (for example a missing permission), the
 script stops with an error naming the step instead of taking the failure for a missing setting,
-so it never generates a new JWT signing key or asks for the admin seed by mistake. The settings
+so it never generates a new JWT signing key by mistake. The settings
 are passed to `az` in a temporary JSON file, deleted right after, so that no secret is on a
 command line and `az.cmd` cannot mangle special characters in a password.
 
@@ -198,6 +203,39 @@ is missing. A broken migration is fixed forward, in a new release (ADR-0018 §5)
 again with the artifacts of the same run, after a new approval, so what reaches production is
 still what that run built and tested.
 
+### 6. Seeding the first admin
+
+The first platform admin is seeded once, after the first release has created the database schema
+([ADR-0022](../docs/architecture/adr/0022-seed-the-production-admin-once.md)):
+
+1. From PowerShell, run the setup script with `-SeedAdmin`. It asks for the admin's e-mail address
+   and password and writes `AdminSeed__Email` and `AdminSeed__Password`:
+
+   ```powershell
+   .\infra\setup.ps1 -SeedAdmin
+   ```
+
+2. The API seeds the admin on its next start, which any request triggers, for example opening the
+   site.
+3. Check that the admin can sign in.
+4. Delete both settings. This restarts the API:
+
+   ```powershell
+   az webapp config appsettings delete --name <api app> --resource-group <group> --setting-names AdminSeed__Email AdminSeed__Password
+   ```
+
+**Why.** The seeder runs at every start of the API while the settings exist, and each run opens a
+database connection to check that the admin exists. On F1 without Always On the API cold-starts
+after every deploy, restart and idle period, so each start would wake the auto-paused free database
+and spend its monthly quota. Without the settings the seeder does nothing (ADR-0006), and cold
+starts no longer touch the database. The admin's password does not stay in the app settings either.
+Forgetting the deletion costs quota, not correctness.
+
+**Recovering access.** Seed again the same way, with `-SeedAdmin`, then delete the two settings
+again. The seeder only creates an admin that does not exist; it never changes an existing user's
+password, so a forgotten password is recovered with a new admin e-mail address, not by seeding the
+same one again.
+
 ## Deliberately manual
 
 - Creating the resources: resource group, plan, web apps, SQL server, database, Application
@@ -206,6 +244,8 @@ still what that run built and tested.
   with the owner as required reviewer (#102).
 - No firewall rule for the release workflow: the GitHub-hosted runners reach the SQL server
   through `AllowAllWindowsAzureIps` (ADR-0018, amendment of 2026-10-28).
+- Deleting `AdminSeed__Email` and `AdminSeed__Password` after the first admin is seeded
+  (ADR-0022): the setup script never deletes a setting.
 
 ## Free-tier limits (ADR-0021 §6)
 

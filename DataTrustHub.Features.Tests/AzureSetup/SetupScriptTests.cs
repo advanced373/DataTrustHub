@@ -14,6 +14,16 @@ public class SetupScriptTests
     private const string SwitchType = "SwitchParameter";
     private const string StringType = "String";
     private const string DeleteArgument = "'delete'";
+    private const string SeedAdminSwitch = "SeedAdmin";
+    private const string OverwriteAdminSeedSwitch = "OverwriteAdminSeed";
+    private const string Adr0022 = "ADR-0022";
+    private const string DescriptionKeyword = ".DESCRIPTION";
+    private const string ParameterKeyword = ".PARAMETER";
+    private const string ExampleKeyword = ".EXAMPLE";
+
+    // The comment-based help block and its keyword lines (.SYNOPSIS, .PARAMETER Name, ...)
+    private static readonly Regex HelpComment = new(@"<#(?<help>.*?)#>", RegexOptions.Singleline);
+    private static readonly Regex HelpKeywordLine = new(@"^[ \t]*\.[A-Z]+(?:[ \t]+\w+)?[ \t]*\r?$", RegexOptions.Multiline);
 
     // A cmdlet of the Az PowerShell module (Connect-AzAccount, Set-AzWebApp, ...): the script must use az only
     private static readonly Regex AzModuleCmdlet = new(@"\b[A-Z][a-z]+-Az[A-Z]\w*");
@@ -49,11 +59,51 @@ public class SetupScriptTests
     [InlineData("WhatIf")]
     [InlineData("Force")]
     [InlineData("RotateJwtSecret")]
+    [InlineData(SeedAdminSwitch)]
     public void SetupScript_DeclaresSwitch(string switchName)
     {
         var parameter = Assert.Single(SetupScriptParser.Script.Parameters, parameter => parameter.Name == switchName);
 
         Assert.Equal(SwitchType, parameter.Type);
+    }
+
+    // #147 AC2: -SeedAdmin replaces -OverwriteAdminSeed (one switch, one meaning)
+    [Fact]
+    public void SetupScript_DoesNotDeclareOverwriteAdminSeed()
+    {
+        Assert.DoesNotContain(SetupScriptParser.Script.Parameters, parameter => parameter.Name == OverwriteAdminSeedSwitch);
+    }
+
+    // #147 AC4: neither the help nor the code mentions the removed switch
+    [Fact]
+    public void SetupScript_DoesNotMentionOverwriteAdminSeed()
+    {
+        Assert.DoesNotContain(OverwriteAdminSeedSwitch, SetupScript(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void SetupScriptHelp_HasParameterSectionForSeedAdmin()
+    {
+        Assert.Matches(HelpKeyword(ParameterKeyword + " " + SeedAdminSwitch), HelpBlock());
+    }
+
+    [Fact]
+    public void SetupScriptHelp_HasExampleRunningSeedAdmin()
+    {
+        var examples = HelpSections(ExampleKeyword);
+
+        Assert.Contains(examples, example => example.Contains("-" + SeedAdminSwitch));
+    }
+
+    // #147 AC4: the description says the admin seed is written only on request, with -SeedAdmin (ADR-0022)
+    [Theory]
+    [InlineData("-" + SeedAdminSwitch)]
+    [InlineData(Adr0022)]
+    public void SetupScriptHelp_DescriptionMentions(string expected)
+    {
+        var description = Assert.Single(HelpSections(DescriptionKeyword));
+
+        Assert.Contains(expected, description);
     }
 
     // The resource names are parameters, with the existing production resources as defaults
@@ -94,4 +144,27 @@ public class SetupScriptTests
     }
 
     private static string SetupScript() => SolutionFiles.ReadText(SetupScriptParser.SetupScriptFile);
+
+    // The comment-based help: the first <# ... #> block of the script
+    private static string HelpBlock()
+    {
+        var match = HelpComment.Match(SetupScript());
+        Assert.True(match.Success, "setup.ps1 has no comment-based help.");
+        return match.Groups["help"].Value;
+    }
+
+    // The text of every help section with the given keyword, up to the next keyword
+    private static List<string> HelpSections(string keyword)
+    {
+        var sections = HelpKeywordLine.Split(HelpBlock());
+        var keywords = HelpKeywordLine.Matches(HelpBlock()).Select(match => match.Value.Trim()).ToList();
+        return keywords
+            .Select((line, index) => (line, text: sections[index + 1]))
+            .Where(section => section.line.StartsWith(keyword, StringComparison.OrdinalIgnoreCase))
+            .Select(section => section.text)
+            .ToList();
+    }
+
+    private static Regex HelpKeyword(string keywordLine) =>
+        new($@"^\s*{Regex.Escape(keywordLine)}\s*$", RegexOptions.Multiline | RegexOptions.IgnoreCase);
 }

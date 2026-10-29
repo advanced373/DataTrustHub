@@ -21,6 +21,7 @@ internal static class SetupScriptDryRun
 {
     internal const string WhatIfSwitch = "-WhatIf";
     internal const string RotateJwtSecretSwitch = "-RotateJwtSecret";
+    internal const string SeedAdminSwitch = "-SeedAdmin";
     internal const string FakeApiHostName = "fake-api.example.test";
     internal const string FakeSubscriptionName = "Fake Subscription";
 

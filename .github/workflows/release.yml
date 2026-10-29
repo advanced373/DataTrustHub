@@ -1,0 +1,281 @@
+# Releases the application to production on every push to main, which is a merge of a release
+# (ADR-0009, ADR-0017, ADR-0018 §2, ADR-0021). Two jobs, the second only after the first succeeded:
+# - "build" builds and tests the release commit once and uploads the only inputs of the release:
+#   the API and WebApp packages (dotnet publish), the framework-dependent EF Core migration bundle
+#   and the idempotent SQL script, kept for review. It has no environment and no Azure access;
+# - "release" runs in the GitHub environment "production", so it waits for the owner's approval
+#   and only main can deploy. It signs in to Azure as the deploy identity through OIDC, applies
+#   the migrations with the bundle (retrying while the auto-paused database resumes), deploys the
+#   API and then the WebApp, and checks that both answer /health. Nothing is rebuilt after the
+#   approval.
+# CD never touches the infrastructure (ADR-0021 §5) and opens no SQL firewall rule (ADR-0018,
+# amendment of 2026-10-28). No repository secret, publish profile or client secret: the Azure ids
+# are variables of the environment, and the JWT signing key the bundle needs is generated in the run.
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# One release at a time; a running release is never cancelled. A newer run waits for it, and only
+# the newest waiting run is kept: GitHub replaces an older waiting run of the group
+concurrency:
+  group: release-production
+  cancel-in-progress: false
+
+permissions: {}
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  RESOURCE_GROUP: DataTrustHub
+  API_APP_NAME: datatrusthubapi
+  WEBAPP_APP_NAME: DataTrustHub
+  SQL_SERVER_NAME: datatrusthub
+  DATABASE_NAME: datatrusthub
+
+jobs:
+  build:
+    # workflow_dispatch can pick any branch; only main is released
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    env:
+      EF_PROJECTS: --project DataTrustHub.Infrastructure --startup-project DataTrustHub.API --configuration Release
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      # Same cache as ci.yml
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      # The EF Core tools build the API host, which refuses to start without a JWT signing key of at
+      # least 32 bytes. A new random key, masked before any later step can print it; it signs nothing
+      # and is never committed (ADR-0007). The real key lives only in the API's app settings.
+      - name: Generate JWT signing key
+        run: |
+          key="$(openssl rand -base64 48)"
+          echo "::add-mask::$key"
+          echo "Jwt__Secret=$key" >> "$GITHUB_ENV"
+
+      - name: Restore
+        run: |
+          dotnet restore DataTrustHub.sln
+          dotnet tool restore
+
+      - name: Build
+        run: dotnet build DataTrustHub.sln --no-restore -c Release
+
+      - name: Test
+        run: >
+          dotnet test DataTrustHub.Features.Tests/ --no-build -c Release
+          --logger "trx;LogFileName=test-results.trx"
+          --results-directory TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults/*.trx
+          if-no-files-found: warn
+
+      # Framework-dependent: App Service runs the built-in DOTNETCORE|10.0 runtime (ADR-0020). Each
+      # package is zipped here, so the release job deploys exactly these files.
+      - name: Publish the API and the WebApp
+        run: |
+          dotnet publish DataTrustHub.API/DataTrustHub.API.csproj --no-build -c Release -o publish/api
+          dotnet publish DataTrustHub/DataTrustHub.WebApp.csproj --no-build -c Release -o publish/webapp
+          mkdir -p packages
+          (cd publish/api && zip -qr ../../packages/api.zip .)
+          (cd publish/webapp && zip -qr ../../packages/webapp.zip .)
+
+      # Kept for review before approving (ADR-0018 §2); the bundle applies the migrations
+      - name: Generate idempotent SQL script
+        run: |
+          # shellcheck disable=SC2086 # EF_PROJECTS is split into its arguments on purpose
+          dotnet dotnet-ef migrations script --idempotent $EF_PROJECTS --no-build -o migrations.sql
+
+      # The same kind of bundle that ci.yml checks against SQL Server 2022 on every pull request.
+      # Framework-dependent: a self-contained single-file bundle cannot discover Carter's assemblies.
+      - name: Build migration bundle
+        run: |
+          # shellcheck disable=SC2086 # EF_PROJECTS is split into its arguments on purpose
+          dotnet dotnet-ef migrations bundle $EF_PROJECTS -r linux-x64 -o efbundle
+
+      - name: Upload the API package
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-package
+          path: packages/api.zip
+          if-no-files-found: error
+
+      - name: Upload the WebApp package
+        uses: actions/upload-artifact@v4
+        with:
+          name: webapp-package
+          path: packages/webapp.zip
+          if-no-files-found: error
+
+      - name: Upload migration bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: migration-bundle
+          path: efbundle
+          if-no-files-found: error
+
+      - name: Upload SQL script
+        uses: actions/upload-artifact@v4
+        with:
+          name: migrations-sql
+          path: migrations.sql
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Waits for the owner's approval; the environment accepts deployments from main only, and the
+    # deploy identity's federated credential trusts this environment only
+    environment: production
+    permissions:
+      id-token: write
+      contents: read
+
+    env:
+      ARTIFACTS_DIR: ${{ github.workspace }}/artifacts
+      # Bounds of the retry loops, in seconds: about three and a half minutes each, enough for the
+      # serverless database to resume from auto-pause and for an F1 app to cold start (ADR-0021 §6)
+      RETRY_BUDGET_SECONDS: 210
+      MIGRATE_PAUSE_SECONDS: 20
+      # Grace period for a bundle attempt stopped at the end of the budget before it is killed
+      MIGRATE_KILL_AFTER_SECONDS: 10
+      SMOKE_PAUSE_SECONDS: 10
+      SMOKE_REQUEST_TIMEOUT_SECONDS: 30
+      HEALTH_PATH: /health
+      HEALTHY_STATUS: 200
+
+    steps:
+      # The bundle is framework-dependent, so the runner needs the .NET 10 runtime; nothing is built
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Download the build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ${{ env.ARTIFACTS_DIR }}
+
+      # The ids are environment variables of "production", not secrets; no client secret exists
+      - name: Sign in to Azure (OIDC)
+        uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      # A new throwaway JWT signing key for the API host that the bundle builds, masked before any
+      # later step can print it. The bundle runs from the unpacked API package, whose appsettings.json
+      # (the Jwt issuer and audience) the host reads from the working directory. Artifacts lose the
+      # executable bit, so it is set again. The SQL host suffix comes from the signed-in cloud.
+      - name: Prepare the migration
+        run: |
+          key="$(openssl rand -base64 48)"
+          echo "::add-mask::$key"
+          echo "Jwt__Secret=$key" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/api"
+          unzip -q "$ARTIFACTS_DIR/api-package/api.zip" -d "$RUNNER_TEMP/api"
+          chmod +x "$ARTIFACTS_DIR/migration-bundle/efbundle"
+          suffix="$(az cloud show --query suffixes.sqlServerHostname -o tsv)"
+          echo "SQL_HOST=$SQL_SERVER_NAME$suffix" >> "$GITHUB_ENV"
+
+      # Passwordless: the bundle connects as the deploy identity with the token of the signed-in Azure
+      # CLI (AZURE_TOKEN_CREDENTIALS limits Active Directory Default to that credential). The database
+      # auto-pauses, and its first connection fails while it resumes: the API host's own retry policy
+      # covers transient errors, and this loop starts the bundle again, with a pause, until the retry
+      # budget is spent. Each attempt gets only the time left in the budget, so the step fails after
+      # about three and a half minutes; the step timeout is a safety net above that. Applied
+      # migrations are recorded, so a new attempt applies only what is missing.
+      - name: Apply migrations
+        working-directory: ${{ runner.temp }}/api
+        env:
+          AZURE_TOKEN_CREDENTIALS: AzureCliCredential
+        timeout-minutes: 5
+        run: |
+          connection="Server=tcp:$SQL_HOST,1433;Database=$DATABASE_NAME;Authentication=Active Directory Default;Encrypt=True;Connect Timeout=60"
+          deadline=$((SECONDS + RETRY_BUDGET_SECONDS))
+          attempt=1
+          until timeout --kill-after="$MIGRATE_KILL_AFTER_SECONDS" "$((deadline - SECONDS))" \
+            "$ARTIFACTS_DIR/migration-bundle/efbundle" --connection "$connection"; do
+            # Another attempt only if it still has time after the pause (timeout 0 would mean no limit)
+            if [ $((SECONDS + MIGRATE_PAUSE_SECONDS)) -ge "$deadline" ]; then
+              echo "::error::The migrations failed after $attempt attempt(s); see infra/README.md, step 5"
+              exit 1
+            fi
+            echo "Attempt $attempt failed; trying again in $MIGRATE_PAUSE_SECONDS s"
+            attempt=$((attempt + 1))
+            sleep "$MIGRATE_PAUSE_SECONDS"
+          done
+          echo "Migrations applied after $attempt attempt(s)"
+
+      # OneDeploy with the Microsoft Entra token of the sign-in: basic publishing credentials are
+      # disabled on both apps. Startup is checked by the smoke check, not by the deployment. No
+      # output: the result names the app's hosts.
+      - name: Deploy the API
+        run: >
+          az webapp deploy --resource-group "$RESOURCE_GROUP" --name "$API_APP_NAME"
+          --src-path "$ARTIFACTS_DIR/api-package/api.zip" --type zip --track-status false
+          --output none
+
+      - name: Deploy the WebApp
+        run: >
+          az webapp deploy --resource-group "$RESOURCE_GROUP" --name "$WEBAPP_APP_NAME"
+          --src-path "$ARTIFACTS_DIR/webapp-package/webapp.zip" --type zip --track-status false
+          --output none
+
+      # The host names have a random suffix and are read from Azure, never written in the repository;
+      # they are masked so the public log does not show them. /health does not touch the database, so
+      # only a cold start delays it. Both apps are probed until both answer exactly 200 (a redirect is
+      # not healthy) or the budget is spent.
+      - name: Smoke check
+        run: |
+          api_host="$(az webapp show --resource-group "$RESOURCE_GROUP" --name "$API_APP_NAME" --query defaultHostName -o tsv)"
+          webapp_host="$(az webapp show --resource-group "$RESOURCE_GROUP" --name "$WEBAPP_APP_NAME" --query defaultHostName -o tsv)"
+          echo "::add-mask::$api_host"
+          echo "::add-mask::$webapp_host"
+          healthy() {
+            status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+              --max-time "$SMOKE_REQUEST_TIMEOUT_SECONDS" "https://$1$HEALTH_PATH")" || true
+            [ "$status" = "$HEALTHY_STATUS" ]
+          }
+          deadline=$((SECONDS + RETRY_BUDGET_SECONDS))
+          api_ok=false
+          webapp_ok=false
+          while [ "$SECONDS" -lt "$deadline" ]; do
+            [ "$api_ok" = true ] || { healthy "$api_host" && api_ok=true && echo "The API answers $HEALTH_PATH"; }
+            [ "$webapp_ok" = true ] || { healthy "$webapp_host" && webapp_ok=true && echo "The WebApp answers $HEALTH_PATH"; }
+            if [ "$api_ok" = true ] && [ "$webapp_ok" = true ]; then
+              exit 0
+            fi
+            sleep "$SMOKE_PAUSE_SECONDS"
+          done
+          [ "$api_ok" = true ] || echo "::error::The API did not answer $HEALTH_PATH in time"
+          [ "$webapp_ok" = true ] || echo "::error::The WebApp did not answer $HEALTH_PATH in time"
+          exit 1

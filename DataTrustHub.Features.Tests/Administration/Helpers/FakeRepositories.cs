@@ -210,13 +210,13 @@ internal sealed class FakeUserRepository : IUserRepository
         Task.FromResult(Stored.SingleOrDefault(u => u.Id == id));
 
     public Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken) =>
-        Task.FromResult(Stored.SingleOrDefault(u => u.Email == email));
+        Task.FromResult(Stored.SingleOrDefault(u => u.Email == EmailAddress.From(email).Value));
 
     public Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken) =>
         Task.FromResult(Stored.Any(u => u.Id == id));
 
     public Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken) =>
-        Task.FromResult(Stored.Any(u => u.Email == email));
+        Task.FromResult(Stored.Any(u => u.Email == EmailAddress.From(email).Value));
 
     public void Add(User user) => Added.Add(user);
 

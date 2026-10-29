@@ -47,6 +47,7 @@ architecture that implements them is in ADR-0012 and [the architecture overview]
 | Term | Meaning | In code |
 |---|---|---|
 | **User** | A person with an account. Their role is `User` or `Admin` | `User` |
+| **Email address** | What a user logs in with, unique per user. Always in its normalized form: surrounding whitespace trimmed and the whole address lower-cased, so `" Ion@Firma.RO "` and `"ion@firma.ro"` are the same address and the same account (U7) | `EmailAddress`, `User.Email` |
 | **Admin** | A user who manages organizations and users; policies and clearances are now managed by organization admins. Admins have no automatic access to data (need-to-know). Under ADR-0014 this role becomes the *platform admin* | `User.Role` |
 | **Platform admin** | A user with the `Admin` role. Under ADR-0014 they manage tenants only: create and delete organizations and appoint their first organization admin. Not to be confused with an organization admin | `UserRoles.Admin`, `User.IsAdmin` |
 | **Membership** | A user's membership in one organization, with a role there. A user can be a member of several organizations, with at most one membership in each | `Membership` |
@@ -60,7 +61,7 @@ architecture that implements them is in ADR-0012 and [the architecture overview]
 | **Remove a member** | An organization admin ends another user's membership in their organization. It revokes the user's clearances on the organization's policies. The last organization admin cannot be removed | `RemoveMember` |
 | **Leave an organization** | A member, guest or organization admin ends their own membership. It revokes their clearances on the organization's policies. The last organization admin cannot leave | `LeaveOrganization` |
 | **My organizations** | The organizations the signed-in user belongs to, each with the role of their membership there. A user sees only their own memberships | `ListMyOrganizations` |
-| **Find a user by email** | An organization admin looks up a user by their exact email address, to add them as a member or guest. Only an exact match: an organization admin can confirm an address they already know, but cannot list or search the users of the platform. The answer says whether the user already has a membership in the organization, and its role | `FindUserByEmail` |
+| **Find a user by email** | An organization admin looks up a user by their exact email address, to add them as a member or guest. Exact means the same normalized address, so case and surrounding spaces do not matter (U7). Only an exact match: an organization admin can confirm an address they already know, but cannot list or search the users of the platform. The answer says whether the user already has a membership in the organization, and its role | `FindUserByEmail` |
 | **Organization** | A tenant: the company that policies, clearances and classified data belong to. The word is never *group*. The old *Group* names in the API and the UI are being renamed (#91) | `Organization` |
 | **Policy** | A named area of access inside one organization. Every classified data item belongs to one policy | `Policy` |
 | **Classification level** | A named sensitivity level with a priority: Public (0), Internal, Confidential, Secret, Top Secret (4) | `ClassificationLevel` |
@@ -94,7 +95,7 @@ These are the words for how the code is structured (ADR-0012).
 | **Presentation layer** | `DataTrustHub.API` (Carter endpoints) and the WebApp |
 | **Entity** | A domain object with an identity and behaviour: `User`, `Organization`, `Policy`, `Clearance`, `Membership`, `DataItem`, and `AuditRecord`, which is only appended |
 | **Aggregate root** | An entity that is loaded and saved as a whole, through its own repository. Today every entity is its own aggregate root |
-| **Value object** | An immutable object defined by its values: `ClassificationLevel`, `MembershipRole`, `DeletionRights` |
+| **Value object** | An immutable object defined by its values: `EmailAddress`, `ClassificationLevel`, `MembershipRole`, `DeletionRights` |
 | **Invariant / business rule** | A rule that must always hold. A rule of one aggregate lives in an entity method (`IsReadableBy`, `MarkDeleted`, `CheckCanBeDeletedBy`). A rule that needs other aggregates or the whole set (uniqueness, references, deletion guards) is checked in the use case through repositories. Never in validators. The full list is in [aggregates.md](aggregates.md) |
 | **Factory method** | The only way to create a new entity. It applies the entity's rules: `User.Register`, `Policy.Create`, `Clearance.Grant`, `DataItem.CreateClassified` |
 | **Rehydration** | Rebuilding a stored entity without running its creation rules, through an `internal` constructor that only the persistence mappers can see |

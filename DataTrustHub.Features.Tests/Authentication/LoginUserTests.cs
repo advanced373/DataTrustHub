@@ -81,6 +81,7 @@ public class LoginUserTests(ApiFactory factory) : IClassFixture<ApiFactory>
     public async Task LoginUser_WithValidCredentials_TokenClaimsMatchTheUser()
     {
         const string email = "Claims.User@Example.com";
+        const string normalizedEmail = "claims.user@example.com";
         var register = await _client.PostAsJsonAsync(RegisterEndpoint, new { Email = email, Password = "Password1!" });
         var userId = (await register.Content.ReadFromJsonAsync<RegisterUserResponse>())!.UserId;
 
@@ -89,7 +90,7 @@ public class LoginUserTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
         var claims = new JwtSecurityTokenHandler().ReadJwtToken(token).Claims.ToList();
         Assert.Equal(userId.ToString(), claims.Single(c => c.Type == JwtRegisteredClaimNames.Sub).Value);
-        Assert.Equal(email, claims.Single(c => c.Type == JwtRegisteredClaimNames.Email).Value);
+        Assert.Equal(normalizedEmail, claims.Single(c => c.Type == JwtRegisteredClaimNames.Email).Value);
         Assert.Equal(UserRoles.User, claims.Single(c => c.Type == RoleClaim).Value);
     }
 

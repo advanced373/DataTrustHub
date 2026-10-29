@@ -17,6 +17,7 @@ namespace DataTrustHub.Features.Tests.Administration;
 public class AccountClearanceCommandHandlerTests
 {
     private const string Email = "Handler.User@Example.com";
+    private const string NormalizedEmail = "handler.user@example.com";
     private const string Password = "Password1!";
     private const string ClearanceName = "Handler clearance";
     private const string LevelName = "Secret";
@@ -40,13 +41,13 @@ public class AccountClearanceCommandHandlerTests
     // --- CreateAccount ---
 
     [Fact]
-    public async Task CreateAccount_NewEmail_AddsRegularUserWithHashedPasswordAndCommitsOnce()
+    public async Task CreateAccount_NewEmail_AddsRegularUserWithNormalizedEmailAndHashedPasswordAndCommitsOnce()
     {
         var result = await CreateAccountHandler().Handle(new CreateAccountCommand(Email, Password), default);
 
         Assert.True(result.IsSuccess);
         var added = Assert.Single(_users.Added);
-        Assert.Equal((result.Value, Email, UserRoles.User), (added.Id, added.Email, added.Role));
+        Assert.Equal((result.Value, NormalizedEmail, UserRoles.User), (added.Id, added.Email, added.Role));
         Assert.NotEqual(Password, added.HashedPassword);
         Assert.True(_hasher.VerifyHashedPassword(added.HashedPassword, Password));
         Assert.Equal(1, _unitOfWork.SaveChangesCalls);

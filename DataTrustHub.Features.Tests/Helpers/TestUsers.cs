@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using DataTrustHub.Domain.Users;
 using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.SharedKernel;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -38,7 +39,8 @@ internal static class TestUsers
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DContext>();
-        return (await db.Users.SingleAsync(u => u.Email == email)).Id;
+        var storedEmail = Stored(email);
+        return (await db.Users.SingleAsync(u => u.Email == storedEmail)).Id;
     }
 
     private static async Task SetRoleAsync<TEntryPoint>(
@@ -47,10 +49,14 @@ internal static class TestUsers
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DContext>();
-        var user = await db.Users.SingleAsync(u => u.Email == email);
+        var storedEmail = Stored(email);
+        var user = await db.Users.SingleAsync(u => u.Email == storedEmail);
         user.Role = role;
         await db.SaveChangesAsync();
     }
+
+    // Emails are stored in their normalized form (U7), whatever case or spaces the test registered with
+    private static string Stored(string email) => EmailAddress.From(email).Value;
 
     private record LoginResponse(string Token);
 }

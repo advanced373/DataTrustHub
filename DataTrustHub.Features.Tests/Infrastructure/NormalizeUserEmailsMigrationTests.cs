@@ -37,14 +37,16 @@ public partial class NormalizeUserEmailsMigrationTests
         Assert.EndsWith(MigrationIdSeparator + MigrationName, id);
     }
 
+    // It was the latest migration until #121 added AddUniquenessIndexes after it; its place in the order stays
     [Fact]
-    public void Migration_IsTheLatestMigration()
+    public void Migration_ComesRightAfterAddAuditRecords()
     {
         using var context = SqlServerContext();
+        var migrations = context.Database.GetMigrations().ToList();
 
-        var latest = context.Database.GetMigrations().Last();
+        var index = migrations.FindIndex(id => id.EndsWith(MigrationIdSeparator + MigrationName));
 
-        Assert.EndsWith(MigrationIdSeparator + MigrationName, latest);
+        Assert.EndsWith(MigrationIdSeparator + PreviousMigrationName, migrations[index - 1]);
     }
 
     [Fact]
@@ -114,14 +116,8 @@ public partial class NormalizeUserEmailsMigrationTests
             TargetModel(context, PreviousMigrationName), TargetModel(context, MigrationName)));
     }
 
-    [Fact]
-    public void TargetModel_IsTheSameAsTheModelSnapshot()
-    {
-        using var context = SqlServerContext();
-        var snapshot = context.GetService<IMigrationsAssembly>().ModelSnapshot!.Model;
-
-        Assert.False(Differ(context).HasDifferences(TargetModel(context, MigrationName), Relational(context, snapshot)));
-    }
+    // The model snapshot now follows AddUniquenessIndexes (#121): AddUniquenessIndexesMigrationTests compares the
+    // latest migration with it
 
     // No pending model changes: AuditRecordsMigrationTests.Model_HasNoChangesPendingAMigration covers the whole model
 

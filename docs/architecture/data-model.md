@@ -8,7 +8,7 @@ Represents an individual account.
 | Field | Type | Notes |
 |---|---|---|
 | Id | Guid | Primary key |
-| Email | string | Unique, max 256 chars |
+| Email | string | nvarchar(256), normalized (U7). Unique index `IX_Users_Email` (U1) |
 | HashedPassword | string | SHA-256 hashed |
 | OrgId | Guid? | Foreign key -> Organization |
 
@@ -18,7 +18,7 @@ Groups users together.
 | Field | Type | Notes |
 |---|---|---|
 | Id | Guid | Primary key |
-| Name | string | Organization name |
+| Name | string | Organization name, nvarchar(256). Unique index `IX_Organizations_Name` (O1) |
 
 ### Policy
 Defines an access control rule scoped to an organization.
@@ -26,7 +26,7 @@ Defines an access control rule scoped to an organization.
 | Field | Type | Notes |
 |---|---|---|
 | Id | Guid | Primary key |
-| Name | string | Policy name |
+| Name | string | Policy name, nvarchar(256). Unique per organization: index `IX_Policies_OrganizationId_Name` (P2) |
 | OrgId | Guid | Foreign key -> Organization |
 
 ### Clearance
@@ -35,8 +35,8 @@ Links a user to a policy (grants access).
 | Field | Type | Notes |
 |---|---|---|
 | Id | Guid | Primary key |
-| UserId | Guid | Foreign key -> User |
-| PolicyId | Guid | Foreign key -> Policy |
+| UserId | Guid | References a User by id (no foreign key) |
+| PolicyId | Guid | References a Policy by id (no foreign key). (`UserId`, `PolicyId`) is unique: index `IX_Clearances_UserId_PolicyId` (C3) |
 
 ### DataItem
 A file or data object with a security classification.
@@ -56,7 +56,7 @@ Tracks all significant system actions.
 | Field | Type | Notes |
 |---|---|---|
 | Id | Guid | Primary key |
-| UserId | Guid | Foreign key -> User |
+| UserId | Guid | References a User by id (no foreign key) |
 | EventType | string | Category of event |
 | EventDetails | string | Free-text details |
 

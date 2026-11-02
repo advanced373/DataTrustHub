@@ -35,6 +35,16 @@ internal sealed class UniqueViolationUnitOfWork : IUnitOfWork
     }
 }
 
+// A save that fails for a reason other than a unique index (e.g. the database is gone): a use case must not
+// turn it into its conflict error (#121)
+internal sealed class FailingUnitOfWork : IUnitOfWork
+{
+    internal const string FailureMessage = "Simulated save failure that is not a unique-index violation.";
+
+    public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
+        throw new InvalidOperationException(FailureMessage);
+}
+
 internal sealed class FakeMembershipRepository : IMembershipRepository
 {
     internal List<Membership> Stored { get; } = [];

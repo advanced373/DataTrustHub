@@ -6,8 +6,13 @@ namespace DataTrustHub.Features.Tests.AzureSetup.Helpers;
 /// <param name="SignedIn">Whether az account show succeeds.</param>
 /// <param name="AppSettingsReadFails">Whether every az webapp config appsettings list exits with an error.</param>
 /// <param name="ApiSettingNames">The app setting names the fake reports (for any app).</param>
-internal sealed record DryRunScenario(bool SignedIn, bool AppSettingsReadFails, IReadOnlyList<string> ApiSettingNames)
+/// <param name="PlanTier">The pricing tier of the App Service plan the fake reports (for any app).</param>
+internal sealed record DryRunScenario(bool SignedIn, bool AppSettingsReadFails, IReadOnlyList<string> ApiSettingNames,
+    string PlanTier = DryRunScenario.ProductionPlanTier)
 {
+    // The documented production tier (App Service F1)
+    internal const string ProductionPlanTier = "Free";
+
     internal const string ConnectionStringSetting = "ConnectionStrings__DefaultConnection";
     internal const string JwtSecretSetting = "Jwt__Secret";
     internal const string AdminSeedEmailSetting = "AdminSeed__Email";

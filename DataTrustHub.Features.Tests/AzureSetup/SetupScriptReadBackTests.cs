@@ -12,25 +12,54 @@ public class SetupScriptReadBackTests
     private const string Rg = "--resource-group DataTrustHub";
     private const string Api = FakeAzure.ApiAppName;
     private const string WebApp = FakeAzure.WebAppName;
+    private const string SqlServer = "datatrusthub";
 
-    // One change step: what to ignore in the fake, the change call, the read that decides, and the words
-    // the error must name the step with
-    public static TheoryData<string, string, string, string> ChangeSteps => new()
+    // One change step of a real run
+    // Ignored: the change the fake az accepts with exit 0 but does not apply
+    // ChangeCall / DecidingRead: the change command and the read the step decides with
+    // StepWords / Resource: what the read-back error must name: the step and the resource it changes
+    private sealed record ChangeStep(string Ignored, string ChangeCall, string DecidingRead, string StepWords, string Resource);
+
+    private static readonly ChangeStep[] Steps =
+    [
+        new(FakeChange.Identity, $"webapp identity assign {Rg} --name {Api} ",
+            $"webapp show {Rg} --name {Api} --query identity.type", "managed identity", $"on {Api}"),
+        new(FakeChange.AppSettings, $"webapp config appsettings set {Rg} --name {Api} ",
+            $"webapp config appsettings list {Rg} --name {Api} --query [].name", "app settings", $"on {Api}"),
+        new(FakeChange.Ftps, $"webapp config set {Rg} --name {Api} --ftps-state Disabled",
+            $"webapp config show {Rg} --name {Api} --query ftpsState", "FTP", $"on {Api}"),
+        new(FakeChange.BasicAuth, $"--parent sites/{Api} --name scm --set properties.allow=false",
+            $"resource show {Rg} --namespace Microsoft.Web --resource-type basicPublishingCredentialsPolicies --parent sites/{Api} --name scm --query properties.allow",
+            "basic publishing credentials", $"on {Api}"),
+        new(FakeChange.HealthCheck, $"webapp config set {Rg} --name {Api} --generic-configurations healthCheckPath=/health",
+            $"webapp config show {Rg} --name {Api} --query healthCheckPath", "health check", $"of {Api}"),
+        new(FakeChange.Firewall, $"sql server firewall-rule create {Rg} --server {SqlServer} --name {FakeAzure.FirewallRuleName}",
+            $"sql server firewall-rule list {Rg} --server {SqlServer} --query [].name", "firewall", $"SQL server {SqlServer}"),
+    ];
+
+    // Each step's change command and the read that decides it
+    public static TheoryData<string, string> ChangeAndDecidingRead
     {
-        { FakeChange.Identity, $"webapp identity assign {Rg} --name {Api} ",
-            $"webapp show {Rg} --name {Api} --query identity.type", "managed identity" },
-        { FakeChange.AppSettings, $"webapp config appsettings set {Rg} --name {Api} ",
-            $"webapp config appsettings list {Rg} --name {Api} --query [].name", "app settings" },
-        { FakeChange.Ftps, $"webapp config set {Rg} --name {Api} --ftps-state Disabled",
-            $"webapp config show {Rg} --name {Api} --query ftpsState", "FTP" },
-        { FakeChange.BasicAuth, "--parent sites/" + Api + " --name scm --set properties.allow=false",
-            "resource show " + Rg + " --namespace Microsoft.Web --resource-type basicPublishingCredentialsPolicies --parent sites/" + Api + " --name scm --query properties.allow",
-            "basic publishing credentials" },
-        { FakeChange.HealthCheck, $"webapp config set {Rg} --name {Api} --generic-configurations healthCheckPath=/health",
-            $"webapp config show {Rg} --name {Api} --query healthCheckPath", "health check" },
-        { FakeChange.Firewall, "sql server firewall-rule create " + Rg + " --server datatrusthub --name AllowAllWindowsAzureIps",
-            $"sql server firewall-rule list {Rg} --server datatrusthub --query [].name", "firewall" },
-    };
+        get
+        {
+            var data = new TheoryData<string, string>();
+            foreach (var step in Steps)
+                data.Add(step.ChangeCall, step.DecidingRead);
+            return data;
+        }
+    }
+
+    // Each step's ignored change, its change command, and what its read-back error must name
+    public static TheoryData<string, string, string, string> IgnoredChangeAndError
+    {
+        get
+        {
+            var data = new TheoryData<string, string, string, string>();
+            foreach (var step in Steps)
+                data.Add(step.Ignored, step.ChangeCall, step.StepWords, step.Resource);
+            return data;
+        }
+    }
 
     // Every change sticks: the run succeeds and Azure holds the whole setup
     [Fact]
@@ -49,11 +78,9 @@ public class SetupScriptReadBackTests
 
     // After the change, the step's own read runs again
     [Theory]
-    [MemberData(nameof(ChangeSteps))]
-    public void RealRun_AfterChange_ReadsTheValueBackWithTheDecidingRead(
-        string ignoredChange, string changeCall, string decidingRead, string stepWords)
+    [MemberData(nameof(ChangeAndDecidingRead))]
+    public void RealRun_AfterChange_ReadsTheValueBackWithTheDecidingRead(string changeCall, string decidingRead)
     {
-        _ = (ignoredChange, stepWords);
         var result = SetupScriptRun.RealRun(FakeAzure.NothingConfigured(FakeAzure.BasicTier));
 
         Assert.True(result.ExitCode == 0, result.Output);
@@ -64,13 +91,12 @@ public class SetupScriptReadBackTests
         Assert.Contains(calls.Skip(change + 1), call => call.StartsWith(decidingRead));
     }
 
-    // az exits 0 but changes nothing: the script stops with an error naming the step
+    // az exits 0 but changes nothing: the script stops with an error naming the step and its resource
     [Theory]
-    [MemberData(nameof(ChangeSteps))]
+    [MemberData(nameof(IgnoredChangeAndError))]
     public void RealRun_ChangeNotApplied_StopsNamingTheStep(
-        string ignoredChange, string changeCall, string decidingRead, string stepWords)
+        string ignoredChange, string changeCall, string stepWords, string resource)
     {
-        _ = decidingRead;
         var azure = FakeAzure.NothingConfigured(FakeAzure.BasicTier);
         azure.IgnoredChanges.Add(ignoredChange);
 
@@ -78,8 +104,8 @@ public class SetupScriptReadBackTests
 
         Assert.NotEqual(0, result.ExitCode);
         Assert.Contains(result.AzCalls, call => call.Contains(changeCall));
-        Assert.Contains(stepWords, result.StandardError, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains(stepWords.Equals("firewall") ? "datatrusthub" : Api, result.StandardError);
+        Assert.True(result.ErrorContains(stepWords, StringComparison.OrdinalIgnoreCase), $"The error does not name '{stepWords}':{Environment.NewLine}{result.StandardError}");
+        Assert.True(result.ErrorContains(resource), $"The error does not name '{resource}':{Environment.NewLine}{result.StandardError}");
     }
 
     // The script stops at the failed step: no later change runs
@@ -106,8 +132,8 @@ public class SetupScriptReadBackTests
         var result = SetupScriptRun.RealRun(azure);
 
         Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("app settings", result.StandardError, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains(Api, result.StandardError);
+        Assert.True(result.ErrorContains("app settings", StringComparison.OrdinalIgnoreCase), result.StandardError);
+        Assert.True(result.ErrorContains($"on {Api}"), result.StandardError);
     }
 
     // The WebApp's Api__BaseUrl is checked by value too
@@ -121,8 +147,8 @@ public class SetupScriptReadBackTests
         var result = SetupScriptRun.RealRun(azure);
 
         Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("app settings", result.StandardError, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains($"on {WebApp}", result.StandardError);
+        Assert.True(result.ErrorContains("app settings", StringComparison.OrdinalIgnoreCase), result.StandardError);
+        Assert.True(result.ErrorContains($"on {WebApp}"), result.StandardError);
     }
 
     // A secret setting only has to exist: its value is never read back
@@ -150,6 +176,7 @@ public class SetupScriptReadBackTests
         var secret = result.FinalState.Received(DryRunScenario.JwtSecretSetting);
         Assert.False(string.IsNullOrEmpty(secret), "The script sent no JWT signing key.");
         Assert.DoesNotContain(secret, result.Output);
+        Assert.False(result.OutputContains(secret), "The JWT signing key was printed, cut over two lines.");
     }
 
     // Not even the read-back error prints the secret
@@ -167,5 +194,6 @@ public class SetupScriptReadBackTests
         var secret = result.FinalState.Received(DryRunScenario.JwtSecretSetting);
         Assert.False(string.IsNullOrEmpty(secret), "The script sent no JWT signing key.");
         Assert.DoesNotContain(secret, result.Output);
+        Assert.False(result.OutputContains(secret), "The JWT signing key was printed, cut over two lines.");
     }
 }

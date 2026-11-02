@@ -17,6 +17,13 @@ internal sealed record SetupRunResult(int ExitCode, string StandardOutput, strin
 
     internal string Output => StandardOutput + Environment.NewLine + StandardError;
 
+    /// <summary>Tells whether the script's error holds the text, however PowerShell laid the error out.</summary>
+    internal bool ErrorContains(string text, StringComparison comparison = StringComparison.Ordinal) =>
+        RenderedError.Contains(StandardError, text, comparison);
+
+    /// <summary>Tells whether the text was printed anywhere, even cut over two lines of a rendered error.</summary>
+    internal bool OutputContains(string text) => RenderedError.Contains(Output, text);
+
     /// <summary>The az calls that change Azure (none of them in a dry run).</summary>
     internal IReadOnlyList<string> ChangeCalls => AzCalls.Where(call => ChangeVerb.IsMatch(call)).ToList();
 }

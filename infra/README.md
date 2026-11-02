@@ -17,8 +17,8 @@ scripts' parameters.
 | Resource | Name | Tier and key settings |
 |---|---|---|
 | App Service plan | `DataTrustHubPlan` | F1 (free), Linux |
-| Web app, the API | `datatrusthubapi` | `DOTNETCORE\|10.0` (ADR-0020), HTTPS only, TLS 1.2 minimum, Always On off (not available on F1). After the setup: system-assigned managed identity, FTP disabled, basic publishing credentials (SCM and FTP) disabled, health check path `/health` |
-| Web app, the WebApp | `DataTrustHub` | `DOTNETCORE\|10.0`, HTTPS only, TLS 1.2 minimum, Always On off, no managed identity (it holds no secret). After the setup: FTP disabled, basic publishing credentials disabled, health check path `/health` |
+| Web app, the API | `datatrusthubapi` | `DOTNETCORE\|10.0` (ADR-0020), HTTPS only, TLS 1.2 minimum, Always On off (not available on F1). After the setup: system-assigned managed identity, FTP disabled, basic publishing credentials (SCM and FTP) disabled. No health check path: skipped on the Free tier ([ADR-0024](../docs/architecture/adr/0024-no-app-service-health-check-on-the-free-tier.md)), applied by the setup script once the plan moves to a paid tier |
+| Web app, the WebApp | `DataTrustHub` | `DOTNETCORE\|10.0`, HTTPS only, TLS 1.2 minimum, Always On off, no managed identity (it holds no secret). After the setup: FTP disabled, basic publishing credentials disabled. No health check path: skipped on the Free tier ([ADR-0024](../docs/architecture/adr/0024-no-app-service-health-check-on-the-free-tier.md)), applied by the setup script once the plan moves to a paid tier |
 | Azure SQL server | `datatrusthub` | Microsoft Entra-only authentication (no SQL logins), the owner's account as Entra admin. After the setup: one firewall rule, `AllowAllWindowsAzureIps` (`0.0.0.0`–`0.0.0.0`), which lets Azure services in |
 | Azure SQL database | `datatrusthub` | Serverless `GP_S_Gen5`, on the Azure SQL free offer, auto-pause when idle |
 | Application Insights | `DataTrustHub` | Connected to both web apps through their app settings (below); its smart detection action group is created with it |
@@ -87,19 +87,25 @@ The script shows the subscription and asks for confirmation (`-Force` skips it).
      [Seeding the first admin](#6-seeding-the-first-admin));
 3. sets the WebApp's `Api__BaseUrl` from the API's default host name;
 4. disables FTP and basic publishing credentials (SCM and FTP) on both apps;
-5. sets the health check path to `/health` on both apps;
+5. sets the health check path to `/health` on both apps, only when their App Service plan, read
+   from Azure, is on a paid tier. On the Free tier (F1) it skips it and says so ([ADR-0024](../docs/architecture/adr/0024-no-app-service-health-check-on-the-free-tier.md)): the
+   health check pings `/health` about once a minute, which keeps both apps awake and spends the
+   60 CPU minutes a day the plan shares between them. The release workflow's smoke check (#102)
+   is the health signal instead. Once the plan moves to a paid tier, the next run applies it. A dry
+   run that cannot read the tier (not signed in, or an empty plan id or tier) assumes the production
+   tier, Free; a real run stops with an error instead;
 6. adds the SQL firewall rule `AllowAllWindowsAzureIps` if it is missing;
 7. prints what it changed and the next step, without any secret value.
 
 It is idempotent: each step reads the current state first and changes only what differs, so a
-second run reports nothing to change. If a read fails (for example a missing permission), the
+second run reports nothing to change. After each change it reads the value back with the same
+read and stops with an error naming the step if Azure does not hold it, because `az` can exit
+without an error and change nothing; a secret setting is only checked to exist, its value is
+never read back or printed. If a read fails (for example a missing permission), the
 script stops with an error naming the step instead of taking the failure for a missing setting,
 so it never generates a new JWT signing key by mistake. The settings
 are passed to `az` in a temporary JSON file, deleted right after, so that no secret is on a
 command line and `az.cmd` cannot mangle special characters in a password.
-
-**Known gap (#150):** on the first real run the health check path was not applied to either web
-app, although `az` reported no error; a second dry run still plans it.
 
 Its parameters default to the resource names above: `-ResourceGroup`, `-ApiAppName`,
 `-WebAppName`, `-SqlServerName`, `-DatabaseName`.
@@ -252,15 +258,15 @@ same one again.
 Free tiers are accepted for the MVP, with their consequences:
 - **App Service F1:** 60 CPU minutes a day for the plan, shared by both apps; no Always On, so the
   apps sleep when idle and the first request after that is slow (cold start). When the CPU quota
-  is used up, the apps stop until the next day. A single instance: the health check reports, but
-  cannot move traffic to another instance.
+  is used up, the apps stop until the next day. No App Service health check: its pings would keep
+  both apps awake and spend the CPU quota, so the setup script skips it on the Free tier
+  ([ADR-0024](../docs/architecture/adr/0024-no-app-service-health-check-on-the-free-tier.md)); the release workflow's smoke check (#102) is the health signal.
 - **Azure SQL free offer:** a monthly quota of vCore seconds and storage. The database pauses when
   idle, and the first connection after that waits for it to resume. When the quota is used up, the
   database pauses until the next month, and production stops with it.
 - No SLA.
 
-Because of them, the code must have a health endpoint that does not touch the database and SQL
-connections that retry on transient errors (#146; until the endpoint exists, the health check
-path answers 404), and CD wakes the database with retries before migrating
-and retries its smoke check (#102). Moving to paid tiers (for example B1, and SQL billing over the
+Because of them, the code has a `/health` endpoint that does not touch the database and SQL
+connections that retry on transient errors (#146), and CD wakes the database with retries before
+migrating and retries its smoke check against `/health` (#102). Moving to paid tiers (for example B1, and SQL billing over the
 free limit) is due with the first real users.

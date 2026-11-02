@@ -31,6 +31,8 @@ public class SetupScriptTests
     // A function the script defines itself (Invoke-AzRead, Invoke-AzChange): not a module cmdlet
     private static readonly Regex FunctionDefinition = new(@"^\s*function\s+(?<name>[\w-]+)", RegexOptions.Multiline);
 
+    private static readonly Regex Whitespace = new(@"\s+");
+
     private static readonly byte[] Utf8Bom = [0xEF, 0xBB, 0xBF];
 
     [Fact]
@@ -119,6 +121,20 @@ public class SetupScriptTests
 
         Assert.Equal(StringType, parameter.Type);
         Assert.Equal(expectedDefault, parameter.DefaultValue);
+    }
+
+    // #150 AC8: the description says the health check is skipped on the Free tier (ADR-0024) and applied
+    // once the plan moves to a paid tier
+    [Theory]
+    [InlineData("ADR-0024")]
+    [InlineData("Free tier")]
+    [InlineData("paid tier")]
+    [InlineData("skipped")]
+    public void SetupScriptHelp_DescriptionSaysHealthCheckSkippedOnFreeTier(string expected)
+    {
+        var description = Whitespace.Replace(Assert.Single(HelpSections(DescriptionKeyword)), " ");
+
+        Assert.Contains(expected, description);
     }
 
     [Fact]

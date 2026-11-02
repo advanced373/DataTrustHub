@@ -8,6 +8,8 @@ namespace DataTrustHub.Features.Tests.AzureSetup;
 // #147 AC5: infra/README.md documents that the admin seed is written only with -SeedAdmin and removed after
 // the first seed (ADR-0022): the settings table row, the one-time procedure (seed, API start, sign-in check,
 // delete), why, and how to recover. No secret or host name: see InfraFilesTests.
+// #150 AC8: the web app rows, the script's steps and the Free-tier limits say the health check is skipped on
+// the Free tier (ADR-0024) and applied once the plan moves to a paid tier; the "Known gap (#150)" is gone.
 public class InfraReadmeTests
 {
     private const string InfraReadme = "infra/README.md";
@@ -23,6 +25,17 @@ public class InfraReadmeTests
     private const string ColdStart = "cold";
     private const string ScriptStepsStart = "The script shows the subscription";
     private const string ScriptStepsEnd = "It is idempotent";
+
+    private const string Adr0024 = "ADR-0024";
+    private const string Adr0024Link = "../docs/architecture/adr/0024-no-app-service-health-check-on-the-free-tier.md";
+    private const string FreeTier = "Free tier";
+    private const string PaidTier = "paid tier";
+    private const string HealthCheckPathPromise = "health check path `/health`";
+    private const string KnownGap150 = "Known gap (#150)";
+    private const string FreeTierLimitsStart = "**App Service F1:**";
+    private const string FreeTierLimitsEnd = "No SLA";
+    private const string HealthCheckStepStart = "5. ";
+    private const string HealthCheckStepEnd = "6. ";
 
     private static readonly Regex Whitespace = new(@"\s+");
 
@@ -111,6 +124,85 @@ public class InfraReadmeTests
     public void Readme_DoesNotMentionOverwriteAdminSeed()
     {
         Assert.DoesNotContain(OverwriteAdminSeedSwitch, Readme(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    // #150 AC8: the two web app rows no longer promise a health check path on F1
+    [Theory]
+    [InlineData("| Web app, the API |")]
+    [InlineData("| Web app, the WebApp |")]
+    public void ResourcesTable_WebAppRow_DoesNotPromiseHealthCheckPath(string rowStart)
+    {
+        Assert.DoesNotContain(HealthCheckPathPromise, Row(rowStart), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData("| Web app, the API |")]
+    [InlineData("| Web app, the WebApp |")]
+    public void ResourcesTable_WebAppRow_SaysSkippedOnFreeTierAndAppliedOnPaidTier(string rowStart)
+    {
+        var row = Row(rowStart);
+
+        Assert.Contains("skipped", row, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(FreeTier, row);
+        Assert.Contains(PaidTier, row);
+        Assert.Contains($"[{Adr0024}]({Adr0024Link})", row);
+    }
+
+    // #150 AC8: step 5 of the script's steps says the same
+    [Fact]
+    public void Readme_ScriptSteps_HealthCheckSkippedOnFreeTierAndAppliedOnPaidTier()
+    {
+        var step = SingleSpaced(HealthCheckStep());
+
+        Assert.Contains("health check", step, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("skips", step, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(FreeTier, step);
+        Assert.Contains(PaidTier, step);
+        Assert.Contains($"[{Adr0024}]({Adr0024Link})", step);
+    }
+
+    [Fact]
+    public void Readme_DoesNotHaveKnownGap150()
+    {
+        Assert.DoesNotContain(KnownGap150, Readme());
+    }
+
+    // #150 AC8: the Free-tier limits do not read as if a health check runs on F1
+    [Theory]
+    [InlineData("the health check reports")]
+    [InlineData("cannot move traffic")]
+    [InlineData("answers 404")]
+    [InlineData("until the endpoint exists")]
+    public void Readme_FreeTierLimits_DoNotDescribeARunningHealthCheck(string outdated)
+    {
+        Assert.DoesNotContain(outdated, SingleSpaced(Readme()), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Readme_FreeTierLimits_SayNoHealthCheckOnF1AndLinkAdr0024()
+    {
+        var readme = Readme();
+        var start = readme.IndexOf(FreeTierLimitsStart, StringComparison.Ordinal);
+        var end = readme.IndexOf(FreeTierLimitsEnd, start + 1, StringComparison.Ordinal);
+        Assert.True(start >= 0 && end > start, "The App Service F1 limits are missing.");
+
+        var limits = SingleSpaced(readme[start..end]);
+        Assert.Contains("No App Service health check", limits, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(Adr0024Link, limits);
+    }
+
+    private static string Row(string rowStart) =>
+        Assert.Single(Readme().Split('\n'), line => line.StartsWith(rowStart, StringComparison.Ordinal));
+
+    // Step 5 of the script's steps, up to step 6
+    private static string HealthCheckStep()
+    {
+        var readme = Readme();
+        var steps = readme.IndexOf(ScriptStepsStart, StringComparison.Ordinal);
+        var start = readme.IndexOf("\n" + HealthCheckStepStart, steps, StringComparison.Ordinal);
+        var end = readme.IndexOf("\n" + HealthCheckStepEnd, start + 1, StringComparison.Ordinal);
+        Assert.True(steps >= 0 && start > steps && end > start, "Step 5 of the script's steps is missing.");
+        return readme[start..end];
     }
 
     private static string Readme() => SolutionFiles.ReadText(InfraReadme);

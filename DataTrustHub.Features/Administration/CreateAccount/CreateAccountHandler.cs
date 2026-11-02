@@ -26,7 +26,21 @@ public class CreateAccountHandler(
 
         var user = User.Register(command.Email, _hasher.HashPassword(command.Password));
         _users.Add(user);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-        return Result.Success(user.Id);
+        return await SaveUser(user, cancellationToken);
+    }
+
+    // U1 under concurrency: a request that passed EmailExistsAsync at the same time saved first, and the
+    // unique index rejects this one
+    private async Task<Result<Guid>> SaveUser(User user, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            return Result.Success(user.Id);
+        }
+        catch (UniqueConstraintViolationException)
+        {
+            return Result.Failure<Guid>(Errors.EmailAlreadyInUse);
+        }
     }
 }

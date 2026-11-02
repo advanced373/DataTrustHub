@@ -115,6 +115,9 @@ namespace DataTrustHub.Infrastructure.Migrations
 
                     b.HasIndex("ClassificationLevelId");
 
+                    b.HasIndex("UserId", "PolicyId")
+                        .IsUnique();
+
                     b.ToTable("Clearances");
                 });
 
@@ -188,9 +191,13 @@ namespace DataTrustHub.Infrastructure.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
 
                     b.ToTable("Organizations");
                 });
@@ -203,12 +210,16 @@ namespace DataTrustHub.Infrastructure.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
 
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId", "Name")
+                        .IsUnique();
 
                     b.ToTable("Policies");
                 });
@@ -221,7 +232,8 @@ namespace DataTrustHub.Infrastructure.Migrations
 
                     b.Property<string>("Email")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
 
                     b.Property<string>("HashedPassword")
                         .IsRequired()
@@ -232,6 +244,9 @@ namespace DataTrustHub.Infrastructure.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("Email")
+                        .IsUnique();
 
                     b.ToTable("Users");
                 });

@@ -36,7 +36,7 @@ Both store the normalized address (U7). Rehydration keeps the stored email as it
 
 | # | Invariant / rule | Enforced in |
 |---|---|---|
-| U1 | An email belongs to at most one user, case-insensitive, ignoring surrounding spaces | Use case: `RegisterUser`, `CreateAccount` (`EmailExistsAsync`, which compares the normalized address, U7) |
+| U1 | An email belongs to at most one user, case-insensitive, ignoring surrounding spaces | Use case: `RegisterUser`, `CreateAccount` (`EmailExistsAsync`, which compares the normalized address, U7). Database: unique index on `Email` (`nvarchar(256)`, the stored normalized form); when two concurrent requests both pass the check, the save fails with `UniqueConstraintViolationException`, and `RegisterUser` answers `User.EmailAlreadyInUse`, `CreateAccount` `Account.EmailAlreadyInUse` (409). The admin seed at startup does not map it: it logs the failed seed and promotes the existing user at the next start |
 | U2 | An email is at most 256 characters, counted on the trimmed address; a password is at least 8 | Validator: `RegisterUser`, `CreateAccount` |
 | U3 | A user cannot delete their own account, so an admin cannot lock everyone out | Entity: `CheckCanBeDeletedBy` → `Account.CannotDeleteOwnAccount` |
 | U4 | Login gives the same error for an unknown email and a wrong password, so it does not reveal which emails exist | Use case: `LoginUser` → `User.InvalidCredentials` |
@@ -63,7 +63,7 @@ applies the rule U7 and is the only place that implements it. `User.Email` holds
 
 | # | Invariant / rule | Enforced in |
 |---|---|---|
-| O1 | Organization names are unique | Use case: `CreateOrganization` (`NameExistsAsync`) |
+| O1 | Organization names are unique | Use case: `CreateOrganization` (`NameExistsAsync`) → `Organization.NameAlreadyInUse` (409). Database: unique index on `Name` (`nvarchar(256)`); when two concurrent requests both pass the check, the save fails with `UniqueConstraintViolationException`, and `CreateOrganization` answers `Organization.NameAlreadyInUse` too |
 | O2 | An organization that still has policies cannot be deleted | Use case: `DeleteOrganization` (`AnyInOrganizationAsync`) |
 | O3 | Deleting an organization also removes its memberships, in the same transaction | Use case: `DeleteOrganization` (`ListForOrganizationAsync`) |
 
@@ -83,7 +83,7 @@ applies the rule U7 and is the only place that implements it. `User.Email` holds
 | # | Invariant / rule | Enforced in |
 |---|---|---|
 | P1 | A policy belongs to an existing organization | Use case: `CreatePolicy`. The organization comes from the route, and the caller must be an organization admin there (C6); deleting an organization ends its memberships (O3), so that check also proves the organization exists (`Organization.NotFound` otherwise) |
-| P2 | Policy names are unique within an organization | Use case: `CreatePolicy` (`NameExistsInOrganizationAsync`) → `Policy.NameAlreadyInUse` (409) |
+| P2 | Policy names are unique within an organization | Use case: `CreatePolicy` (`NameExistsInOrganizationAsync`) → `Policy.NameAlreadyInUse` (409). Database: unique index on (`OrganizationId`, `Name`), `Name` `nvarchar(256)`; when two concurrent requests both pass the check, the save fails with `UniqueConstraintViolationException`, and `CreatePolicy` answers `Policy.NameAlreadyInUse` too |
 | P3 | A policy on which clearances are still granted cannot be deleted | Use case: `DeletePolicy` (`AnyForPolicyAsync`) → `Policy.HasClearances` (409) |
 | C6 (policies) | Only an organization admin of X creates, lists, reads and deletes X's policies. The platform admin does not manage policies (ADR-0014) | Use case + authorization: `CreatePolicy`, `ListPolicies`, `GetPolicy`, `DeletePolicy` on `/organizations/{organizationId}/policies`, checked first (`IsOrgAdminAsync`) → `Organization.NotFound` (404) for anyone else, the platform admin included. A policy of another organization answers `Policy.NotFound` (404), so it is not revealed. For clearances, see C6 (clearances) |
 
@@ -108,7 +108,7 @@ level's priority is at least `priority`.
 |---|---|---|
 | C1 | A clearance covers its own level and every lower level, on its policy only | Entity: `Allows` |
 | C2 | A clearance references an existing user and an existing policy of the organization | Use case: `CreateClearance` (`IPolicyRepository.GetByIdAsync` and the policy's `OrganizationId`, `IUserRepository.ExistsAsync`) → `Clearance.PolicyNotFound` (404, also for a policy of another organization, so it is not revealed), `Clearance.UserNotFound` (404) |
-| C3 | A user holds at most one clearance per policy | Use case: `CreateClearance` (`IClearanceRepository.ExistsAsync`) → `Clearance.AlreadyGranted` (409) |
+| C3 | A user holds at most one clearance per policy | Use case: `CreateClearance` (`IClearanceRepository.ExistsAsync`) → `Clearance.AlreadyGranted` (409). Database: unique index on (`UserId`, `PolicyId`); when two concurrent requests both pass the check, the save fails with `UniqueConstraintViolationException`, and `CreateClearance` answers `Clearance.AlreadyGranted` too |
 | C4 | A level's priority is never negative | Validator: `CreateClearance` |
 | C5 | A clearance on a policy of organization X is granted only to a user with a membership in X: a member, a guest or an organization admin (ADR-0014) | Use case: `CreateClearance` (`IMembershipRepository.ExistsAsync`) → `Clearance.UserNotMember` (409) |
 | C6 (clearances) | Only an organization admin of X grants, lists, reads and revokes clearances on X's policies. The platform admin does not manage clearances (ADR-0014) | Use case + authorization: `CreateClearance`, `ListClearances`, `GetClearance`, `DeleteClearance` on `/organizations/{organizationId}/clearances`, checked first (`IsOrgAdminAsync`) → `Organization.NotFound` (404) for anyone else, the platform admin included. A clearance on a policy of another organization answers `Clearance.NotFound` (404), and the list shows only clearances on the organization's policies, so neither is revealed |
@@ -294,5 +294,7 @@ These are findings, not decisions. Each one needs an issue before it changes.
   (`CountOrgAdminsAsync`). Two organization admins who demote or remove each other, or leave, at the
   same moment can both pass the count and leave the organization with none. The platform admin can
   then appoint one again.
-- **Uniqueness is checked, not constrained:** U1, O1 and P2 are checked before saving. Two concurrent
-  requests can both pass unless the database has a unique index.
+- **Uniqueness is checked first, then constrained:** U1, O1, P2, C3 and M1 are checked before saving
+  and enforced by a unique index. The index compares under the column collation, as the checks do:
+  with SQL Server's default case-insensitive collation, O1 and P2 names that differ only in letter case
+  or trailing spaces count as the same name. No uniqueness rule is only checked any more.

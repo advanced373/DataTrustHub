@@ -39,3 +39,4 @@ Status values: `Proposed`, `Accepted`, `Superseded by ADR-NNNN`, `Deprecated`.
 | [0021](0021-production-only-scripted-azure-setup.md) | Production only, in Poland Central, set up by script instead of Bicep and Key Vault | Accepted | 2026-10-28, amended by ADR-0022 |
 | [0022](0022-seed-the-production-admin-once.md) | Seed the production admin once, then remove the seed settings | Accepted | 2026-10-29 |
 | [0023](0023-normalize-email-addresses.md) | Email addresses are trimmed and lower-cased as a whole | Accepted | 2026-10-29 |
+| [0024](0024-no-app-service-health-check-on-the-free-tier.md) | No App Service health check while the plan is on the Free tier | Accepted | 2026-11-02 |

@@ -5,7 +5,14 @@ using System.Text;
 namespace DataTrustHub.Features.Tests.WebApp.Helpers;
 
 // One request the WebApp's API clients sent: the method, the path relative to the API base address, the body
-internal sealed record RecordedApiRequest(string Method, string Path, string Body);
+// and the request headers (each name with its values)
+internal sealed record RecordedApiRequest(
+    string Method, string Path, string Body, IReadOnlyDictionary<string, string[]> Headers)
+{
+    // The values of a header; none when the request did not carry it
+    internal string[] HeaderValues(string name) =>
+        Headers.FirstOrDefault(header => string.Equals(header.Key, name, StringComparison.OrdinalIgnoreCase)).Value ?? [];
+}
 
 // One canned API answer: the status code and an optional JSON body
 internal sealed record StubResponse(HttpStatusCode StatusCode, string? JsonBody = null);
@@ -36,7 +43,8 @@ internal sealed class StubApi
     {
         var path = request.RequestUri!.AbsolutePath.TrimStart('/');
         var body = request.Content is null ? string.Empty : await request.Content.ReadAsStringAsync(cancellationToken);
-        requests.Enqueue(new RecordedApiRequest(request.Method.Method, path, body));
+        var headers = request.Headers.ToDictionary(header => header.Key, header => header.Value.ToArray());
+        requests.Enqueue(new RecordedApiRequest(request.Method.Method, path, body, headers));
 
         if (!responses.TryGetValue(Key(request.Method.Method, path), out var stub))
             return new HttpResponseMessage(HttpStatusCode.NotImplemented);

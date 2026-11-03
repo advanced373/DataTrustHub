@@ -18,7 +18,7 @@ scripts' parameters.
 |---|---|---|
 | App Service plan | `DataTrustHubPlan` | F1 (free), Linux |
 | Web app, the API | `datatrusthubapi` | `DOTNETCORE\|10.0` (ADR-0020), HTTPS only, TLS 1.2 minimum, Always On off (not available on F1). After the setup: system-assigned managed identity, FTP disabled, basic publishing credentials (SCM and FTP) disabled. No health check path: skipped on the Free tier ([ADR-0024](../docs/architecture/adr/0024-no-app-service-health-check-on-the-free-tier.md)), applied by the setup script once the plan moves to a paid tier |
-| Web app, the WebApp | `DataTrustHub` | `DOTNETCORE\|10.0`, HTTPS only, TLS 1.2 minimum, Always On off, no managed identity (it holds no secret). After the setup: FTP disabled, basic publishing credentials disabled. No health check path: skipped on the Free tier ([ADR-0024](../docs/architecture/adr/0024-no-app-service-health-check-on-the-free-tier.md)), applied by the setup script once the plan moves to a paid tier |
+| Web app, the WebApp | `DataTrustHub` | `DOTNETCORE\|10.0`, HTTPS only, TLS 1.2 minimum, Always On off, no managed identity (its only secret is the client key, `Api__ClientKey`, below). After the setup: FTP disabled, basic publishing credentials disabled. No health check path: skipped on the Free tier ([ADR-0024](../docs/architecture/adr/0024-no-app-service-health-check-on-the-free-tier.md)), applied by the setup script once the plan moves to a paid tier |
 | Azure SQL server | `datatrusthub` | Microsoft Entra-only authentication (no SQL logins), the owner's account as Entra admin. After the setup: one firewall rule, `AllowAllWindowsAzureIps` (`0.0.0.0`–`0.0.0.0`), which lets Azure services in |
 | Azure SQL database | `datatrusthub` | Serverless `GP_S_Gen5`, on the Azure SQL free offer, auto-pause when idle |
 | Application Insights | `DataTrustHub` | Connected to both web apps through their app settings (below); its smart detection action group is created with it |
@@ -28,8 +28,9 @@ The web apps' host names have a random suffix. The scripts read them from Azure
 
 ### App settings
 
-The application secrets live in the API's App Service app settings, encrypted at rest by the
-platform, never in the repository or in CI (ADR-0021 §4). Their values are not recorded here.
+The application secrets live in the apps' App Service app settings (the WebApp holds only the client
+key), encrypted at rest by the platform, never in the repository or in CI (ADR-0021 §4). Their values
+are not recorded here.
 
 | Web app | Setting | Value | Set by |
 |---|---|---|---|
@@ -37,7 +38,9 @@ platform, never in the repository or in CI (ADR-0021 §4). Their values are not 
 | API | `ConnectionStrings__DefaultConnection` | `Server=tcp:<server>.database.windows.net,1433;Database=<database>;Authentication=Active Directory Managed Identity;Encrypt=True;Connect Timeout=60`: the API reaches SQL with its managed identity, so no password exists | setup script |
 | API | `Jwt__Secret` | random 48-byte key, base64 | setup script, generated only when missing |
 | API | `AdminSeed__Email`, `AdminSeed__Password` | the first platform admin (ADR-0006) | setup script, only with `-SeedAdmin`; removed by the owner after the first seed ([ADR-0022](../docs/architecture/adr/0022-seed-the-production-admin-once.md), see [Seeding the first admin](#6-seeding-the-first-admin)) |
+| API | `Registration__TrustedClientKey` | the client key: random 48-byte key, base64, the same value as the WebApp's `Api__ClientKey`. With it the API trusts the browser address the WebApp sends on register ([ADR-0026](../docs/architecture/adr/0026-registration-requests.md) §6) | setup script, generated with the WebApp's when either is missing, or with `-RotateClientKey` |
 | WebApp | `Api__BaseUrl` | `https://<API default host name>` | setup script |
+| WebApp | `Api__ClientKey` | the client key, the same value as the API's `Registration__TrustedClientKey` | setup script, together with the API's |
 
 ## Prerequisites
 
@@ -85,7 +88,18 @@ The script shows the subscription and asks for confirmation (`-Force` skips it).
      are planned masked and nothing is asked. Without `-SeedAdmin` the admin seed is neither asked
      for nor written, whether it is set or not, and existing values are kept (see
      [Seeding the first admin](#6-seeding-the-first-admin));
-3. sets the WebApp's `Api__BaseUrl` from the API's default host name;
+   - `Registration__TrustedClientKey`, the client key (see step 3);
+3. sets the WebApp's `Api__BaseUrl` from the API's default host name, and its `Api__ClientKey`.
+   The client key is one new random key written to both apps in the same run, the API's
+   `Registration__TrustedClientKey` and the WebApp's `Api__ClientKey`, **only when either app
+   lacks it**; when both hold it, both are left untouched. Its value is never read back from Azure,
+   so when only one app holds it the script cannot copy it: it generates a new key and writes it to
+   both. `-RotateClientKey` replaces it on both on purpose. In a dry run it is planned masked. With
+   the key, the API's register limit counts each browser's address instead of the WebApp's
+   ([ADR-0026](../docs/architecture/adr/0026-registration-requests.md) §6). If the two apps ever hold
+   different keys (for example a rotation that stopped after the API's change), the API ignores the
+   WebApp's address header and every sign-up through the WebApp shares one budget again: run the
+   script again with `-RotateClientKey`;
 4. disables FTP and basic publishing credentials (SCM and FTP) on both apps;
 5. sets the health check path to `/health` on both apps, only when their App Service plan, read
    from Azure, is on a paid tier. On the Free tier (F1) it skips it and says so ([ADR-0024](../docs/architecture/adr/0024-no-app-service-health-check-on-the-free-tier.md)): the
@@ -103,7 +117,7 @@ read and stops with an error naming the step if Azure does not hold it, because 
 without an error and change nothing; a secret setting is only checked to exist, its value is
 never read back or printed. If a read fails (for example a missing permission), the
 script stops with an error naming the step instead of taking the failure for a missing setting,
-so it never generates a new JWT signing key by mistake. The settings
+so it never generates a new JWT signing key or client key by mistake. The settings
 are passed to `az` in a temporary JSON file, deleted right after, so that no secret is on a
 command line and `az.cmd` cannot mangle special characters in a password.
 

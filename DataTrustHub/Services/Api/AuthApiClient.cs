@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Options;
+
 namespace DataTrustHub.Services.Api;
 
 public interface IAuthApiClient
@@ -8,7 +10,11 @@ public interface IAuthApiClient
     Task<ApiResult<Guid>> RegisterAsync(string email, string password, CancellationToken cancellationToken);
 }
 
-internal sealed class AuthApiClient(HttpClient httpClient) : IAuthApiClient
+// Only register sends the browser's address (TrustedClientHeaders), read from the WebApp request being served
+internal sealed class AuthApiClient(
+    HttpClient httpClient,
+    IHttpContextAccessor httpContextAccessor,
+    IOptions<ApiSettings> apiSettings) : IAuthApiClient
 {
     public async Task<ApiResult<string>> LoginAsync(
         string email, string password, CancellationToken cancellationToken)
@@ -27,9 +33,15 @@ internal sealed class AuthApiClient(HttpClient httpClient) : IAuthApiClient
     public async Task<ApiResult<Guid>> RegisterAsync(
         string email, string password, CancellationToken cancellationToken)
     {
-        var request = new CredentialsRequest(email, password);
+        using var message = new HttpRequestMessage(HttpMethod.Post, ApiRoutes.Register)
+        {
+            Content = JsonContent.Create(new CredentialsRequest(email, password))
+        };
+        TrustedClientHeaders.AddTo(
+            message, httpContextAccessor.HttpContext?.Connection.RemoteIpAddress, apiSettings.Value.ClientKey);
+
         var result = await ApiRequest.SendAsync<RegistrationRequestCreatedResponse>(
-            token => httpClient.PostAsJsonAsync(ApiRoutes.Register, request, token),
+            token => httpClient.SendAsync(message, token),
             cancellationToken);
 
         // Register is limited per client address; 409 and 503 carry the API's own description

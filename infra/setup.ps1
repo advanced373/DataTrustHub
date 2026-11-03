@@ -4,13 +4,19 @@
 
 .DESCRIPTION
     Finishes what the portal did not set on the existing production resources, with the Azure CLI only:
-      - a system-assigned managed identity on the API (the WebApp holds no secret);
+      - a system-assigned managed identity on the API (the WebApp needs none: its only secret is the
+        client key below);
       - the API's app settings: SQL connection string (managed identity, no password), JWT signing key;
         existing settings, such as the Application Insights ones, are kept;
+      - the client key shared by both apps (ADR-0026), so that the API trusts the browser address the
+        WebApp sends on register: one random key written to the API's Registration__TrustedClientKey
+        and to the WebApp's Api__ClientKey in the same run, only when either app lacks it, or with
+        -RotateClientKey. Its value is never read back, so when only one app holds it, a new key is
+        generated and written to both;
       - the admin seed (AdminSeed__Email, AdminSeed__Password), only when asked for with -SeedAdmin:
         the first admin is seeded once, then the owner removes both settings (ADR-0022). Without
         -SeedAdmin the admin seed is neither asked for nor written, and existing values are kept;
-      - the WebApp's Api__BaseUrl, read from the API's default host name;
+      - the WebApp's Api__BaseUrl, read from the API's default host name, and its Api__ClientKey;
       - FTP and basic publishing credentials (SCM and FTP) disabled on both apps;
       - the health check path on both apps, only when their App Service plan is on a paid tier: on the
         Free tier (F1) it is skipped (see ADR-0024), because its pings keep both apps awake and spend
@@ -28,6 +34,10 @@
 
 .PARAMETER RotateJwtSecret
     Generates a new JWT signing key even if one exists. This signs out every user.
+
+.PARAMETER RotateClientKey
+    Generates a new client key and writes it to both apps even if both hold one (ADR-0026). Until both
+    apps have restarted with it, the API may partition sign-ups by the WebApp's address.
 
 .PARAMETER SeedAdmin
     Asks for the admin seed e-mail address and password and writes both settings, overwriting
@@ -52,6 +62,7 @@ param(
     [switch] $WhatIf,
     [switch] $Force,
     [switch] $RotateJwtSecret,
+    [switch] $RotateClientKey,
     [switch] $SeedAdmin
 )
 
@@ -66,12 +77,16 @@ $JwtSecretSetting = 'Jwt__Secret'
 $AdminSeedEmailSetting = 'AdminSeed__Email'
 $AdminSeedPasswordSetting = 'AdminSeed__Password'
 $ApiBaseUrlSetting = 'Api__BaseUrl'
-$MaskedSettings = @($JwtSecretSetting, $AdminSeedEmailSetting, $AdminSeedPasswordSetting)
+$ApiClientKeySetting = 'Registration__TrustedClientKey'
+$WebAppClientKeySetting = 'Api__ClientKey'
+$MaskedSettings = @($JwtSecretSetting, $AdminSeedEmailSetting, $AdminSeedPasswordSetting,
+    $ApiClientKeySetting, $WebAppClientKeySetting)
 
 $ConnectionStringFormat = 'Server=tcp:{0}.database.windows.net,1433;Database={1};' +
     'Authentication=Active Directory Managed Identity;Encrypt=True;Connect Timeout=60'
 $ApiBaseUrlFormat = 'https://{0}'
 $JwtSecretByteCount = 48
+$ClientKeyByteCount = 48
 
 $SystemAssignedIdentity = '[system]'
 $SystemAssignedType = 'SystemAssigned'
@@ -235,9 +250,10 @@ function Get-AppSettingValue {
     return $null
 }
 
-# Generates a random JWT signing key, base64-encoded.
-function New-JwtSecret {
-    $bytes = New-Object byte[] $JwtSecretByteCount
+# Generates a random key of the given number of bytes, base64-encoded: the JWT signing key or the client key.
+function New-RandomKey {
+    param([int] $ByteCount)
+    $bytes = New-Object byte[] $ByteCount
     $generator = [System.Security.Cryptography.RandomNumberGenerator]::Create()
     try { $generator.GetBytes($bytes) } finally { $generator.Dispose() }
     return [Convert]::ToBase64String($bytes)
@@ -266,7 +282,26 @@ function Add-JwtSecretSetting {
     if (($ExistingNames -contains $JwtSecretSetting) -and -not $RotateJwtSecret) { return }
     if (-not $RotateJwtSecret) { Assert-SettingNamesRead $JwtSecretSetting }
     if ($WhatIf) { $Settings[$JwtSecretSetting] = $MaskedValue; return }
-    $Settings[$JwtSecretSetting] = New-JwtSecret
+    $Settings[$JwtSecretSetting] = New-RandomKey $JwtSecretByteCount
+}
+
+# Returns the client key to write to both apps (ADR-0026), or $null when both already hold it and no
+# rotation is asked for. Its value is never read back from Azure, so a key held by one app only cannot be
+# copied to the other: a new key is generated for both. Masked in a dry run.
+function Get-NewClientKey {
+    param([string[]] $ApiSettingNames, [string[]] $WebAppSettingNames)
+    $bothHoldIt = ($ApiSettingNames -contains $ApiClientKeySetting) -and
+        ($WebAppSettingNames -contains $WebAppClientKeySetting)
+    if ($bothHoldIt -and -not $RotateClientKey) { return $null }
+    if (-not $RotateClientKey) { Assert-SettingNamesRead $ApiClientKeySetting }
+    if ($WhatIf) { return $MaskedValue }
+    return New-RandomKey $ClientKeyByteCount
+}
+
+# Adds the client key to an app's settings under the given name, when one is to be written.
+function Add-ClientKeySetting {
+    param([hashtable] $Settings, [string] $SettingName, [string] $ClientKey)
+    if ($ClientKey) { $Settings[$SettingName] = $ClientKey }
 }
 
 # Adds the admin seed to the settings, only when -SeedAdmin asks for it (ADR-0022): both values are
@@ -371,32 +406,42 @@ function Write-SettingsPreview {
     }
 }
 
-# Sets the API's connection string, JWT signing key and, with -SeedAdmin, the admin seed;
-# keeps every other setting.
+# Sets the API's connection string, JWT signing key, the client key (when one is to be written) and,
+# with -SeedAdmin, the admin seed; keeps every other setting.
 function Set-ApiAppSettings {
-    $existingNames = Get-AppSettingNames $ApiAppName
+    param([string[]] $ExistingNames, [string] $ClientKey)
     $settings = @{}
     $connectionString = $ConnectionStringFormat -f $SqlServerName, $DatabaseName
     if ((Get-AppSettingValue $ApiAppName $ConnectionStringSetting) -ne $connectionString) {
         $settings[$ConnectionStringSetting] = $connectionString
     }
-    Add-JwtSecretSetting $settings $existingNames
+    Add-JwtSecretSetting $settings $ExistingNames
+    Add-ClientKeySetting $settings $ApiClientKeySetting $ClientKey
     Add-AdminSeedSettings $settings
     Set-AppSettings $ApiAppName $settings
 }
 
-# Sets the WebApp's Api__BaseUrl to the API's default host name, read from Azure.
-function Set-WebAppApiBaseUrl {
+# Sets the WebApp's Api__BaseUrl to the API's default host name, read from Azure, and the client key
+# (when one is to be written), in one change; keeps every other setting.
+function Set-WebAppAppSettings {
+    param([string] $ClientKey)
+    $settings = @{}
+    $baseUrl = $ApiBaseUrlFormat -f (Get-ApiHostName)
+    if ((Get-AppSettingValue $WebAppName $ApiBaseUrlSetting) -ne $baseUrl) {
+        $settings[$ApiBaseUrlSetting] = $baseUrl
+    }
+    Add-ClientKeySetting $settings $WebAppClientKeySetting $ClientKey
+    Set-AppSettings $WebAppName $settings
+}
+
+# Reads the API's default host name; a dry run that reads nothing uses a placeholder.
+function Get-ApiHostName {
     $apiHostName = Invoke-AzRead "the default host name of $ApiAppName" @(
         'webapp', 'show', '--resource-group', $ResourceGroup,
         '--name', $ApiAppName, '--query', 'defaultHostName', '--output', 'tsv')
-    if (-not $apiHostName) {
-        if (-not $WhatIf) { throw "Cannot read the default host name of $ApiAppName." }
-        $apiHostName = $ApiHostPlaceholder
-    }
-    $baseUrl = $ApiBaseUrlFormat -f ([string] $apiHostName)
-    if ((Get-AppSettingValue $WebAppName $ApiBaseUrlSetting) -eq $baseUrl) { return }
-    Set-AppSettings $WebAppName @{ $ApiBaseUrlSetting = $baseUrl }
+    if ($apiHostName) { return [string] $apiHostName }
+    if (-not $WhatIf) { throw "Cannot read the default host name of $ApiAppName." }
+    return $ApiHostPlaceholder
 }
 
 # ---------------------------------------------------------------------------------------------
@@ -541,8 +586,11 @@ function Write-Summary {
 $subscriptionName = Get-SignedInSubscription
 Confirm-Run $subscriptionName
 Enable-ApiManagedIdentity
-Set-ApiAppSettings
-Set-WebAppApiBaseUrl
+$apiSettingNames = Get-AppSettingNames $ApiAppName
+$webAppSettingNames = Get-AppSettingNames $WebAppName
+$clientKey = Get-NewClientKey $apiSettingNames $webAppSettingNames
+Set-ApiAppSettings $apiSettingNames $clientKey
+Set-WebAppAppSettings $clientKey
 foreach ($appName in @($ApiAppName, $WebAppName)) {
     Disable-Ftp $appName
     Disable-BasicPublishingCredentials $appName

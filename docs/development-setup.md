@@ -38,6 +38,18 @@ dotnet user-secrets set "Jwt:Secret" $key --project DataTrustHub.API
 Check what is set with `dotnet user-secrets list --project DataTrustHub.API`. Never paste the key
 into a committed file, an issue or a pull request.
 
+### Optional: the client key
+
+Without it everything works, but the API's register limit counts every sign-up made through the
+WebApp as coming from one address, the WebApp's (ADR-0026 §6). To give each browser its own budget,
+set the same random key, at least 32 characters, in both projects:
+
+```powershell
+$clientKey = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(48))
+dotnet user-secrets set "Registration:TrustedClientKey" $clientKey --project DataTrustHub.API
+dotnet user-secrets set "Api:ClientKey" $clientKey --project DataTrustHub
+```
+
 ## Local database
 
 ```bash

@@ -65,6 +65,14 @@ internal static class ApiRoutes
     internal const string TimeFormat = "O";
 }
 
+// The headers that carry the browser's address to the API's register limit (ADR-0026). The API defines the
+// same names; the WebApp shares them by name only, never by reference
+internal static class ApiHeaders
+{
+    internal const string ClientAddress = "X-DTH-Client-Address";
+    internal const string ClientKey = "X-DTH-Client-Key";
+}
+
 // Attribute routes of the administration pages, under /Admin/<section>
 internal static class AdminRoutes
 {

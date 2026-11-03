@@ -1,10 +1,9 @@
 using DataTrustHub.Domain.Auditing;
+using DataTrustHub.Features._Shared.Extensions;
 using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.SharedKernel;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 
 namespace DataTrustHub.Features._Shared.Auditing;
 
@@ -71,8 +70,7 @@ internal sealed class AuditCommandDecorator<TCommand, TResult>(
         var user = httpContextAccessor.HttpContext?.User;
         if (user?.Identity?.IsAuthenticated != true) return null;
 
-        var sub = user.FindFirstValue(JwtRegisteredClaimNames.Sub) ?? user.FindFirstValue(ClaimTypes.NameIdentifier);
-        return Guid.TryParse(sub, out var userId) ? userId : null;
+        return user.GetUserId();
     }
 
     private static string ToAction(string commandTypeName) =>

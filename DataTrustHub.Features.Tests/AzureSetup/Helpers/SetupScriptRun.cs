@@ -1,5 +1,7 @@
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using DataTrustHub.Features.Tests.Build.Helpers;
 
 namespace DataTrustHub.Features.Tests.AzureSetup.Helpers;
 
@@ -41,6 +43,7 @@ internal static class SetupScriptRun
 
     private const string CallLogFile = "az-calls.log";
     private const string StateFile = "azure-state.json";
+    private const string VariantScriptFile = "setup-variant.ps1";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -77,7 +80,10 @@ internal static class SetupScriptRun
         if ($call -match '^account show') { Write-Value $state.subscription; exit 0 }
         if ($call -match '^webapp show') {
             $app = Get-App (Get-Flag '--name')
-            $property = @{ 'identity.type' = 'identityType'; 'defaultHostName' = 'defaultHostName'; 'appServicePlanId' = 'planId' }[(Get-Flag '--query')]
+            $query = Get-Flag '--query'
+            # Like the real Azure CLI (#177): the plan id is under serverFarmId, appServicePlanId answers empty
+            if ($query -eq 'appServicePlanId') { exit 0 }
+            $property = @{ 'identity.type' = 'identityType'; 'defaultHostName' = 'defaultHostName'; 'serverFarmId' = 'planId' }[$query]
             if (-not $property) { Stop-Fake "Fake az: unexpected command: $call" 99 }
             Write-Value $app.$property; exit 0
         }
@@ -164,12 +170,24 @@ internal static class SetupScriptRun
     internal static SetupRunResult DryRun(FakeAzure azure, params string[] switches) =>
         Run(azure, [SetupScriptDryRun.WhatIfSwitch, .. switches]);
 
-    private static SetupRunResult Run(FakeAzure azure, string[] switches)
+    /// <summary>
+    /// A real run (-Force) of a variant of infra/setup.ps1: its text with <paramref name="oldText"/> replaced by
+    /// <paramref name="newText"/>, run from a temporary copy. Lets a test show the fake catches a regression.
+    /// </summary>
+    internal static SetupRunResult RealRunOfVariant(FakeAzure azure, string oldText, string newText)
+    {
+        var original = File.ReadAllText(Path.Combine(SolutionFiles.RepositoryRoot, SetupScriptParser.SetupScriptFile));
+        if (!original.Contains(oldText, StringComparison.Ordinal))
+            throw new InvalidOperationException($"infra/setup.ps1 does not contain: {oldText}");
+        return Run(azure, [ForceSwitch], original.Replace(oldText, newText, StringComparison.Ordinal));
+    }
+
+    private static SetupRunResult Run(FakeAzure azure, string[] switches, string? scriptText = null)
     {
         var workFolder = Directory.CreateTempSubdirectory("dth-setup-run-");
         try
         {
-            return RunIn(workFolder.FullName, azure, switches);
+            return RunIn(workFolder.FullName, azure, switches, scriptText);
         }
         finally
         {
@@ -177,8 +195,9 @@ internal static class SetupScriptRun
         }
     }
 
-    private static SetupRunResult RunIn(string workFolder, FakeAzure azure, string[] switches)
+    private static SetupRunResult RunIn(string workFolder, FakeAzure azure, string[] switches, string? scriptText)
     {
+        var scriptPath = WriteVariant(workFolder, scriptText);
         var fakeAzFolder = SetupScriptProcess.WriteFakeAz(workFolder, FakeAz);
         var callLog = Path.Combine(workFolder, CallLogFile);
         var stateFile = Path.Combine(workFolder, StateFile);
@@ -186,11 +205,22 @@ internal static class SetupScriptRun
         File.WriteAllText(stateFile, JsonSerializer.Serialize(azure, JsonOptions));
 
         var environment = new Dictionary<string, string> { ["FAKE_AZ_LOG"] = callLog, ["FAKE_AZ_STATE"] = stateFile };
-        var result = SetupScriptProcess.Run(workFolder, fakeAzFolder, environment, switches);
+        var result = SetupScriptProcess.Run(workFolder, fakeAzFolder, environment, switches, scriptPath);
 
         var calls = File.ReadAllLines(callLog).Where(line => line.Length > 0).ToList();
         var finalState = JsonSerializer.Deserialize<FakeAzure>(File.ReadAllText(stateFile), JsonOptions)
             ?? throw new InvalidOperationException("The fake Azure state is empty.");
         return new SetupRunResult(result.ExitCode, result.StandardOutput, result.StandardError, calls, finalState);
+    }
+
+    // Writes the variant script (with a byte order mark, so Windows PowerShell 5.1 reads it as UTF-8), or
+    // returns null to run infra/setup.ps1 itself
+    private static string? WriteVariant(string workFolder, string? scriptText)
+    {
+        if (scriptText is null)
+            return null;
+        var scriptPath = Path.Combine(workFolder, VariantScriptFile);
+        File.WriteAllText(scriptPath, scriptText, new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
+        return scriptPath;
     }
 }

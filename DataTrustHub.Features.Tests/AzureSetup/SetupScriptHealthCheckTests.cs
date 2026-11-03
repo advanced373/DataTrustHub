@@ -14,6 +14,18 @@ public class SetupScriptHealthCheckTests
     private const string AppServicePlanStep = "App Service plan of ";
     private const string ResourceGroupArguments = "--resource-group DataTrustHub";
 
+    // #177: the real Azure CLI holds the plan id of a web app under serverFarmId; appServicePlanId is empty
+    private const string ServerFarmIdProperty = "serverFarmId";
+    private const string AppServicePlanIdProperty = "appServicePlanId";
+    private const string WebAppShow = "webapp show";
+    private const string QueryArgument = "--query ";
+    private const string CannotRead = "Cannot read";
+    private const string WarningPrefix = "WARNING:";
+    private const string RealRunWouldStopHere = "A real run would stop here.";
+    private const string RealRunStopHeading = "A real run would stop with an error:";
+    private const string ListItemPrefix = "- ";
+    private const int PredictedStopExitCode = 1;
+
     private static readonly string[] Apps = [FakeAzure.ApiAppName, FakeAzure.WebAppName];
 
     // AC1 (real run): no health check change on the Free tier
@@ -175,19 +187,90 @@ public class SetupScriptHealthCheckTests
         Assert.DoesNotContain(result.AzCalls, call => call.Contains(HealthCheckChange));
     }
 
-    // AC9: signed in, a dry run that reads an empty plan id or tier assumes Free
+    // #177 AC3 (replaces #150 AC9 for a signed-in dry run): an empty plan id or tier is warned about, naming
+    // the step for each app, instead of being taken for the Free tier
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void DryRun_EmptyPlanIdOrTier_AssumesFreeTier(bool emptyPlanId)
+    public void DryRun_SignedInEmptyPlanIdOrTier_WarnsNamingTheStep(bool emptyPlanId)
     {
-        var azure = WithEmptyPlan(FakeAzure.NothingConfigured(FakeAzure.BasicTier), emptyPlanId);
+        var result = SetupScriptRun.DryRun(WithEmptyPlan(FakeAzure.NothingConfigured(FakeAzure.BasicTier), emptyPlanId));
 
-        var result = SetupScriptRun.DryRun(azure);
+        Assert.All(Apps, appName => Assert.Contains(result.Output.Split('\n'), line =>
+            line.Contains(WarningPrefix) && line.Contains(CannotRead) && line.Contains(AppServicePlanStep + appName)
+            && line.Contains(RealRunWouldStopHere)));
+    }
+
+    // #177 AC3: the dry run does not claim the health check would be skipped for the Free tier
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void DryRun_SignedInEmptyPlanIdOrTier_PrintsNoFreeTierSkipLine(bool emptyPlanId)
+    {
+        var result = SetupScriptRun.DryRun(WithEmptyPlan(FakeAzure.NothingConfigured(FakeAzure.BasicTier), emptyPlanId));
+
+        Assert.All(Apps, appName => Assert.Empty(SkipLines(result.Output, appName)));
+    }
+
+    // #177 AC3: with the tier unknown, no health check change is planned, and nothing changes Azure
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void DryRun_SignedInEmptyPlanIdOrTier_PlansNoHealthCheckChange(bool emptyPlanId)
+    {
+        var result = SetupScriptRun.DryRun(WithEmptyPlan(FakeAzure.NothingConfigured(FakeAzure.BasicTier), emptyPlanId));
+
+        Assert.DoesNotContain(HealthCheckChange, result.Output);
+        Assert.Empty(result.ChangeCalls);
+    }
+
+    // #177 AC3: the summary predicts the failing real run, listing the step of each app
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void DryRun_SignedInEmptyPlanIdOrTier_ListsTheStepAsRealRunStop(bool emptyPlanId)
+    {
+        var result = SetupScriptRun.DryRun(WithEmptyPlan(FakeAzure.NothingConfigured(FakeAzure.BasicTier), emptyPlanId));
+
+        var stops = PredictedStops(result.StandardOutput);
+        Assert.All(Apps, appName => Assert.Contains(stops, stop =>
+            stop.Contains(CannotRead) && stop.Contains(AppServicePlanStep + appName)));
+    }
+
+    // #177 AC3: the exit code of the dry run says a real run would fail
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void DryRun_SignedInEmptyPlanIdOrTier_ExitsWithPredictedStopCode(bool emptyPlanId)
+    {
+        var result = SetupScriptRun.DryRun(WithEmptyPlan(FakeAzure.NothingConfigured(FakeAzure.BasicTier), emptyPlanId));
+
+        Assert.True(result.ExitCode == PredictedStopExitCode, result.Output);
+    }
+
+    // #177 AC3: a signed-in dry run that reads the tier predicts no stop (the summary section stays out)
+    [Theory]
+    [InlineData(FakeAzure.FreeTier)]
+    [InlineData(FakeAzure.BasicTier)]
+    public void DryRun_SignedInTierRead_ListsNoRealRunStop(string tier)
+    {
+        var result = SetupScriptRun.DryRun(FakeAzure.NothingConfigured(tier));
 
         Assert.True(result.ExitCode == 0, result.Output);
-        Assert.DoesNotContain(HealthCheckChange, result.Output);
-        Assert.All(Apps, appName => Assert.Single(SkipLines(result.StandardOutput, appName)));
+        Assert.DoesNotContain(RealRunStopHeading, result.Output);
+        Assert.DoesNotContain(CannotRead, result.Output);
+    }
+
+    // #177 AC3: signed out, the dry run behaves as before: it assumes Free, predicts no stop and exits 0
+    [Fact]
+    public void DryRun_SignedOut_AssumesFreeTierWithoutPredictedStop()
+    {
+        var result = SetupScriptDryRun.Run(DryRunScenario.SignedOut, SetupScriptDryRun.WhatIfSwitch);
+
+        Assert.True(result.ExitCode == 0, result.Output);
+        Assert.DoesNotContain(RealRunStopHeading, result.Output);
+        Assert.DoesNotContain(CannotRead, result.Output);
+        Assert.All(Apps, appName => Assert.Single(SkipLines(result.Output, appName)));
     }
 
     // AC9: a real run that reads an empty plan id or tier stops with an error naming the step
@@ -205,6 +288,67 @@ public class SetupScriptHealthCheckTests
         Assert.DoesNotContain(result.AzCalls, call => call.Contains(HealthCheckChange));
         Assert.Empty(SkipLines(result.StandardOutput, FakeAzure.ApiAppName));
     }
+
+    // #177 AC1: against an az that holds the plan id only under serverFarmId (like the real CLI), a real run on
+    // a paid tier reads the tier, sets the health check and goes on to the firewall rule
+    [Fact]
+    public void RealRun_PlanIdUnderServerFarmIdOnly_ContinuesPastHealthCheckStep()
+    {
+        var result = SetupScriptRun.RealRun(FakeAzure.NothingConfigured(FakeAzure.BasicTier));
+
+        Assert.True(result.ExitCode == 0, result.Output);
+        Assert.All(Apps, appName => Assert.Equal(FakeAzure.HealthCheckPath, result.FinalState.Apps[appName].HealthCheckPath));
+        Assert.Contains(FakeAzure.FirewallRuleName, result.FinalState.FirewallRules);
+        Assert.DoesNotContain(CannotRead, result.Output);
+    }
+
+    // #177 AC1: on the Free tier the real run reads the tier, skips the health check and goes on
+    [Fact]
+    public void RealRun_PlanIdUnderServerFarmIdOnlyFreeTier_SkipsHealthCheckAndContinues()
+    {
+        var result = SetupScriptRun.RealRun(FakeAzure.NothingConfigured(FakeAzure.FreeTier));
+
+        Assert.True(result.ExitCode == 0, result.Output);
+        Assert.All(Apps, appName => Assert.Single(SkipLines(result.StandardOutput, appName)));
+        Assert.Contains(FakeAzure.FirewallRuleName, result.FinalState.FirewallRules);
+    }
+
+    // #177 AC1: the plan id of each app is read from serverFarmId, never from appServicePlanId
+    [Theory]
+    [InlineData(FakeAzure.ApiAppName)]
+    [InlineData(FakeAzure.WebAppName)]
+    public void RealRun_ReadsPlanIdFromServerFarmId(string appName)
+    {
+        var result = SetupScriptRun.RealRun(FakeAzure.NothingConfigured(FakeAzure.BasicTier));
+
+        Assert.Contains(result.AzCalls, call => call.StartsWith(WebAppShow, StringComparison.Ordinal)
+            && call.Contains($"--name {appName} ") && call.Contains(QueryArgument + ServerFarmIdProperty));
+        Assert.DoesNotContain(result.AzCalls, call => call.Contains(AppServicePlanIdProperty));
+    }
+
+    // #177 AC2 (regression): a script that still queried appServicePlanId gets an empty answer from the fake,
+    // as from the real CLI, so its real run stops at the plan step and sets no health check
+    [Fact]
+    public void RealRun_ScriptQueryingAppServicePlanId_StopsAtThePlanStep()
+    {
+        var result = SetupScriptRun.RealRunOfVariant(FakeAzure.NothingConfigured(FakeAzure.BasicTier),
+            QuotedProperty(ServerFarmIdProperty), QuotedProperty(AppServicePlanIdProperty));
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains(result.AzCalls, call => call.Contains(QueryArgument + AppServicePlanIdProperty));
+        Assert.True(result.ErrorContains($"{CannotRead} the {AppServicePlanStep}{FakeAzure.ApiAppName}"), result.Output);
+        Assert.All(result.FinalState.Apps.Values, app => Assert.Null(app.HealthCheckPath));
+    }
+
+    // Lines listed under "A real run would stop with an error:" in the summary
+    private static List<string> PredictedStops(string output) =>
+        output.Split('\n')
+            .SkipWhile(line => !line.Contains(RealRunStopHeading))
+            .Skip(1)
+            .TakeWhile(line => line.TrimStart().StartsWith(ListItemPrefix, StringComparison.Ordinal))
+            .ToList();
+
+    private static string QuotedProperty(string property) => $"'{property}'";
 
     private static FakeAzure WithEmptyPlan(FakeAzure azure, bool emptyPlanId)
     {

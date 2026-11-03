@@ -33,11 +33,12 @@ internal static class SetupScriptProcess
         return fakeAzFolder;
     }
 
+    /// <summary>Runs infra/setup.ps1, or the script at <paramref name="scriptPath"/> when one is given.</summary>
     internal static ScriptProcessResult Run(string workFolder, string fakeAzFolder,
-        IReadOnlyDictionary<string, string> environment, IEnumerable<string> switches)
+        IReadOnlyDictionary<string, string> environment, IEnumerable<string> switches, string? scriptPath = null)
     {
         var azureConfigFolder = Directory.CreateDirectory(Path.Combine(workFolder, "azure-config")).FullName;
-        var startInfo = StartInfo(switches);
+        var startInfo = StartInfo(switches, scriptPath ?? Path.Combine(SolutionFiles.RepositoryRoot, SetupScriptParser.SetupScriptFile));
         startInfo.Environment["PATH"] = fakeAzFolder;
         startInfo.Environment["AZURE_CONFIG_DIR"] = azureConfigFolder;
         foreach (var (name, value) in environment)
@@ -45,7 +46,7 @@ internal static class SetupScriptProcess
         return Execute(startInfo);
     }
 
-    private static ProcessStartInfo StartInfo(IEnumerable<string> switches)
+    private static ProcessStartInfo StartInfo(IEnumerable<string> switches, string scriptPath)
     {
         var startInfo = new ProcessStartInfo(ShellExecutable())
         {
@@ -56,7 +57,7 @@ internal static class SetupScriptProcess
         };
         // Bypass applies to this process only; it lets Windows PowerShell run the script and the fake
         string[] arguments = ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
-            "-File", Path.Combine(SolutionFiles.RepositoryRoot, SetupScriptParser.SetupScriptFile)];
+            "-File", scriptPath];
         foreach (var argument in arguments.Concat(switches))
             startInfo.ArgumentList.Add(argument);
         return startInfo;

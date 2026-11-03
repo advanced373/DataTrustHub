@@ -105,9 +105,11 @@ The script shows the subscription and asks for confirmation (`-Force` skips it).
    from Azure, is on a paid tier. On the Free tier (F1) it skips it and says so ([ADR-0024](../docs/architecture/adr/0024-no-app-service-health-check-on-the-free-tier.md)): the
    health check pings `/health` about once a minute, which keeps both apps awake and spends the
    60 CPU minutes a day the plan shares between them. The release workflow's smoke check (#102)
-   is the health signal instead. Once the plan moves to a paid tier, the next run applies it. A dry
-   run that cannot read the tier (not signed in, or an empty plan id or tier) assumes the production
-   tier, Free; a real run stops with an error instead;
+   is the health signal instead. Once the plan moves to a paid tier, the next run applies it. The
+   plan id is read from the web app's `serverFarmId`. A signed-out dry run, which reads nothing,
+   assumes the production tier, Free. A real run that reads an empty plan id or tier stops with an
+   error naming the step; a signed-in dry run that reads one warns naming the step, plans nothing for
+   the health check, lists the step under "A real run would stop with an error" and exits with code 1;
 6. adds the SQL firewall rule `AllowAllWindowsAzureIps` if it is missing;
 7. prints what it changed and the next step, without any secret value.
 

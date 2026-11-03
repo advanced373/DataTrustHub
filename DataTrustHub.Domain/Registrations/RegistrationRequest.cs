@@ -1,4 +1,5 @@
 using DataTrustHub.Domain.Users;
+using DataTrustHub.SharedKernel;
 
 namespace DataTrustHub.Domain.Registrations;
 
@@ -38,4 +39,12 @@ public sealed class RegistrationRequest
     // R2: a request older than the pending lifetime has expired; it is purged and no longer counts. The purge
     // (IRegistrationRequestRepository.RemoveExpiredAsync) applies the same strict comparison in the database
     public bool IsExpired(DateTime now, TimeSpan lifetime) => RequestedAt < now - lifetime;
+
+    // R5: approving creates the user, role User, with the request's normalized email and its password hash,
+    // reused as it is, so the requester logs in with the password they registered with. An expired request
+    // cannot be approved: it answers NotFound, as if already purged. The caller then removes the request
+    public Result<User> Approve(DateTime now, TimeSpan lifetime) =>
+        IsExpired(now, lifetime)
+            ? Result.Failure<User>(RegistrationRequestErrors.NotFound)
+            : Result.Success(User.Register(Email, HashedPassword));
 }

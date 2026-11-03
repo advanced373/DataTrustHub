@@ -27,6 +27,7 @@ internal static class AdminErrorCodes
     internal const string MembershipLastOrgAdmin = "Membership.LastOrgAdmin";
     internal const string MembershipUnknownRole = "Membership.UnknownRole";
     internal const string UserNotFound = "User.NotFound";
+    internal const string RegistrationRequestNotFound = "RegistrationRequest.NotFound";
     internal const string ValidationGeneral = "Validation.General";
 }
 
@@ -56,5 +57,6 @@ internal static class AdminErrorMessages
     internal const string MembershipNotFound = "The user is not a member of this organization.";
     internal const string MembershipLastOrgAdmin = "The organization must keep at least one organization admin. Appoint another one first.";
     internal const string UserNotFound = "No user has this email address.";
+    internal const string RegistrationRequestNotFound = "The registration request was not found.";
     internal const string ValidationGeneral = "One or more validation errors occurred";
 }

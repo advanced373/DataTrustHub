@@ -16,8 +16,8 @@ should exist only when a platform admin has accepted the person.
    normalized email address (U7) and the password hash (`IPasswordHasher`), never the plain password,
    and the time it was made (UTC). Register answers **202 Accepted** with the request's id. Nobody can
    log in with it: login answers exactly as for an unknown account (U4). A platform admin approves a
-   request (the user is created) or rejects it (the request is deleted); those routes come in the next
-   PR of #172. Register stays the `RegisterUser` command, audited as before (ADR-0016).
+   request (the user is created) or rejects it (the request is deleted). Register stays the
+   `RegisterUser` command, audited as before (ADR-0016).
 2. **A separate table, not a pending status on users.** Registration requests live in their own table
    `RegistrationRequests`, as the aggregate `RegistrationRequest`. `Users` holds approved accounts only.
 3. **One pending request per email address** (R1). Register refuses an email that already has an
@@ -33,16 +33,28 @@ should exist only when a platform admin has accepted the person.
    - `MaxPendingRequests` (default 100): with this many pending requests, register answers **503**
      `Registration.QueueFull` and saves nothing (R3), until requests are approved, rejected or expire.
      A new `ErrorType.Unavailable` maps to 503.
-5. **Expired requests are purged lazily,** at the start of every register (and, in the next PR, when the
-   platform admin lists the requests), with one set-based delete that runs at once, outside the
+5. **Expired requests are purged lazily,** at the start of every register and every list of the
+   requests by the platform admin, with one set-based delete that runs at once, outside the
    command's unit of work. There is no timer: on the Free tier the app sleeps when idle (ADR-0024), so a
    timer would not run.
+   So `ListRegistrationRequests` is a query that writes: the purge goes through the repository, then
+   the pending requests are read.
 6. **The client address is the connection's remote address.** App Service's front end passes the
    client's own address to the app, so no forwarded headers are read. This is an assumption about the
    host: behind another proxy all clients would share the proxy's address, and the limit would become
    global. A request without an address shares one partition. The limit is per address, so it is weak
    against an IPv6 client that rotates addresses inside its own prefix; the cap still bounds the queue.
-7. The time comes from a `TimeProvider` (the system clock in the host), so tests can control it.
+7. **The platform admin's routes** (role `Admin`, like the account routes):
+   - `GET /admin/registration-requests`: the pending requests, oldest first, with id, email, requestedAt
+     and expiresAt, never the hash. Unpaged, like the account list: `MaxPendingRequests` bounds it.
+   - `POST /admin/registration-requests/{id}/approve`: creates the user from the request, role `User`,
+     reusing its password hash, and deletes the request in one save; 200 with the user id (R5). An
+     unknown or expired request answers 404 `RegistrationRequest.NotFound`; an email that already has an
+     account answers 409 `User.EmailAlreadyInUse` and the request stays.
+   - `POST /admin/registration-requests/{id}/reject`: deletes the request, expired or not; 204, or 404.
+   Approve and reject are commands audited with the target `RegistrationRequest` and its id, never the
+   email, and are tenant-level actions (ADR-0016).
+8. The time comes from a `TimeProvider` (the system clock in the host), so tests can control it.
 
 ## Alternatives considered
 
@@ -65,8 +77,7 @@ should exist only when a platform admin has accepted the person.
   concurrent registers can pass it by a few requests.
 
 **Harder:**
-- Nobody can sign up and use the platform until a platform admin acts; until the next PR adds the
-  approve route, register only fills the queue.
+- Nobody can sign up and use the platform until a platform admin acts.
 - One client can fill the queue in `MaxPendingRequests / PermitsPerHourPerIp` hours from one address, or
   faster from several; then everyone gets 503 until the requests are handled or expire.
 - The limiter counts in memory per instance and resets on restart (as in ADR-0025).

@@ -41,12 +41,15 @@ internal static class AuditTrailSetup
     internal const string CreateAccountAction = "CreateAccount";
     internal const string DeleteAccountAction = "DeleteAccount";
     internal const string RegisterUserAction = "RegisterUser";
+    internal const string ApproveRegistrationRequestAction = "ApproveRegistrationRequest";
+    internal const string RejectRegistrationRequestAction = "RejectRegistrationRequest";
     internal const string LoginUserAction = "LoginUser";
 
     internal static readonly string[] TenantLevelActions =
     [
         CreateOrganizationAction, DeleteOrganizationAction, AppointOrganizationAdminAction,
-        CreateAccountAction, DeleteAccountAction, RegisterUserAction, LoginUserAction
+        CreateAccountAction, DeleteAccountAction, RegisterUserAction, ApproveRegistrationRequestAction,
+        RejectRegistrationRequestAction, LoginUserAction
     ];
 
     // Actions inside an organization: members, policies, clearances, data items

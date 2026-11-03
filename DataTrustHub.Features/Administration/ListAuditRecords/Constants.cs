@@ -25,6 +25,8 @@ internal static class TenantLevelActions
     internal const string CreateAccount = "CreateAccount";
     internal const string DeleteAccount = "DeleteAccount";
     internal const string RegisterUser = "RegisterUser";
+    internal const string ApproveRegistrationRequest = "ApproveRegistrationRequest";
+    internal const string RejectRegistrationRequest = "RejectRegistrationRequest";
     internal const string LoginUser = "LoginUser";
 
     internal static readonly string[] All =
@@ -35,6 +37,8 @@ internal static class TenantLevelActions
         CreateAccount,
         DeleteAccount,
         RegisterUser,
+        ApproveRegistrationRequest,
+        RejectRegistrationRequest,
         LoginUser
     ];
 }

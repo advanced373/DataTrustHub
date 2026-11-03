@@ -11,6 +11,9 @@ public sealed record ApiResult<T>
 
     public bool IsUnauthorized { get; private init; }
 
+    // The API answered 429: the caller made too many requests to a rate-limited route
+    public bool IsTooManyRequests { get; private init; }
+
     public bool IsSuccess => ErrorMessage is null && !IsUnauthorized;
 
     public static ApiResult<T> Success(T value) => new() { Value = value };
@@ -21,12 +24,17 @@ public sealed record ApiResult<T>
     public static ApiResult<T> Unauthorized() =>
         new() { ErrorMessage = Messages.SessionExpired, IsUnauthorized = true };
 
+    public static ApiResult<T> TooManyRequests() =>
+        new() { ErrorMessage = Messages.TooManyRequests, IsTooManyRequests = true };
+
     public ApiResult<TOut> Map<TOut>(Func<T, TOut> map)
     {
         if (IsSuccess) return ApiResult<TOut>.Success(map(Value!));
 
-        return IsUnauthorized
-            ? ApiResult<TOut>.Unauthorized()
+        if (IsUnauthorized) return ApiResult<TOut>.Unauthorized();
+
+        return IsTooManyRequests
+            ? ApiResult<TOut>.TooManyRequests()
             : ApiResult<TOut>.Failure(ErrorMessage!, Details);
     }
 }

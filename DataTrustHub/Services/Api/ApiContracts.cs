@@ -25,6 +25,9 @@ internal sealed record LoginResponse(string Token);
 
 internal sealed record UserCreatedResponse(Guid UserId);
 
+// Register answers 202 with the registration request's id; the account waits for approval (ADR-0026)
+internal sealed record RegistrationRequestCreatedResponse(Guid RegistrationRequestId);
+
 internal sealed record DataItemCreatedResponse(Guid DataItemId);
 
 // A data item the user may read; policy fields are null for a personal item. CanDelete says whether the
@@ -63,6 +66,9 @@ internal sealed record PolicyCreatedResponse(Guid PolicyId);
 internal sealed record ClearanceCreatedResponse(Guid ClearanceId);
 
 public sealed record AccountResponse(Guid Id, string Email, string Role);
+
+// A pending registration request; RequestedAt and ExpiresAt are in UTC
+public sealed record RegistrationRequestResponse(Guid Id, string Email, DateTime RequestedAt, DateTime ExpiresAt);
 
 public sealed record OrganizationResponse(Guid Id, string Name);
 

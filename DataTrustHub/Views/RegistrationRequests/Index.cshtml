@@ -1,0 +1,58 @@
+@using System.Globalization
+@model ListViewModel<DataTrustHub.Services.Api.RegistrationRequestResponse>
+@{
+    ViewData["Title"] = "Registration requests";
+}
+
+<partial name="_AdminNav" model="@ControllerNames.RegistrationRequests" />
+
+<h1 class="h3 mb-3">Registration requests</h1>
+
+<partial name="_ListError" model="Model.ErrorMessage" />
+
+@if (Model.Items.Count == 0 && Model.ErrorMessage is null)
+{
+    <p class="text-muted">No registration requests are waiting.</p>
+}
+else if (Model.Items.Count > 0)
+{
+    @* The API returns the requests oldest first *@
+    <div class="card shadow-sm">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Email</th>
+                    <th>Requested at</th>
+                    <th>Expires at</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var request in Model.Items)
+                {
+                    <tr>
+                        <td>@request.Email</td>
+                        <td class="small text-nowrap">@request.RequestedAt.ToUniversalTime().ToString(AuditTrailDisplay.TimeFormat, CultureInfo.InvariantCulture)</td>
+                        <td class="small text-nowrap">@request.ExpiresAt.ToUniversalTime().ToString(AuditTrailDisplay.TimeFormat, CultureInfo.InvariantCulture)</td>
+                        <td class="text-end">
+                            <form asp-action="@nameof(DataTrustHub.Controllers.RegistrationRequestsController.Approve)" asp-route-id="@request.Id" method="post" class="d-inline">
+                                <input type="hidden" name="email" value="@request.Email" />
+                                <button type="submit" class="btn btn-sm btn-outline-success" title="Approve">
+                                    <i class="bi bi-check-lg"></i> Approve
+                                </button>
+                            </form>
+                            @* Asks the browser to confirm first, like the delete buttons *@
+                            <form asp-action="@nameof(DataTrustHub.Controllers.RegistrationRequestsController.Reject)" asp-route-id="@request.Id" method="post" class="d-inline"
+                                  onsubmit="return confirm(this.dataset.confirm);" data-confirm="@($"Reject the registration of {request.Email}? No account is created.")">
+                                <input type="hidden" name="email" value="@request.Email" />
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Reject">
+                                    <i class="bi bi-x-lg"></i> Reject
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

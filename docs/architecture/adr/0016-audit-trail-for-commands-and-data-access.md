@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-10-22; amended 2026-10-24 (failure handling, own context, who sees what)
-- **Related:** #24, #6, #22; [ADR-0012](0012-clean-architecture-with-vertical-slices.md)
+- **Related:** #24, #6, #22; [ADR-0012](0012-clean-architecture-with-vertical-slices.md); audited queries: [ADR-0025](0025-rate-limiting-and-audited-queries.md)
 
 ## Context
 

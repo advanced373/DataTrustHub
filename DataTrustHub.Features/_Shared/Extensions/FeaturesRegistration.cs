@@ -2,9 +2,12 @@ using Carter;
 using DataTrustHub.Features._Shared.Auditing;
 using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Features._Shared.Jwt;
+using DataTrustHub.Features._Shared.RateLimiting;
 using DataTrustHub.Features._Shared.Seeding;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,6 +25,7 @@ public static class FeaturesRegistration
         services.AddCarter();
         RegisterHandlers(services);
         RegisterAuditing(services);
+        RegisterRateLimiting(services);
         RegisterJwt(services, configuration);
         RegisterAdminSeeding(services, configuration);
         return services;
@@ -35,7 +39,8 @@ public static class FeaturesRegistration
 
     // Scrutor: Scan registers every slice handler, Decorate wraps each one in its decorators. The last one
     // registered is the outermost (ADR-0012): the audit decorator wraps validation, so it also records
-    // rejected input (ADR-0016).
+    // rejected input (ADR-0016). Queries get the same order; only those marked IAuditedQuery leave a record
+    // (ADR-0025).
     private static void RegisterHandlers(IServiceCollection services)
     {
         services.Scan(scan => scan
@@ -50,6 +55,7 @@ public static class FeaturesRegistration
         services.Decorate(typeof(ICommandHandler<,>), typeof(CommandValidationDecorator<,>));
         services.Decorate(typeof(ICommandHandler<,>), typeof(AuditCommandDecorator<,>));
         services.Decorate(typeof(IQueryHandler<,>), typeof(QueryValidationDecorator<,>));
+        services.Decorate(typeof(IQueryHandler<,>), typeof(AuditQueryDecorator<,>));
 
         services.AddValidatorsFromAssembly(
             typeof(FeaturesRegistration).Assembly,
@@ -62,6 +68,15 @@ public static class FeaturesRegistration
         services.AddHttpContextAccessor();
         services.AddScoped<AuditScope>();
     }
+
+    // Endpoints opt in with RequireRateLimiting; the API adds the middleware after authorization, so the
+    // caller is known when the request is partitioned (ADR-0025)
+    private static void RegisterRateLimiting(IServiceCollection services) =>
+        services.AddRateLimiter(options =>
+        {
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            options.AddPolicy(RateLimitPolicies.UserLookup, UserLookupRateLimit.Partition);
+        });
 
     // The signing key comes from User Secrets or the environment, never from appsettings.json (ADR-0007);
     // a missing or too short key stops the host here, before any token is issued or validated

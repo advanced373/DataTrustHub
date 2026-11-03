@@ -2,6 +2,7 @@ using System.Reflection;
 using DataTrustHub.Domain.Auditing;
 using DataTrustHub.Features._Shared.Auditing;
 using DataTrustHub.Features._Shared.Messaging;
+using DataTrustHub.Features.Administration.FindUserByEmail;
 using DataTrustHub.Features.DataManagement.AddDataItem;
 using DataTrustHub.Features.DataManagement.DeleteDataItem;
 using DataTrustHub.SharedKernel;
@@ -11,7 +12,7 @@ using static DataTrustHub.Features.Tests.Architecture.ArchitectureConstants;
 namespace DataTrustHub.Features.Tests.Architecture;
 
 // #24 step 1 (ADR-0016): the audit log port is append-only (AC2), every command can be audited (AC5), and
-// only the two use cases of AC6 fill the audit scope
+// only the two use cases of AC6 and the find-by-email lookup (#122, ADR-0025) fill the audit scope
 public class AuditTrailArchitectureTests
 {
     private const string AppendAsyncName = "AppendAsync";
@@ -58,9 +59,9 @@ public class AuditTrailArchitectureTests
         Assert.All(resultTypes, t => Assert.True(typeof(Result).IsAssignableFrom(t), t.Name));
     }
 
-    // AC6: "Do not add AuditScope anywhere else"
+    // AC6: "Do not add AuditScope anywhere else"; #122 adds FindUserByEmail, which sets the found user as target
     [Fact]
-    public void OnlyAddAndDeleteDataItemHandlers_DependOnAuditScope()
+    public void OnlyAddAndDeleteDataItemAndFindUserByEmailHandlers_DependOnAuditScope()
     {
         var dependents = FeaturesAssembly.GetTypes()
             .Where(t => t.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
@@ -68,13 +69,17 @@ public class AuditTrailArchitectureTests
             .Where(t => !t.IsGenericType)
             .ToHashSet();
 
-        Assert.Equal(new HashSet<Type> { typeof(AddDataItemHandler), typeof(DeleteDataItemHandler) }, dependents);
+        Assert.Equal(new HashSet<Type> { typeof(AddDataItemHandler), typeof(DeleteDataItemHandler), typeof(FindUserByEmailHandler) }, dependents);
     }
 
     [Fact]
     public void AuditingContracts_LiveInSharedAuditing()
     {
-        Type[] contracts = [typeof(AuditScope), typeof(AuditTarget), typeof(AuditTargetTypes), typeof(IOrganizationScopedCommand), typeof(ITargetedCommand)];
+        Type[] contracts =
+        [
+            typeof(AuditScope), typeof(AuditTarget), typeof(AuditTargetTypes), typeof(IOrganizationScopedCommand), typeof(ITargetedCommand),
+            typeof(IAuditedQuery), typeof(IOrganizationScopedQuery)
+        ];
         var auditingNamespace = SharedNamespace + NamespaceSeparator + AuditingFolder;
 
         Assert.All(contracts, t => Assert.Equal(auditingNamespace, t.Namespace));

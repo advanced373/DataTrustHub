@@ -7,7 +7,7 @@ namespace DataTrustHub.Features.Tests.Build;
 // #102: the release workflow builds once without Azure access, waits for the owner's approval in the
 // environment "production", signs in through OIDC, migrates, deploys the API then the WebApp and checks
 // /health. Read as text (the test project has no YAML library); what only a real run proves is not here.
-public class ReleaseWorkflowTests
+public partial class ReleaseWorkflowTests
 {
     private const string ReleaseWorkflowFile = ".github/workflows/release.yml";
     private const string InfraReadmeFile = "infra/README.md";
@@ -31,6 +31,7 @@ public class ReleaseWorkflowTests
     private const string SetupDotnetAction = "actions/setup-dotnet@";
     private const string MigrateStepKey = "migrate";
     private const string SmokeStepKey = "smoke";
+    private const string SmokeCheckStepName = "Smoke check";
     private const int MinimumConnectTimeoutSeconds = 30;
     private const int MinimumRetryBudgetSeconds = 180;
     private const int MaximumRetryBudgetSeconds = 240;
@@ -328,16 +329,6 @@ public class ReleaseWorkflowTests
     // AC6 — smoke check
 
     [Fact]
-    public void SmokeCheck_ReadsBothHostNamesFromAzure()
-    {
-        var shows = Regex.Matches(SmokeStep().Text, @"az webapp show[^\n]*defaultHostName");
-
-        Assert.Equal(2, shows.Count);
-        Assert.Contains(shows, show => show.Value.Contains($"${EnvKeyOf(ApiAppName, ApiKeyHint)}"));
-        Assert.Contains(shows, show => show.Value.Contains($"${EnvKeyOf(WebAppAppName, WebAppKeyHint)}"));
-    }
-
-    [Fact]
     public void SmokeCheck_ProbesTheHealthPathOverHttps()
     {
         var job = AzureJobs().First(candidate => Workflow().Steps(candidate).Contains(SmokeStep()));
@@ -453,7 +444,10 @@ public class ReleaseWorkflowTests
     private static WorkflowStep MigrateStep() =>
         ReleaseSteps().Single(step => step.Text.Contains("efbundle") && step.Text.Contains("--connection"));
 
-    private static WorkflowStep SmokeStep() => ReleaseSteps().Single(step => step.Text.Contains("defaultHostName"));
+    private static WorkflowStep SmokeStep() => ReleaseSteps().Single(step => step.Name == SmokeCheckStepName);
+
+    // #154: the only step that reads the host names (HostNames_AreReadByOneStepOnly checks that)
+    private static WorkflowStep HostMaskStep() => ReleaseSteps().Single(step => CodeOf(step.Text).Contains(DefaultHostName));
 
     private static WorkflowStep RetryStep(string stepKey) => stepKey == MigrateStepKey ? MigrateStep() : SmokeStep();
 

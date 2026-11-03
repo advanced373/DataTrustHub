@@ -13,7 +13,8 @@ DataItems are files classified by security level.
 - Own handler interfaces, no MediatR (ADR-0012): `ICommandHandler<TCommand, TResult>` for writes and
   `IQueryHandler<TQuery, TResult>` for reads, in `Features/_Shared/Messaging`; endpoints inject the handler
   they call. Scrutor registers the handlers and wraps them in decorators: validation for commands and
-  queries, and the audit decorator (outermost) for commands (ADR-0016)
+  queries, and the audit decorator (outermost) for commands and for queries marked `IAuditedQuery`
+  (ADR-0016, ADR-0025)
 - FluentValidation 12 (validated by the validation decorators before the handler runs)
 - Entity Framework Core 10 with SQL Server
 - DataTrustHub.SharedKernel: Result<T>, Error, ErrorType, ValidationError, UserRoles, Entity base classes

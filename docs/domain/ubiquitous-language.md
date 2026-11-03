@@ -78,7 +78,7 @@ architecture that implements them is in ADR-0012 and [the architecture overview]
 | **Need-to-know** | An admin cannot bypass the read rule. A data item the user may not read answers 404, so its existence is not revealed | — |
 | **Download** | Opening one data item with its content (`GET /data/{id}`). Every download is recorded in the audit trail before the content is returned; if the record cannot be written, nothing is returned | `GetDataItem`, action `DataItem.Download` |
 | **Denied read** | An attempt to open a data item that exists (deleted or not) but that the read rule hides from the user. It answers 404 like a missing item, and is recorded with outcome *Denied* | `GetDataItem`, `AuditOutcome.Denied` |
-| **Audit trail** | The append-only record of who did what and who read what: every command, also a rejected or failed one, every download and every denied read (ADR-0016). Nothing in it is updated or deleted | `IAuditLog`, `AuditCommandDecorator`, `GetDataItem` |
+| **Audit trail** | The append-only record of who did what and who read what: every command, also a rejected or failed one, every audited query (ADR-0025), every download and every denied read (ADR-0016). Nothing in it is updated or deleted | `IAuditLog`, `AuditCommandDecorator`, `AuditQueryDecorator`, `GetDataItem` |
 | **Audit record** | One entry of the audit trail: when, who (or anonymous), the action, the target, the organization and the outcome. Never a payload, file content, email, password, hash or token | `AuditRecord` |
 | **Outcome** | How an audited action ended: *Succeeded*; *Rejected* by validation or a domain error, with its error code; *Denied*, a read the user may not make; *Failed*, an exception | `AuditOutcome` |
 | **Tenant-level action** | One of the platform's own use cases: `CreateOrganization`, `DeleteOrganization`, `AppointOrganizationAdmin`, `CreateAccount`, `DeleteAccount`, `RegisterUser`, `LoginUser`. Their records are the only ones the platform admin sees in the audit trail. An action inside an organization (members, policies, clearances, data items) is not tenant-level | `TenantLevelActions` (`ListAuditRecords`) |
@@ -110,6 +110,8 @@ These are the words for how the code is structured (ADR-0012).
 | **Persistence model** | The shape of an EF table, `Db*` (`DbUser`, `DbDataItem`). It exists only in Infrastructure. Never call it an entity |
 | **Mapper** | Converts between a persistence model and an entity (Mapperly). It lives in Infrastructure |
 | **Input validation** | Checks on the shape of a request (required fields, length, format), in the slice's `*Validator`. Business rules do not go here |
-| **Decorator** | A cross-cutting step that Scrutor wraps around handlers: validation, and auditing around every command handler (outermost) |
+| **Audited query** | A read that is recorded in the audit trail like a command, because it can reveal something about other users; today only find-user-by-email (ADR-0025). Marked with `IAuditedQuery`, recorded by `AuditQueryDecorator` |
+| **Rate limit** | The most requests one caller may make to a route in a time window; over it the API answers 429. Today only find-user-by-email: 10 per minute per caller (ADR-0025). Policy `RateLimitPolicies.UserLookup` |
+| **Decorator** | A cross-cutting step that Scrutor wraps around handlers: validation, and auditing (outermost) around every command handler and every audited query handler |
 | **Domain service** | A rule that needs several aggregates and belongs to none of them. There are none yet |
 | **Bounded context** | A part of the domain with its own model and language. Today there are three: Identity and Access, Access Governance and Data Management ([bounded-contexts.md](bounded-contexts.md)) |

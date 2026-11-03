@@ -9,11 +9,12 @@ using Microsoft.Extensions.Logging;
 
 namespace DataTrustHub.Features.Tests.Auditing.Helpers;
 
-// Builds the internal AuditCommandDecorator around a fake inner handler, with a fake audit log, a request
+// Builds the internal AuditCommandDecorator or AuditQueryDecorator around a fake inner handler, with a fake audit log, a request
 // audit scope, the request's user and a logger that keeps what it logs
 internal sealed class AuditDecoratorHarness
 {
     private const string DecoratorTypeName = "DataTrustHub.Features._Shared.Auditing.AuditCommandDecorator`2";
+    private const string QueryDecoratorTypeName = "DataTrustHub.Features._Shared.Auditing.AuditQueryDecorator`2";
     private const string AuthenticationType = "Test";
 
     internal FakeAuditLog AuditLog { get; } = new();
@@ -23,6 +24,9 @@ internal sealed class AuditDecoratorHarness
 
     internal static Type DecoratorDefinition { get; } =
         typeof(FeaturesRegistration).Assembly.GetType(DecoratorTypeName, throwOnError: true)!;
+
+    internal static Type QueryDecoratorDefinition { get; } =
+        typeof(FeaturesRegistration).Assembly.GetType(QueryDecoratorTypeName, throwOnError: true)!;
 
     // An authenticated request whose user has these claims
     internal void SignIn(params Claim[] claims) =>
@@ -46,6 +50,22 @@ internal sealed class AuditDecoratorHarness
             decoratorType, new FakeHandler<TCommand, TResult>(inner), AuditLog, AuditScope, HttpContextAccessor, logger)!;
     }
 
+    internal IQueryHandler<TQuery, TResult> DecorateQuery<TQuery, TResult>(Func<TQuery, Task<TResult>> inner)
+        where TResult : Result
+    {
+        var decoratorType = QueryDecoratorDefinition.MakeGenericType(typeof(TQuery), typeof(TResult));
+        var loggerFactory = LoggerFactory.Create(builder => builder.AddProvider(Logs));
+        var logger = Activator.CreateInstance(typeof(Logger<>).MakeGenericType(decoratorType), loggerFactory)!;
+
+        return (IQueryHandler<TQuery, TResult>)Activator.CreateInstance(
+            decoratorType, new FakeQueryHandler<TQuery, TResult>(inner), AuditLog, AuditScope, HttpContextAccessor, logger)!;
+    }
+
+    private sealed class FakeQueryHandler<TQuery, TResult>(Func<TQuery, Task<TResult>> handle) : IQueryHandler<TQuery, TResult>
+    {
+        public Task<TResult> Handle(TQuery query, CancellationToken cancellationToken) => handle(query);
+    }
+
     private sealed class FakeHandler<TCommand, TResult>(Func<TCommand, Task<TResult>> handle) : ICommandHandler<TCommand, TResult>
     {
         public Task<TResult> Handle(TCommand command, CancellationToken cancellationToken) => handle(command);
@@ -57,9 +77,11 @@ internal sealed class FakeAuditLog : IAuditLog
 {
     internal List<AuditRecord> Appended { get; } = [];
     internal Exception? ThrowOnAppend { get; set; }
+    internal List<CancellationToken> Tokens { get; } = [];
 
     public Task AppendAsync(AuditRecord record, CancellationToken cancellationToken)
     {
+        Tokens.Add(cancellationToken);
         if (ThrowOnAppend is not null) throw ThrowOnAppend;
         Appended.Add(record);
         return Task.CompletedTask;

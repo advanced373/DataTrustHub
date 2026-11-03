@@ -49,6 +49,8 @@ internal static class ApiRequest
         {
             HttpStatusCode.Unauthorized => ApiResult<T>.Unauthorized(),
             HttpStatusCode.Forbidden => ApiResult<T>.Failure(Messages.Forbidden),
+            // The rate limiter answers 429 with an empty body
+            HttpStatusCode.TooManyRequests => ApiResult<T>.TooManyRequests(),
             _ => await ReadFailureAsync<T>(response, cancellationToken)
         };
     }

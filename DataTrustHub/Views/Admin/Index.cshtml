@@ -11,6 +11,10 @@
         <i class="bi bi-person"></i> Users
         <div class="small text-muted">Accounts that can sign in to DataTrustHub. List, create and delete them.</div>
     </a>
+    <a class="list-group-item list-group-item-action py-3" asp-controller="@ControllerNames.RegistrationRequests" asp-action="Index">
+        <i class="bi bi-person-check"></i> Registration requests
+        <div class="small text-muted">Sign-ups waiting for approval. Approve one to create the account, or reject it.</div>
+    </a>
     <a class="list-group-item list-group-item-action py-3" asp-controller="Organizations" asp-action="Index">
         <i class="bi bi-people"></i> Organizations
         <div class="small text-muted">The tenants of the platform. List, create and delete them, and appoint their first organization admin.</div>

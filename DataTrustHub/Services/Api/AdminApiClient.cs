@@ -11,6 +11,14 @@ public interface IAdminApiClient
 
     Task<ApiResult<bool>> DeleteAccountAsync(Guid accountId, CancellationToken cancellationToken);
 
+    // The pending registration requests, oldest first (ADR-0026)
+    Task<ApiResult<IReadOnlyList<RegistrationRequestResponse>>> ListRegistrationRequestsAsync(CancellationToken cancellationToken);
+
+    // Creates the user from the registration request; the value is the new user's id
+    Task<ApiResult<Guid>> ApproveRegistrationRequestAsync(Guid registrationRequestId, CancellationToken cancellationToken);
+
+    Task<ApiResult<bool>> RejectRegistrationRequestAsync(Guid registrationRequestId, CancellationToken cancellationToken);
+
     Task<ApiResult<Guid>> CreateOrganizationAsync(string name, CancellationToken cancellationToken);
 
     Task<ApiResult<IReadOnlyList<OrganizationResponse>>> ListOrganizationsAsync(CancellationToken cancellationToken);
@@ -86,6 +94,29 @@ internal sealed class AdminApiClient(HttpClient httpClient) : IAdminApiClient
 
     public Task<ApiResult<bool>> DeleteAccountAsync(Guid accountId, CancellationToken cancellationToken) =>
         DeleteAsync(string.Format(ApiRoutes.AdminAccountById, accountId), cancellationToken);
+
+    public Task<ApiResult<IReadOnlyList<RegistrationRequestResponse>>> ListRegistrationRequestsAsync(
+        CancellationToken cancellationToken) =>
+        GetAsync<IReadOnlyList<RegistrationRequestResponse>>(ApiRoutes.AdminRegistrationRequests, cancellationToken);
+
+    public async Task<ApiResult<Guid>> ApproveRegistrationRequestAsync(
+        Guid registrationRequestId, CancellationToken cancellationToken)
+    {
+        var result = await ApiRequest.SendAsync<UserCreatedResponse>(
+            token => httpClient.PostAsync(
+                string.Format(ApiRoutes.AdminApproveRegistrationRequest, registrationRequestId), null, token),
+            cancellationToken);
+
+        return result.Map(response => response.UserId);
+    }
+
+    // The API answers 204 No Content
+    public Task<ApiResult<bool>> RejectRegistrationRequestAsync(
+        Guid registrationRequestId, CancellationToken cancellationToken) =>
+        ApiRequest.SendWithoutContentAsync(
+            token => httpClient.PostAsync(
+                string.Format(ApiRoutes.AdminRejectRegistrationRequest, registrationRequestId), null, token),
+            cancellationToken);
 
     public Task<ApiResult<IReadOnlyList<OrganizationResponse>>> ListOrganizationsAsync(CancellationToken cancellationToken) =>
         GetAsync<IReadOnlyList<OrganizationResponse>>(ApiRoutes.AdminOrganizations, cancellationToken);

@@ -131,6 +131,7 @@ internal static class FakeChange
 /// <summary>Patterns of az reads, for <see cref="FakeAzure.FailingReads"/>.</summary>
 internal static class FakeRead
 {
-    internal const string PlanId = @"^webapp show .*appServicePlanId";
+    // The real Azure CLI holds the plan id of a web app under serverFarmId (#177)
+    internal const string PlanId = @"^webapp show .*serverFarmId";
     internal const string PlanTier = @"^appservice plan show .*sku\.tier";
 }

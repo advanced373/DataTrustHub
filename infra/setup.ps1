@@ -28,6 +28,8 @@
 
 .PARAMETER WhatIf
     Dry run: prints every az command that would change Azure, with secrets masked, and changes nothing.
+    Signed in, a step at which a real run would stop (an empty App Service plan id or tier) is warned
+    about, listed in the summary, and the dry run exits with code 1.
 
 .PARAMETER Force
     Skips the confirmation prompt.
@@ -107,10 +109,13 @@ $ApiHostPlaceholder = '<API default host name>'
 $SubscriptionPlaceholder = '<not signed in>'
 $SettingsFilePlaceholder = '@<temporary settings file>'
 $SqlScriptPath = 'infra/sql/grant-roles.sql'
+$PredictedStopExitCode = 1
 
 # State of the run
 $script:IsSignedIn = $false
 $script:Changes = New-Object System.Collections.Generic.List[string]
+# Steps at which a real run would stop, found by a signed-in dry run that still goes on
+$script:PredictedStops = New-Object System.Collections.Generic.List[string]
 
 # ---------------------------------------------------------------------------------------------
 # Azure CLI helpers
@@ -469,14 +474,14 @@ function Disable-Ftp {
 }
 
 # Returns the pricing tier (Free, Basic, ...) of the App Service plan an app belongs to, read from Azure.
-# A dry run that reads nothing (signed out) or an empty plan id or tier assumes the documented
-# production tier, Free; a real run stops with an error naming the step instead.
+# The Azure CLI holds the plan id in the web app's serverFarmId property. An empty plan id or tier is
+# handled by Get-UnreadPlanTier.
 function Get-AppServicePlanTier {
     param([string] $AppName)
     $planStep = "the App Service plan of $AppName"
     $planId = Invoke-AzRead $planStep @(
         'webapp', 'show', '--resource-group', $ResourceGroup,
-        '--name', $AppName, '--query', 'appServicePlanId', '--output', 'tsv')
+        '--name', $AppName, '--query', 'serverFarmId', '--output', 'tsv')
     if (-not $planId) { return Get-UnreadPlanTier $planStep }
     $tierStep = "the pricing tier of the App Service plan of $AppName"
     $tier = Invoke-AzRead $tierStep @(
@@ -485,19 +490,28 @@ function Get-AppServicePlanTier {
     return [string] $tier
 }
 
-# Handles a plan id or tier that came back empty: a dry run assumes the production tier, Free
-# (like the placeholder for the API's host name); a real run stops with an error naming the step.
+# Handles a plan id or tier that came back empty. A real run stops with an error naming the step.
+# A signed-out dry run, which reads nothing, assumes the production tier, Free (like the placeholder
+# for the API's host name). A signed-in dry run read an empty value, so a real run would stop here:
+# it warns naming the step, records it for the summary and returns $null (tier unknown).
 function Get-UnreadPlanTier {
     param([string] $Step)
-    if (-not $WhatIf) { throw "Cannot read $Step." }
-    return $FreeTier
+    $message = "Cannot read $Step."
+    if (-not $WhatIf) { throw $message }
+    if (-not $script:IsSignedIn) { return $FreeTier }
+    Write-Warning "$message A real run would stop here."
+    $script:PredictedStops.Add($message)
+    return $null
 }
 
 # Sets the App Service health check path of an app, if it differs. On the Free tier it is skipped
-# (ADR-0024): its pings keep the apps awake and spend the plan's daily CPU quota.
+# (ADR-0024): its pings keep the apps awake and spend the plan's daily CPU quota. When a signed-in dry
+# run cannot read the tier, nothing is planned: the warning already says a real run would stop.
 function Set-HealthCheckPath {
     param([string] $AppName)
-    if ((Get-AppServicePlanTier $AppName) -eq $FreeTier) {
+    $tier = Get-AppServicePlanTier $AppName
+    if (-not $tier) { return }
+    if ($tier -eq $FreeTier) {
         Write-Host "  Health check of $AppName skipped: its App Service plan is on the $FreeTier tier (see $HealthCheckDecision)."
         return
     }
@@ -574,10 +588,19 @@ function Write-Summary {
         Write-Host "${verb}:"
         foreach ($change in $script:Changes) { Write-Host "  - $change" }
     }
+    Write-PredictedStops
     Write-Host ''
     Write-Host "Next step: as the Entra admin of SQL server $SqlServerName, run $SqlScriptPath"
     Write-Host "on database $DatabaseName (for example in the portal query editor) for the API user;"
     Write-Host 'run it again after #102 for the deploy user. See infra/README.md.'
+}
+
+# Prints the steps at which a real run would stop, found by a signed-in dry run.
+function Write-PredictedStops {
+    if ($script:PredictedStops.Count -eq 0) { return }
+    Write-Host ''
+    Write-Host 'A real run would stop with an error:' -ForegroundColor Red
+    foreach ($stop in $script:PredictedStops) { Write-Host "  - $stop" -ForegroundColor Red }
 }
 
 # ---------------------------------------------------------------------------------------------
@@ -598,3 +621,4 @@ foreach ($appName in @($ApiAppName, $WebAppName)) {
 }
 Add-AzureServicesFirewallRule
 Write-Summary
+if ($script:PredictedStops.Count -gt 0) { exit $PredictedStopExitCode }

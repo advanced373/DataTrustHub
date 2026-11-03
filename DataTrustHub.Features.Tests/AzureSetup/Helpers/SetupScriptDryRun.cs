@@ -38,7 +38,8 @@ internal static class SetupScriptDryRun
         }
         if ($call -match '^webapp show .*defaultHostName') { $env:FAKE_AZ_HOST_NAME; exit 0 }
         if ($call -match '^webapp show .*identity\.type') { exit 0 }
-        if ($call -match '^webapp show .*appServicePlanId') { $env:FAKE_AZ_PLAN_ID; exit 0 }
+        if ($call -match '^webapp show .*serverFarmId') { $env:FAKE_AZ_PLAN_ID; exit 0 }
+        if ($call -match '^webapp show .*appServicePlanId') { exit 0 }
         if ($call -match '^appservice plan show .*sku\.tier') { $env:FAKE_AZ_PLAN_TIER; exit 0 }
         if ($call -match '^webapp config show') { exit 0 }
         if ($call -match '^resource show') { exit 0 }

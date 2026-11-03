@@ -82,13 +82,15 @@ public static class FeaturesRegistration
             options.AddPolicy(RateLimitPolicies.Registration, RegistrationRateLimit.Partition);
         });
 
-    // The sign-up limits are checked when the host starts, so a value below 1 stops it (ADR-0026). The clock
-    // is a TimeProvider, so tests can replace it; the host gets the system clock unless one is registered
+    // The sign-up limits are checked when the host starts, so a value below 1 or a too short trusted client key
+    // stops it (ADR-0026). The clock is a TimeProvider, so tests can replace it; the host gets the system clock
+    // unless one is registered
     private static void RegisterRegistration(IServiceCollection services, IConfiguration configuration)
     {
         services.AddOptions<RegistrationOptions>()
             .Bind(configuration.GetSection(RegistrationOptions.SectionName))
             .ValidateDataAnnotations()
+            .Validate(options => options.HasAcceptableTrustedClientKey(), RegistrationOptions.TrustedClientKeyTooShortMessage)
             .ValidateOnStart();
         services.TryAddSingleton(TimeProvider.System);
     }

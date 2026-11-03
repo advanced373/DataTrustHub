@@ -39,10 +39,20 @@ should exist only when a platform admin has accepted the person.
    timer would not run.
    So `ListRegistrationRequests` is a query that writes: the purge goes through the repository, then
    the pending requests are read.
-6. **The client address is the connection's remote address.** App Service's front end passes the
-   client's own address to the app, so no forwarded headers are read. This is an assumption about the
-   host: behind another proxy all clients would share the proxy's address, and the limit would become
-   global. A request without an address shares one partition. The limit is per address, so it is weak
+6. **The client address is the connection's remote address, or the browser's address sent by the
+   WebApp with the shared client key.** App Service's front end passes the client's own address to the
+   app, so no forwarded headers are read; this is an assumption about the host. A direct caller of the
+   API is partitioned by its own connection address. Sign-ups through the WebApp reach the API from the
+   WebApp's server, so the WebApp's register call sends the browser's address (its own connection
+   address) in `X-DTH-Client-Address` together with the client key in `X-DTH-Client-Key`. The API uses
+   that address only when it has a key configured (`Registration:TrustedClientKey`), the request carries
+   exactly that key (constant-time comparison) and the address parses; otherwise, silently, the
+   connection address. A caller without the key cannot choose its partition, and a key that is set must
+   have at least 32 characters, or the host does not start. The WebApp holds the same key in
+   `Api:ClientKey`; without it the WebApp sends neither header and all its sign-ups share one budget.
+   The key is a secret: never committed, logged or shown in a message; `infra/setup.ps1` writes the
+   same random key to both apps (see `infra/README.md`). A request without an address shares one
+   partition. The limit is per address, so it is weak
    against an IPv6 client that rotates addresses inside its own prefix; the cap still bounds the queue.
 7. **The platform admin's routes** (role `Admin`, like the account routes):
    - `GET /admin/registration-requests`: the pending requests, oldest first, with id, email, requestedAt
@@ -64,7 +74,11 @@ should exist only when a platform admin has accepted the person.
 - **A timer or background job for the purge.** Rejected: the Free tier app sleeps, so it would not run
   reliably, and a lazy purge is enough while the queue is capped.
 - **Read `X-Forwarded-For`.** Rejected for now: App Service already gives the client address, and
-  trusting a header the client can set would let one client spread over many partitions.
+  trusting a header the client can set would let one client spread over many partitions. The client
+  address header of point 6 is trusted only with the shared key, which a client does not have.
+- **Trust the WebApp by its outbound addresses.** Rejected: the outbound addresses of an App Service
+  are shared with other tenants of the same scale unit and can change, so they do not identify the
+  WebApp.
 - **Rate limit per email.** Rejected: one client could still submit many requests with different
   addresses; the cap and the per-address limit together bound the queue.
 

@@ -7,8 +7,9 @@ using Microsoft.Extensions.Options;
 namespace DataTrustHub.Features._Shared.RateLimiting;
 
 // The Registration policy (ADR-0026): a fixed window per client address, so one address cannot fill the
-// queue of registration requests. The address is the connection's: App Service passes the client's own
-// address, and no forwarded headers are read
+// queue of registration requests. The address is the browser's address sent by the WebApp with the shared key
+// (TrustedClientAddress), or else the connection's: App Service passes the client's own address, and no
+// forwarded headers are read
 internal static class RegistrationRateLimit
 {
     internal static readonly TimeSpan Window = TimeSpan.FromHours(1);
@@ -23,9 +24,10 @@ internal static class RegistrationRateLimit
     internal static RateLimitPartition<string> Partition(HttpContext httpContext)
     {
         var options = httpContext.RequestServices.GetRequiredService<IOptions<RegistrationOptions>>().Value;
+        var clientAddress = TrustedClientAddress.Resolve(httpContext, options.TrustedClientKey);
 
         return RateLimitPartition.GetFixedWindowLimiter(
-            httpContext.Connection.RemoteIpAddress?.ToString() ?? NoAddressPartitionKey,
+            clientAddress?.ToString() ?? NoAddressPartitionKey,
             _ => new FixedWindowRateLimiterOptions
             {
                 PermitLimit = options.PermitsPerHourPerIp,

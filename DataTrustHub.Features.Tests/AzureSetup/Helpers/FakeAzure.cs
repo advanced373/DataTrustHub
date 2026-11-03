@@ -35,6 +35,11 @@ internal sealed class FakeAzure
     internal const string ApiHostName = "fake-api.example.test";
     internal const string ApiBaseUrl = "https://" + ApiHostName;
     internal const string ExistingJwtSecret = "existing-jwt-secret-value";
+
+    // The client key shared by both apps (#172 PR 4): the API's and the WebApp's setting
+    internal const string ApiClientKeySetting = "Registration__TrustedClientKey";
+    internal const string WebAppClientKeySetting = "Api__ClientKey";
+    internal const string ExistingClientKey = "existing-client-key-value-0123456789abcdef";
     internal const string HealthCheckPath = "/health";
     internal const string FtpsDisabled = "Disabled";
     internal const string FirewallRuleName = "AllowAllWindowsAzureIps";
@@ -81,7 +86,9 @@ internal sealed class FakeAzure
         api.IdentityType = SystemAssigned;
         api.Settings.Add(new FakeSetting(DryRunScenario.ConnectionStringSetting, ConnectionString));
         api.Settings.Add(new FakeSetting(DryRunScenario.JwtSecretSetting, ExistingJwtSecret));
+        api.Settings.Add(new FakeSetting(ApiClientKeySetting, ExistingClientKey));
         azure.Apps[WebAppName].Settings.Add(new FakeSetting(SetupScriptRun.ApiBaseUrlSetting, ApiBaseUrl));
+        azure.Apps[WebAppName].Settings.Add(new FakeSetting(WebAppClientKeySetting, ExistingClientKey));
         foreach (var app in azure.Apps.Values)
         {
             app.FtpsState = FtpsDisabled;

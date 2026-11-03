@@ -6,8 +6,6 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 
 namespace DataTrustHub.Features.DataManagement.AddDataItem;
 
@@ -32,19 +30,11 @@ public class AddDataItemEndpoint : ICarterModule
         HttpContext httpContext,
         CancellationToken cancellationToken)
     {
-        var userIdResult = ExtractUserId(httpContext.User);
+        var userIdResult = httpContext.User.GetUserId();
         if (userIdResult is null) return Results.Unauthorized();
 
         var command = new AddDataItemCommand(file, userIdResult.Value, policyId, levelPriority);
         var result = await handler.Handle(command, cancellationToken);
         return result.ToHttpResult(id => Results.Ok(new AddDataItemResponse(id)));
-    }
-
-    private static Guid? ExtractUserId(ClaimsPrincipal user)
-    {
-        var sub = user.FindFirstValue(JwtRegisteredClaimNames.Sub)
-               ?? user.FindFirstValue(ClaimTypes.NameIdentifier);
-
-        return Guid.TryParse(sub, out var id) ? id : null;
     }
 }

@@ -5,8 +5,6 @@ using DataTrustHub.SharedKernel;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 
 namespace DataTrustHub.Features.Administration.GetPolicy;
 
@@ -27,19 +25,11 @@ public class GetPolicyEndpoint : ICarterModule
         HttpContext httpContext,
         CancellationToken cancellationToken)
     {
-        var callerId = ExtractUserId(httpContext.User);
+        var callerId = httpContext.User.GetUserId();
         if (callerId is null) return Results.Unauthorized();
 
         var query = new GetPolicyQuery(organizationId, callerId.Value, policyId);
         var result = await handler.Handle(query, cancellationToken);
         return result.ToHttpResult(Results.Ok);
-    }
-
-    private static Guid? ExtractUserId(ClaimsPrincipal user)
-    {
-        var sub = user.FindFirstValue(JwtRegisteredClaimNames.Sub)
-               ?? user.FindFirstValue(ClaimTypes.NameIdentifier);
-
-        return Guid.TryParse(sub, out var id) ? id : null;
     }
 }

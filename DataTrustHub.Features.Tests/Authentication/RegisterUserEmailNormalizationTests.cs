@@ -11,8 +11,9 @@ using Xunit;
 namespace DataTrustHub.Features.Tests.Authentication;
 
 // AC2 and AC7 of #123: registration stores the normalized email (U7), a case or space variant of an existing
-// address is the same account (U1), and the format and length rules (U2) apply to the trimmed address
-public class RegisterUserEmailNormalizationTests(ApiFactory factory) : IClassFixture<ApiFactory>
+// address is the same account (U1), and the format and length rules (U2) apply to the trimmed address. Since #172
+// register stores a registration request (202) and the account exists only once it is approved
+public class RegisterUserEmailNormalizationTests(RegistrationApiFactory factory) : IClassFixture<RegistrationApiFactory>
 {
     private const string RegisterEndpoint = "/auth/register";
     private const string Password = "Password1!";
@@ -27,19 +28,19 @@ public class RegisterUserEmailNormalizationTests(ApiFactory factory) : IClassFix
     {
         var response = await RegisterAsync(" Reg.Norm.Stored@Example.COM ");
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var userId = (await response.Content.ReadFromJsonAsync<RegisterUserResponse>())!.UserId;
-        Assert.Equal("reg.norm.stored@example.com", await StoredEmailAsync(userId));
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        var requestId = (await response.Content.ReadFromJsonAsync<RegisterUserResponse>())!.RegistrationRequestId;
+        Assert.Equal("reg.norm.stored@example.com", await StoredEmailAsync(requestId));
     }
 
     // The variants themselves are pinned on EmailAddress (EmailAddressTests); here one variant each way:
-    // the request is a variant, and the existing address was registered as one
+    // the request is a variant, and the existing account was created with one
     [Theory]
     [InlineData("reg_dup_variant@example.com", "\tReg_Dup_Variant@Example.Com ")]
     [InlineData(" Reg_Dup_Reverse@Example.COM ", "reg_dup_reverse@example.com")]
     public async Task RegisterUser_VariantOfAnExistingEmail_Returns409EmailAlreadyInUse(string existing, string variant)
     {
-        await RegisterAsync(existing);
+        await TestUsers.CreateAsync(factory, existing, Password);
 
         var response = await RegisterAsync(variant);
 
@@ -68,13 +69,13 @@ public class RegisterUserEmailNormalizationTests(ApiFactory factory) : IClassFix
     }
 
     [Fact]
-    public async Task RegisterUser_TrimmedEmailOfMaxLengthWithSurroundingSpaces_Returns200()
+    public async Task RegisterUser_TrimmedEmailOfMaxLengthWithSurroundingSpaces_Returns202()
     {
         var email = SurroundingSpaces + EmailOfLength(MaxEmailLength, 'm') + SurroundingSpaces;
 
         var response = await RegisterAsync(email);
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
     }
 
     [Fact]
@@ -93,12 +94,12 @@ public class RegisterUserEmailNormalizationTests(ApiFactory factory) : IClassFix
     private static string EmailOfLength(int length, char localPart) =>
         new string(localPart, length - EmailDomain.Length) + EmailDomain;
 
-    private async Task<string> StoredEmailAsync(Guid userId)
+    private async Task<string> StoredEmailAsync(Guid registrationRequestId)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DContext>();
-        return (await db.Users.SingleAsync(u => u.Id == userId)).Email;
+        return (await db.RegistrationRequests.SingleAsync(r => r.Id == registrationRequestId)).Email;
     }
 
-    private record RegisterUserResponse(Guid UserId);
+    private record RegisterUserResponse(Guid RegistrationRequestId);
 }

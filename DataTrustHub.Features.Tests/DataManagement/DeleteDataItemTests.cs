@@ -11,7 +11,6 @@ namespace DataTrustHub.Features.Tests.DataManagement;
 
 public class DeleteDataItemTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
-    private const string RegisterEndpoint = "/auth/register";
     private const string LoginEndpoint = "/auth/login";
     private const string UploadEndpoint = "/data/upload";
     private const string NotFoundCode = "DataItem.NotFound";
@@ -98,9 +97,9 @@ public class DeleteDataItemTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.Equal((NotFoundCode, NotFoundMessage), (error!.Code, error.Description));
     }
 
-    private static async Task<string> RegisterAndLoginAsync(HttpClient client, string email, string password)
+    private async Task<string> RegisterAndLoginAsync(HttpClient client, string email, string password)
     {
-        await client.PostAsJsonAsync(RegisterEndpoint, new { Email = email, Password = password });
+        await TestUsers.CreateAsync(factory, email, password);
 
         var loginResponse = await client.PostAsJsonAsync(
             LoginEndpoint, new { Email = email, Password = password });

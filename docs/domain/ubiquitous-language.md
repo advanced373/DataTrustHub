@@ -14,7 +14,8 @@ a document only if the rules say so.
 
 The access rules:
 
-1. People have accounts (**users**). An **organization** is a tenant, i.e. a company on the platform.
+1. People have accounts (**users**). Signing up does not create an account: it makes a
+   **registration request** that a platform admin approves or rejects (ADR-0026). An **organization** is a tenant, i.e. a company on the platform.
    A user belongs to an organization through a **membership**, as a member, a guest or an
    organization admin (ADR-0014). The platform admin appoints an organization's first organization
    admin; an organization admin adds members and guests, lists them, changes their roles and removes
@@ -47,6 +48,7 @@ architecture that implements them is in ADR-0012 and [the architecture overview]
 | Term | Meaning | In code |
 |---|---|---|
 | **User** | A person with an account. Their role is `User` or `Admin` | `User` |
+| **Registration request** | A sign-up waiting for a platform admin's approval: the normalized email address and the password hash, never the plain password. It is not an account and nobody can log in with it; approving it creates the user, rejecting it deletes it. One pending request per email address; a request older than the pending lifetime expires and is deleted. Register answers 202 with the request's id (ADR-0026) | `RegistrationRequest`, `RegisterUser` |
 | **Email address** | What a user logs in with, unique per user. Always in its normalized form: surrounding whitespace trimmed and the whole address lower-cased, so `" Ion@Firma.RO "` and `"ion@firma.ro"` are the same address and the same account (U7) | `EmailAddress`, `User.Email` |
 | **Admin** | A user who manages organizations and users; policies and clearances are now managed by organization admins. Admins have no automatic access to data (need-to-know). Under ADR-0014 this role becomes the *platform admin* | `User.Role` |
 | **Platform admin** | A user with the `Admin` role. Under ADR-0014 they manage tenants only: create and delete organizations and appoint their first organization admin. Not to be confused with an organization admin | `UserRoles.Admin`, `User.IsAdmin` |
@@ -93,11 +95,11 @@ These are the words for how the code is structured (ADR-0012).
 | **Application layer** | `DataTrustHub.Features`: one **use case** per vertical slice, as a command handler or a query handler |
 | **Infrastructure layer** | `DataTrustHub.Infrastructure`: the adapters (repositories, mappers, `DContext`) |
 | **Presentation layer** | `DataTrustHub.API` (Carter endpoints) and the WebApp |
-| **Entity** | A domain object with an identity and behaviour: `User`, `Organization`, `Policy`, `Clearance`, `Membership`, `DataItem`, and `AuditRecord`, which is only appended |
+| **Entity** | A domain object with an identity and behaviour: `User`, `RegistrationRequest`, `Organization`, `Policy`, `Clearance`, `Membership`, `DataItem`, and `AuditRecord`, which is only appended |
 | **Aggregate root** | An entity that is loaded and saved as a whole, through its own repository. Today every entity is its own aggregate root |
 | **Value object** | An immutable object defined by its values: `EmailAddress`, `ClassificationLevel`, `MembershipRole`, `DeletionRights` |
 | **Invariant / business rule** | A rule that must always hold. A rule of one aggregate lives in an entity method (`IsReadableBy`, `MarkDeleted`, `CheckCanBeDeletedBy`). A rule that needs other aggregates or the whole set (uniqueness, references, deletion guards) is checked in the use case through repositories. Never in validators. The full list is in [aggregates.md](aggregates.md) |
-| **Factory method** | The only way to create a new entity. It applies the entity's rules: `User.Register`, `Policy.Create`, `Clearance.Grant`, `DataItem.CreateClassified` |
+| **Factory method** | The only way to create a new entity. It applies the entity's rules: `User.Register`, `RegistrationRequest.Submit`, `Policy.Create`, `Clearance.Grant`, `DataItem.CreateClassified` |
 | **Rehydration** | Rebuilding a stored entity without running its creation rules, through an `internal` constructor that only the persistence mappers can see |
 | **Domain error** | An expected rule failure, returned as a `Result` instead of thrown: `UserErrors`, `DataItemErrors`, `MembershipErrors` |
 | **Port** | An interface the domain or application layer needs, implemented outside it: `I*Repository`, `IUnitOfWork`, `IPasswordHasher`, `IAuditLog` |
@@ -111,7 +113,7 @@ These are the words for how the code is structured (ADR-0012).
 | **Mapper** | Converts between a persistence model and an entity (Mapperly). It lives in Infrastructure |
 | **Input validation** | Checks on the shape of a request (required fields, length, format), in the slice's `*Validator`. Business rules do not go here |
 | **Audited query** | A read that is recorded in the audit trail like a command, because it can reveal something about other users; today only find-user-by-email (ADR-0025). Marked with `IAuditedQuery`, recorded by `AuditQueryDecorator` |
-| **Rate limit** | The most requests one caller may make to a route in a time window; over it the API answers 429. Today only find-user-by-email: 10 per minute per caller (ADR-0025). Policy `RateLimitPolicies.UserLookup` |
+| **Rate limit** | The most requests one caller may make to a route in a time window; over it the API answers 429. Find-user-by-email: 10 per minute per caller (ADR-0025), policy `RateLimitPolicies.UserLookup`. Register: `Registration:PermitsPerHourPerIp` per hour per client address (ADR-0026), policy `RateLimitPolicies.Registration` |
 | **Decorator** | A cross-cutting step that Scrutor wraps around handlers: validation, and auditing (outermost) around every command handler and every audited query handler |
 | **Domain service** | A rule that needs several aggregates and belongs to none of them. There are none yet |
 | **Bounded context** | A part of the domain with its own model and language. Today there are three: Identity and Access, Access Governance and Data Management ([bounded-contexts.md](bounded-contexts.md)) |

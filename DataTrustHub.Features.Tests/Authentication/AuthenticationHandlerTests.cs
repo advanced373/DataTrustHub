@@ -1,14 +1,18 @@
 using DataTrustHub.Features._Shared.Jwt;
+using DataTrustHub.Features._Shared.Registration;
 using DataTrustHub.Features.Authentication.LoginUser;
 using DataTrustHub.Features.Authentication.RegisterUser;
 using DataTrustHub.Features.Tests.Administration.Helpers;
 using DataTrustHub.Features.Tests.Authentication.Helpers;
+using DataTrustHub.Features.Tests.Helpers;
 using DataTrustHub.SharedKernel;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace DataTrustHub.Features.Tests.Authentication;
 
-// ADR-0012 step 3c: register and login run on repositories. Register commits once, only on success;
+// ADR-0012 step 3c: register and login run on repositories. Register commits once, only on success (since
+// #172 it stores a registration request, not a user);
 // login never commits. The handlers are built directly with fakes, so no database is involved.
 public class AuthenticationHandlerTests
 {
@@ -21,20 +25,24 @@ public class AuthenticationHandlerTests
     private const string UnknownEmail = "nobody@example.com";
 
     private readonly FakeUserRepository _users = new();
+    private readonly FakeRegistrationRequestRepository _registrationRequests = new();
+    private readonly TestClock _clock = new();
     private readonly FakePasswordHasher _hasher = new();
     private readonly CountingUnitOfWork _unitOfWork = new();
     private readonly RecordingJwtTokenGenerator _jwtGenerator = new();
 
     // --- RegisterUser ---
 
+    // #172: register submits a registration request; no user is added until it is approved
     [Fact]
-    public async Task RegisterUser_NewEmail_AddsUserWithNormalizedEmailAndHashedPasswordAndCommitsOnce()
+    public async Task RegisterUser_NewEmail_SubmitsARequestWithNormalizedEmailAndHashedPasswordAndCommitsOnce()
     {
         var result = await RegisterHandler().Handle(new RegisterUserCommand(Email, Password), default);
 
         Assert.True(result.IsSuccess);
-        var added = Assert.Single(_users.Added);
-        Assert.Equal((result.Value, NormalizedEmail, UserRoles.User), (added.Id, added.Email, added.Role));
+        Assert.Empty(_users.Added);
+        var added = Assert.Single(_registrationRequests.Added);
+        Assert.Equal((result.Value, NormalizedEmail, _clock.UtcNow), (added.Id, added.Email, added.RequestedAt));
         Assert.NotEqual(Password, added.HashedPassword);
         Assert.True(_hasher.VerifyHashedPassword(added.HashedPassword, Password));
         Assert.Equal(1, _unitOfWork.SaveChangesCalls);
@@ -51,6 +59,7 @@ public class AuthenticationHandlerTests
             (ErrorType.Conflict, AuthErrorCodes.EmailAlreadyInUse, AuthErrorMessages.EmailAlreadyInUse),
             (result.Error.Type, result.Error.Code, result.Error.Description));
         Assert.Empty(_users.Added);
+        Assert.Empty(_registrationRequests.Added);
         Assert.Equal(0, _unitOfWork.SaveChangesCalls);
     }
 
@@ -99,6 +108,7 @@ public class AuthenticationHandlerTests
 
         Assert.Equal((ErrorType.Conflict, AuthErrorCodes.EmailAlreadyInUse), (result.Error.Type, result.Error.Code));
         Assert.Empty(_users.Added);
+        Assert.Empty(_registrationRequests.Added);
         Assert.Equal(0, _unitOfWork.SaveChangesCalls);
     }
 
@@ -130,7 +140,8 @@ public class AuthenticationHandlerTests
         Assert.Empty(_jwtGenerator.Calls);
     }
 
-    private RegisterUserHandler RegisterHandler() => new(_users, _hasher, _unitOfWork);
+    private RegisterUserHandler RegisterHandler() =>
+        new(_users, _registrationRequests, _hasher, _unitOfWork, Options.Create(new RegistrationOptions()), _clock);
 
     private LoginUserHandler LoginHandler() => new(_users, _hasher, _jwtGenerator);
 

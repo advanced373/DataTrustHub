@@ -3,6 +3,7 @@ using DataTrustHub.Features._Shared.Auditing;
 using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Features._Shared.Jwt;
 using DataTrustHub.Features._Shared.RateLimiting;
+using DataTrustHub.Features._Shared.Registration;
 using DataTrustHub.Features._Shared.Seeding;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -11,6 +12,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 
@@ -26,6 +28,7 @@ public static class FeaturesRegistration
         RegisterHandlers(services);
         RegisterAuditing(services);
         RegisterRateLimiting(services);
+        RegisterRegistration(services, configuration);
         RegisterJwt(services, configuration);
         RegisterAdminSeeding(services, configuration);
         return services;
@@ -76,7 +79,19 @@ public static class FeaturesRegistration
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
             options.AddPolicy(RateLimitPolicies.UserLookup, UserLookupRateLimit.Partition);
+            options.AddPolicy(RateLimitPolicies.Registration, RegistrationRateLimit.Partition);
         });
+
+    // The sign-up limits are checked when the host starts, so a value below 1 stops it (ADR-0026). The clock
+    // is a TimeProvider, so tests can replace it; the host gets the system clock unless one is registered
+    private static void RegisterRegistration(IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<RegistrationOptions>()
+            .Bind(configuration.GetSection(RegistrationOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        services.TryAddSingleton(TimeProvider.System);
+    }
 
     // The signing key comes from User Secrets or the environment, never from appsettings.json (ADR-0007);
     // a missing or too short key stops the host here, before any token is issued or validated

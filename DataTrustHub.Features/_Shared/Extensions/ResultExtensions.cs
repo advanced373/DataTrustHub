@@ -14,6 +14,7 @@ internal static class ResultExtensions
             ErrorType.NotFound => Results.NotFound(result.Error),
             ErrorType.Conflict => Results.Conflict(result.Error),
             ErrorType.Validation => Results.BadRequest(result.Error),
+            ErrorType.Unavailable => Results.Json(result.Error, statusCode: StatusCodes.Status503ServiceUnavailable),
             _ => Results.Problem(result.Error.Description)
         };
     }

@@ -43,21 +43,16 @@ public partial class AddDataItemClassificationCheckMigrationTests
         Assert.EndsWith(MigrationIdSeparator + MigrationName, MigrationId());
     }
 
-    [Fact]
-    public void Migration_IsTheLatestMigration()
-    {
-        using var context = SqlServerContext();
-
-        Assert.EndsWith(MigrationIdSeparator + MigrationName, context.Database.GetMigrations().Last());
-    }
-
+    // It was the latest migration until #172 added AddRegistrationRequests after it; its place in the order stays
     [Fact]
     public void Migration_ComesRightAfterAddUniquenessIndexes()
     {
         using var context = SqlServerContext();
         var migrations = context.Database.GetMigrations().ToList();
 
-        Assert.EndsWith(MigrationIdSeparator + PreviousMigrationName, migrations[^2]);
+        var index = migrations.FindIndex(id => id.EndsWith(MigrationIdSeparator + MigrationName));
+
+        Assert.EndsWith(MigrationIdSeparator + PreviousMigrationName, migrations[index - 1]);
     }
 
     // --- Up: the data check, then the constraint ---

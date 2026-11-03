@@ -36,7 +36,7 @@ Both store the normalized address (U7). Rehydration keeps the stored email as it
 
 | # | Invariant / rule | Enforced in |
 |---|---|---|
-| U1 | An email belongs to at most one user, case-insensitive, ignoring surrounding spaces | Use case: `RegisterUser`, `CreateAccount` (`EmailExistsAsync`, which compares the normalized address, U7). Database: unique index on `Email` (`nvarchar(256)`, the stored normalized form); when two concurrent requests both pass the check, the save fails with `UniqueConstraintViolationException`, and `RegisterUser` answers `User.EmailAlreadyInUse`, `CreateAccount` `Account.EmailAlreadyInUse` (409). The admin seed at startup does not map it: it logs the failed seed and promotes the existing user at the next start |
+| U1 | An email belongs to at most one user, case-insensitive, ignoring surrounding spaces | Use case: `RegisterUser` (which refuses an email that has an account, and creates a registration request, not a user), `CreateAccount` (`EmailExistsAsync`, which compares the normalized address, U7). Database: unique index on `Email` (`nvarchar(256)`, the stored normalized form); when two concurrent requests both pass the check, the save fails with `UniqueConstraintViolationException`, and `CreateAccount` answers `Account.EmailAlreadyInUse` (409). The admin seed at startup does not map it: it logs the failed seed and promotes the existing user at the next start |
 | U2 | An email is at most 256 characters, counted on the trimmed address; a password is at least 8 | Validator: `RegisterUser`, `CreateAccount` |
 | U3 | A user cannot delete their own account, so an admin cannot lock everyone out | Entity: `CheckCanBeDeletedBy` → `Account.CannotDeleteOwnAccount` |
 | U4 | Login gives the same error for an unknown email and a wrong password, so it does not reveal which emails exist | Use case: `LoginUser` → `User.InvalidCredentials` |
@@ -47,7 +47,36 @@ Both store the normalized address (U7). Rehydration keeps the stored email as it
 ### Value object: EmailAddress
 
 Source: `Domain/Users/EmailAddress.cs`. It is an immutable `record (Value)`; `EmailAddress.From(email)`
-applies the rule U7 and is the only place that implements it. `User.Email` holds its `Value`.
+applies the rule U7 and is the only place that implements it. `User.Email` and `RegistrationRequest.Email`
+hold its `Value`.
+
+## RegistrationRequest
+
+*Context: Identity and Access.* A sign-up waiting for a platform admin's approval (ADR-0026). It is not an
+account: nobody can log in with it, and `Users` holds approved accounts only. Source:
+`Domain/Registrations/RegistrationRequest.cs`.
+
+| Attribute | Notes |
+|---|---|
+| `Id` | Returned by register (202) |
+| `Email` | Always the normalized form of an `EmailAddress` (U7) |
+| `HashedPassword` | Never the plain password (`IPasswordHasher`) |
+| `RequestedAt` | When it was submitted, in UTC |
+
+**Factory method:** `Submit(email, hashedPassword, requestedAt)` stores the normalized address (U7). The time
+comes from code (`TimeProvider`), so a time that is not UTC throws.
+
+**Behaviour:** `IsExpired(now, lifetime)` is true when the request is older than the lifetime.
+
+The limits come from the `Registration` settings: `PendingRequestLifetimeDays` (default 14),
+`PermitsPerHourPerIp` (default 5) and `MaxPendingRequests` (default 100), each at least 1.
+
+| # | Invariant / rule | Enforced in |
+|---|---|---|
+| R1 | One pending registration request per email address, case-insensitive, ignoring surrounding spaces; an email that already has an account cannot register (U1) | Use case: `RegisterUser` (`IUserRepository.EmailExistsAsync` → `User.EmailAlreadyInUse`, then `IRegistrationRequestRepository.EmailExistsAsync` → `Registration.AlreadyPending`, both 409). Database: unique index on `Email`; a concurrent request that passed the check fails with `UniqueConstraintViolationException`, answered `Registration.AlreadyPending` |
+| R2 | A request older than `PendingRequestLifetimeDays` has expired: it is deleted, no longer counts, and its email can register again | Use case: `RegisterUser` purges expired requests first (`RemoveExpiredAsync`, a set-based delete that runs at once, outside the unit of work); entity: `IsExpired` |
+| R3 | At most `MaxPendingRequests` pending requests: when that many are pending, register answers 503 `Registration.QueueFull` and saves nothing. A soft cap: concurrent registers can pass it by a few | Use case: `RegisterUser` (`CountAsync`, after the purge) |
+| R4 | One client address may register at most `PermitsPerHourPerIp` times an hour; over it the answer is 429 | Rate limit policy `RateLimitPolicies.Registration` on `POST /auth/register` |
 
 ## Organization
 

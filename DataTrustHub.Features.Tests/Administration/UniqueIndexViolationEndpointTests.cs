@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
 using DataTrustHub.Features.Tests.Administration.Helpers;
-using DataTrustHub.Features.Tests.Authentication.Helpers;
 using DataTrustHub.Features.Tests.Helpers;
 using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.SharedKernel;
@@ -18,25 +17,13 @@ namespace DataTrustHub.Features.Tests.Administration;
 // code and message, as when the check finds the value taken, and stores nothing.
 public class UniqueIndexViolationEndpointTests(ConcurrentSaveApiFactory factory) : IClassFixture<ConcurrentSaveApiFactory>
 {
-    private const string RegisterEndpoint = "/auth/register";
     private const string CreateAccountEndpoint = "/admin/accounts";
     private const string Password = "Password1!";
     private const string EmailDomain = "@example.com";
 
     // --- AC1 (U1) ---
-
-    [Fact]
-    public async Task RegisterUser_UniqueIndexRejectsSave_Returns409EmailAlreadyInUse()
-    {
-        var email = $"unique_register_{Guid.NewGuid():N}{EmailDomain}";
-        factory.ConcurrentSave.SavedFirstByAnotherRequest();
-
-        var response = await factory.CreateClient().PostAsJsonAsync(RegisterEndpoint, new { Email = email, Password });
-
-        await ErrorAssert.HasErrorAsync(response, HttpStatusCode.Conflict,
-            AuthErrorCodes.EmailAlreadyInUse, AuthErrorMessages.EmailAlreadyInUse);
-        Assert.False(await UserStoredAsync(email));
-    }
+    // Register no longer saves a user (#172): its unique-index handling (R1, 409 Registration.AlreadyPending) is
+    // covered by RegisterUserUniqueIndexTests and RegistrationRequestsSqlServerTests
 
     [Fact]
     public async Task CreateAccount_UniqueIndexRejectsSave_Returns409AccountEmailAlreadyInUse()

@@ -23,8 +23,8 @@ It is about who you are, and whether you are an admin.
 
 | | |
 |---|---|
-| **Owns** | `User` (email, password hash, role), the value object `EmailAddress` |
-| **Use cases** | register, log in, admin seeding; admin account management (create, list, get, delete) |
+| **Owns** | `User` (email, password hash, role), `RegistrationRequest` (a sign-up waiting for approval), the value object `EmailAddress` |
+| **Use cases** | register (creates a registration request, ADR-0026), log in, admin seeding; admin account management (create, list, get, delete) |
 | **Code today** | `Features/Authentication`, plus the account slices in `Features/Administration` (`*Account*`) |
 | **Publishes** | the user id and the role, carried in the JWT |
 

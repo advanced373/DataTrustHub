@@ -10,7 +10,6 @@ namespace DataTrustHub.Features.Tests.Authentication;
 // the normalized email (U7), and an unknown address and a wrong password still fail the same way (U4)
 public class LoginUserEmailNormalizationTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
-    private const string RegisterEndpoint = "/auth/register";
     private const string LoginEndpoint = "/auth/login";
     private const string Password = "Password1!";
     private const string WrongPassword = "WrongPassword1!";
@@ -23,7 +22,7 @@ public class LoginUserEmailNormalizationTests(ApiFactory factory) : IClassFixtur
     [Fact]
     public async Task LoginUser_CaseOrSpaceVariantOfTheEmail_Returns200WithToken()
     {
-        await RegisterAsync(RegisteredEmail);
+        await CreateUserAsync(RegisteredEmail);
 
         var response = await LoginAsync("\tLogin_Variant@Example.Com\n", Password);
 
@@ -34,7 +33,7 @@ public class LoginUserEmailNormalizationTests(ApiFactory factory) : IClassFixtur
     [Fact]
     public async Task LoginUser_RegisteredWithAVariant_SignsInWithTheNormalizedEmail()
     {
-        await RegisterAsync(" Login.Registered.Variant@Example.COM ");
+        await CreateUserAsync(" Login.Registered.Variant@Example.COM ");
 
         var response = await LoginAsync("login.registered.variant@example.com", Password);
 
@@ -44,7 +43,7 @@ public class LoginUserEmailNormalizationTests(ApiFactory factory) : IClassFixtur
     [Fact]
     public async Task LoginUser_WithAVariant_TokenCarriesTheNormalizedEmail()
     {
-        await RegisterAsync("login.token.claim@example.com");
+        await CreateUserAsync("login.token.claim@example.com");
 
         var response = await LoginAsync(" Login.Token.Claim@EXAMPLE.com ", Password);
 
@@ -59,7 +58,7 @@ public class LoginUserEmailNormalizationTests(ApiFactory factory) : IClassFixtur
     [Fact]
     public async Task LoginUser_UnknownVariantAndWrongPasswordOnAVariant_ReturnIdenticalResponses()
     {
-        await RegisterAsync(RegisteredEmail);
+        await CreateUserAsync(RegisteredEmail);
 
         var unknown = await LoginAsync(" Login_Ghost@Example.com ", Password);
         var wrongPassword = await LoginAsync(" Login_Variant@Example.com ", WrongPassword);
@@ -87,8 +86,8 @@ public class LoginUserEmailNormalizationTests(ApiFactory factory) : IClassFixtur
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
-    private Task<HttpResponseMessage> RegisterAsync(string email) =>
-        _client.PostAsJsonAsync(RegisterEndpoint, new { Email = email, Password });
+    // A user account with this email (as an approved registration creates it)
+    private Task CreateUserAsync(string email) => TestUsers.CreateAsync(factory, email, Password);
 
     private Task<HttpResponseMessage> LoginAsync(string email, string password) =>
         _client.PostAsJsonAsync(LoginEndpoint, new { Email = email, Password = password });

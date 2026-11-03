@@ -285,14 +285,15 @@ public partial class AddUniquenessIndexesMigrationTests
         Assert.Equal(KeyColumns.Length + Rules.Length, differences.Count);
     }
 
-    // Since #128 the snapshot also holds the D1 check constraint of AddDataItemClassificationCheck; nothing else
+    // The next migration (#128) adds only the D1 check constraint of AddDataItemClassificationCheck. Later
+    // migrations change the snapshot further, so the step is checked against the next migration's target model
     [Fact]
-    public void TargetModel_DiffersFromTheModelSnapshotOnlyByTheClassificationCheck()
+    public void TargetModel_DiffersFromTheNextMigrationsTargetModelOnlyByTheClassificationCheck()
     {
         using var context = SqlServerContext();
-        var snapshot = context.GetService<IMigrationsAssembly>().ModelSnapshot!.Model;
 
-        var differences = Differ(context).GetDifferences(TargetModel(context, MigrationName), Relational(context, snapshot));
+        var differences = Differ(context).GetDifferences(
+            TargetModel(context, MigrationName), TargetModel(context, NextMigrationName));
 
         var added = Assert.IsType<AddCheckConstraintOperation>(Assert.Single(differences));
         Assert.Equal(NextMigrationConstraint, added.Name);

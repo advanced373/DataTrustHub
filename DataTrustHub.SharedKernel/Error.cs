@@ -33,5 +33,8 @@ namespace DataTrustHub.SharedKernel
 
         public static Error Conflict(string code, string description) =>
             new(code, description, ErrorType.Conflict);
+
+        public static Error Unavailable(string code, string description) =>
+            new(code, description, ErrorType.Unavailable);
     }
 }

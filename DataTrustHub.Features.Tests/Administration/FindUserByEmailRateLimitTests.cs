@@ -16,7 +16,8 @@ using static DataTrustHub.Features.Tests.Administration.Helpers.MembershipSetup;
 namespace DataTrustHub.Features.Tests.Administration;
 
 // #122 Part A (ADR-0025): find-by-email is limited to 10 calls per caller per minute (AC1), the budget is the
-// caller's own (AC2) and covers all their organizations, and no other endpoint is limited (AC3). The limiter
+// caller's own (AC2) and covers all their organizations, and no other endpoint is limited (AC3; since #172 register
+// has its own Registration policy). The limiter
 // keeps its state in the app, partitioned by caller id: every test uses callers of its own, so no test spends
 // another test's budget
 public class FindUserByEmailRateLimitTests(ApiFactory factory) : IClassFixture<ApiFactory>
@@ -24,8 +25,7 @@ public class FindUserByEmailRateLimitTests(ApiFactory factory) : IClassFixture<A
     private const int PermitLimit = 10;
     private const int CallsBeyondLimit = PermitLimit + 5;
     private const string EmailDomain = "@example.com";
-    private const string RegisterEndpoint = "/auth/register";
-    private const string Password = "Password1!";
+    private const string RegisterRoutePattern = "auth/register";
     private const string FindUserByEmailAction = "FindUserByEmail";
     private const string FindUserByEmailRoutePattern = "organizations/{organizationId:guid}/users/find-by-email";
     private const char PathSeparator = '/';
@@ -198,21 +198,6 @@ public class FindUserByEmailRateLimitTests(ApiFactory factory) : IClassFixture<A
     }
 
     [Fact]
-    public async Task Register_CalledMoreThanTheLimitAnonymously_NeverReturns429()
-    {
-        var anonymous = factory.CreateClient();
-        var statuses = new List<HttpStatusCode>();
-
-        for (var call = 0; call < CallsBeyondLimit; call++)
-        {
-            var email = $"limit_register_{Guid.NewGuid():N}{EmailDomain}";
-            statuses.Add((await anonymous.PostAsJsonAsync(RegisterEndpoint, new { Email = email, Password })).StatusCode);
-        }
-
-        Assert.DoesNotContain(HttpStatusCode.TooManyRequests, statuses);
-    }
-
-    [Fact]
     public void RateLimiter_HasNoGlobalLimiter()
     {
         var options = factory.Services.GetRequiredService<IOptions<RateLimiterOptions>>().Value;
@@ -220,17 +205,20 @@ public class FindUserByEmailRateLimitTests(ApiFactory factory) : IClassFixture<A
         Assert.Null(options.GlobalLimiter);
     }
 
+    // Since #172 register has its own per-address policy (RegistrationRateLimitTests); no other endpoint is limited
     [Fact]
-    public void Endpoints_OnlyFindUserByEmailRequiresARateLimit()
+    public void Endpoints_OnlyFindUserByEmailAndRegisterRequireARateLimit()
     {
         var limited = factory.Services.GetRequiredService<EndpointDataSource>().Endpoints
             .OfType<RouteEndpoint>()
             .Where(e => e.Metadata.GetMetadata<EnableRateLimitingAttribute>() is not null)
+            .Select(e => (Route: e.RoutePattern.RawText!.Trim(PathSeparator), e.Metadata.GetMetadata<EnableRateLimitingAttribute>()!.PolicyName))
+            .OrderBy(e => e.Route, StringComparer.Ordinal)
             .ToList();
 
-        var endpoint = Assert.Single(limited);
-        Assert.Equal(FindUserByEmailRoutePattern, endpoint.RoutePattern.RawText!.Trim(PathSeparator));
-        Assert.Equal(RateLimitPolicies.UserLookup, endpoint.Metadata.GetMetadata<EnableRateLimitingAttribute>()!.PolicyName);
+        Assert.Equal(
+            [(RegisterRoutePattern, (string?)RateLimitPolicies.Registration), (FindUserByEmailRoutePattern, RateLimitPolicies.UserLookup)],
+            limited);
     }
 
     // --- helpers ---

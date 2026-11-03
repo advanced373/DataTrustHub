@@ -227,6 +227,34 @@ namespace DataTrustHub.Infrastructure.Migrations
                     b.ToTable("Policies");
                 });
 
+            modelBuilder.Entity("DataTrustHub.Infrastructure.Persistance.Model.DbRegistrationRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("HashedPassword")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email")
+                        .IsUnique();
+
+                    b.HasIndex("RequestedAt");
+
+                    b.ToTable("RegistrationRequests");
+                });
+
             modelBuilder.Entity("DataTrustHub.Infrastructure.Persistance.Model.DbUser", b =>
                 {
                     b.Property<Guid>("Id")

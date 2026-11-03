@@ -18,6 +18,17 @@ the classification-level table, listed under [Relationships](#relationships).
 | HashedPassword | nvarchar(max) | Password hash, produced by `IPasswordHasher` |
 | Role | nvarchar(max) | Platform role: `User` or `Admin` (ADR-0006) |
 
+### RegistrationRequests
+
+Sign-ups waiting for approval (ADR-0026). `Users` holds approved accounts only.
+
+| Column | Type | Notes |
+|---|---|---|
+| Id | uniqueidentifier | Primary key |
+| Email | nvarchar(256) | Stored normalized (U7). Unique index `IX_RegistrationRequests_Email`: one pending request per email (R1) |
+| HashedPassword | nvarchar(max) | Password hash, produced by `IPasswordHasher` |
+| RequestedAt | datetime2 | UTC. Index `IX_RegistrationRequests_RequestedAt`, for the purge of expired requests (R2) |
+
 ### Organizations
 
 | Column | Type | Notes |

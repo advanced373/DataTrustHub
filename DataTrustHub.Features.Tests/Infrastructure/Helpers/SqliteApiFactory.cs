@@ -10,7 +10,7 @@ namespace DataTrustHub.Features.Tests.Infrastructure.Helpers;
 
 // The real wiring (repositories, unit of work) on an in-memory SQLite database instead of EF InMemory.
 // SQLite is relational, so unique indexes and SQL translation are enforced like in SQL Server.
-public sealed class SqliteApiFactory : ApiFactory, IAsyncLifetime
+public class SqliteApiFactory : ApiFactory, IAsyncLifetime
 {
     private const string ConnectionString = "DataSource=:memory:";
 

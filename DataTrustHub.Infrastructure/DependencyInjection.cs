@@ -5,6 +5,7 @@ using DataTrustHub.Domain.DataItems;
 using DataTrustHub.Domain.Memberships;
 using DataTrustHub.Domain.Organizations;
 using DataTrustHub.Domain.Policies;
+using DataTrustHub.Domain.Registrations;
 using DataTrustHub.Domain.Users;
 using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.Infrastructure.Persistance.Auditing;
@@ -50,6 +51,7 @@ namespace DataTrustHub.Infrastructure
             services.AddScoped<IClearanceRepository, ClearanceRepository>();
             services.AddScoped<IDataItemRepository, DataItemRepository>();
             services.AddScoped<IMembershipRepository, MembershipRepository>();
+            services.AddScoped<IRegistrationRequestRepository, RegistrationRequestRepository>();
             services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<DContext>());
         }
 

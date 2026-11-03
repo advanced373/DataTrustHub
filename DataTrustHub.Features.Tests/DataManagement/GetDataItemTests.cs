@@ -8,7 +8,6 @@ namespace DataTrustHub.Features.Tests.DataManagement;
 
 public class GetDataItemTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
-    private const string RegisterEndpoint = "/auth/register";
     private const string LoginEndpoint = "/auth/login";
     private const string UploadEndpoint = "/data/upload";
     private const string Password = "Password1!";
@@ -65,7 +64,7 @@ public class GetDataItemTests(ApiFactory factory) : IClassFixture<ApiFactory>
     private async Task<HttpClient> CreateAuthenticatedClientAsync(string email)
     {
         var client = factory.CreateClient();
-        await client.PostAsJsonAsync(RegisterEndpoint, new { Email = email, Password });
+        await TestUsers.CreateAsync(factory, email, Password);
         var login = await client.PostAsJsonAsync(LoginEndpoint, new { Email = email, Password });
         var token = (await login.Content.ReadFromJsonAsync<LoginUserResponse>())!.Token;
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);

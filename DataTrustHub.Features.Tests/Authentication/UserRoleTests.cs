@@ -13,7 +13,6 @@ namespace DataTrustHub.Features.Tests.Authentication;
 
 public class UserRoleTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
-    private const string RegisterEndpoint = "/auth/register";
     private const string LoginEndpoint = "/auth/login";
     private const string AdminOrganizationsEndpoint = "/admin/organizations";
     private const string RoleClaim = "role";
@@ -21,9 +20,9 @@ public class UserRoleTests(ApiFactory factory) : IClassFixture<ApiFactory>
     private readonly HttpClient _client = factory.CreateClient();
 
     [Fact]
-    public async Task RegisterUser_NewUser_GetsUserRoleInToken()
+    public async Task LoginUser_NewUser_GetsUserRoleInToken()
     {
-        var token = await RegisterAndLoginAsync("role-user@example.com");
+        var token = await CreateUserAndLoginAsync("role-user@example.com");
 
         Assert.Equal(UserRoles.User, ReadRole(token));
     }
@@ -31,7 +30,7 @@ public class UserRoleTests(ApiFactory factory) : IClassFixture<ApiFactory>
     [Fact]
     public async Task LoginUser_AdminUser_TokenGrantsAccessToAdminEndpoints()
     {
-        await RegisterAsync("role-admin@example.com");
+        await CreateUserAsync("role-admin@example.com");
         await PromoteToAdminAsync("role-admin@example.com");
         var token = await LoginAsync("role-admin@example.com");
 
@@ -44,21 +43,20 @@ public class UserRoleTests(ApiFactory factory) : IClassFixture<ApiFactory>
     [Fact]
     public async Task LoginUser_RegularUser_IsForbiddenOnAdminEndpoints()
     {
-        var token = await RegisterAndLoginAsync("role-regular@example.com");
+        var token = await CreateUserAndLoginAsync("role-regular@example.com");
 
         var response = await PostAdminOrganizationAsync(token, "Regular organization");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    private async Task<string> RegisterAndLoginAsync(string email)
+    private async Task<string> CreateUserAndLoginAsync(string email)
     {
-        await RegisterAsync(email);
+        await CreateUserAsync(email);
         return await LoginAsync(email);
     }
 
-    private Task RegisterAsync(string email) =>
-        _client.PostAsJsonAsync(RegisterEndpoint, new { Email = email, Password });
+    private Task CreateUserAsync(string email) => TestUsers.CreateAsync(factory, email, Password);
 
     private async Task<string> LoginAsync(string email)
     {

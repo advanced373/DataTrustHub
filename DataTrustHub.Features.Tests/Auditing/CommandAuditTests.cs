@@ -24,20 +24,16 @@ namespace DataTrustHub.Features.Tests.Auditing;
 // queries leave none. Tests in a class run one after another, so "the records added by this request" is exact
 public class CommandAuditTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
-    private const string RegisterEndpoint = "/auth/register";
     private const string LoginEndpoint = "/auth/login";
     private const string UploadEndpoint = "/data/upload";
     private const string DataItemsEndpoint = "/data";
     private const string ClassificationOptionsEndpoint = "/data/classification-options";
     private const string Password = "Password1!";
     private const string WrongPassword = "WrongPassword1!";
-    private const string InvalidEmail = "not-an-email";
-    private const string ShortPassword = "short";
     private const string UnknownRole = "Overlord";
     private const int Confidential = 2;
     private const int Secret = 3;
 
-    private const string RegisterUserAction = "RegisterUser";
     private const string LoginUserAction = "LoginUser";
     private const string AddDataItemAction = "AddDataItem";
     private const string DeleteDataItemAction = "DeleteDataItem";
@@ -48,59 +44,13 @@ public class CommandAuditTests(ApiFactory factory) : IClassFixture<ApiFactory>
     private const string DataItemNotFoundCode = "DataItem.NotFound";
     private const string DataItemNotClearedCode = "DataItem.NotCleared";
 
-    // --- AC7: register and log in are anonymous and hold no email ---
-
-    [Fact]
-    public async Task Register_Succeeded_RecordsAnonymousWithoutTargetOrganizationOrEmail()
-    {
-        var email = NewEmail("audit_register");
-
-        var records = await RecordsAddedByAsync(() => factory.CreateClient().PostAsJsonAsync(RegisterEndpoint, new { Email = email, Password }));
-
-        var record = Assert.Single(records);
-        AssertRecord(record, RegisterUserAction, null, SucceededOutcome, null);
-        AssertNoTargetOrOrganization(record);
-        AssertHoldsNo(record, email);
-    }
-
-    [Fact]
-    public async Task Register_EmailInUse_RecordsRejectedWithTheErrorCodeAndNoEmail()
-    {
-        var email = NewEmail("audit_register_taken");
-        await factory.CreateClient().PostAsJsonAsync(RegisterEndpoint, new { Email = email, Password });
-
-        var records = await RecordsAddedByAsync(() => factory.CreateClient().PostAsJsonAsync(RegisterEndpoint, new { Email = email, Password }));
-
-        var record = Assert.Single(records);
-        AssertRecord(record, RegisterUserAction, null, RejectedOutcome, AuthErrorCodes.EmailAlreadyInUse);
-        AssertHoldsNo(record, email);
-    }
-
-    // The audit decorator wraps the validation decorator, so a request the validator refuses is recorded too
-    [Fact]
-    public async Task Register_InvalidInput_RecordsTheValidationRejection()
-    {
-        var records = await RecordsAddedByAsync(() =>
-            factory.CreateClient().PostAsJsonAsync(RegisterEndpoint, new { Email = InvalidEmail, Password = ShortPassword }));
-
-        var record = Assert.Single(records);
-        AssertRecord(record, RegisterUserAction, null, RejectedOutcome, ValidationCode);
-        AssertHoldsNo(record, InvalidEmail);
-    }
-
-    [Fact]
-    public async Task Register_InvalidInput_StillAnswers400()
-    {
-        var response = await factory.CreateClient().PostAsJsonAsync(RegisterEndpoint, new { Email = InvalidEmail, Password = ShortPassword });
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-    }
+    // --- AC7: log in is anonymous and holds no email (register: RegisterUserAuditTests, on SQLite since #172) ---
 
     [Fact]
     public async Task Login_Succeeded_RecordsAnonymousWithoutEmail()
     {
         var email = NewEmail("audit_login");
-        await factory.CreateClient().PostAsJsonAsync(RegisterEndpoint, new { Email = email, Password });
+        await TestUsers.CreateAsync(factory, email, Password);
 
         var records = await RecordsAddedByAsync(() => factory.CreateClient().PostAsJsonAsync(LoginEndpoint, new { Email = email, Password }));
 
@@ -114,7 +64,7 @@ public class CommandAuditTests(ApiFactory factory) : IClassFixture<ApiFactory>
     public async Task Login_WrongPassword_RecordsRejectedAnonymousWithoutEmail()
     {
         var email = NewEmail("audit_login_wrong");
-        await factory.CreateClient().PostAsJsonAsync(RegisterEndpoint, new { Email = email, Password });
+        await TestUsers.CreateAsync(factory, email, Password);
 
         var records = await RecordsAddedByAsync(() =>
             factory.CreateClient().PostAsJsonAsync(LoginEndpoint, new { Email = email, Password = WrongPassword }));

@@ -123,7 +123,7 @@ public sealed class DataItemClassificationCheckSqlServerTests(LocalDbApiFactory 
         using (var context = LocalDb.Context(database)) context.Database.Migrate();
 
         Assert.Equal(1, ConstraintCount(database, trustedAndEnabledOnly: true));
-        Assert.EndsWith(MigrationIdSeparator + MigrationName, LastAppliedMigration(database));
+        Assert.True(IsApplied(database, MigrationName));
     }
 
     [LocalDbTheory]
@@ -196,7 +196,7 @@ public sealed class DataItemClassificationCheckSqlServerTests(LocalDbApiFactory 
         foreach (var batch in batches) LocalDb.Execute(database, batch);
 
         Assert.Equal(1, ConstraintCount(database, trustedAndEnabledOnly: true));
-        Assert.EndsWith(MigrationIdSeparator + MigrationName, LastAppliedMigration(database));
+        Assert.True(IsApplied(database, MigrationName));
     }
 
     // On a database holding a half-classified row the script's THROW stops it before the constraint
@@ -255,6 +255,11 @@ public sealed class DataItemClassificationCheckSqlServerTests(LocalDbApiFactory 
             WHERE [name] = N'{ConstraintName}' AND [parent_object_id] = OBJECT_ID(N'[dbo].[{DataItemsTable}]')
             {(trustedAndEnabledOnly ? "AND [is_not_trusted] = 0 AND [is_disabled] = 0" : string.Empty)}
             """);
+
+    // Later migrations may follow this one, so "applied" is checked rather than "last applied"
+    private static bool IsApplied(string database, string migrationName) =>
+        LocalDb.Scalar<int>(database,
+            $"SELECT COUNT(*) FROM [__EFMigrationsHistory] WHERE [MigrationId] LIKE N'%{MigrationIdSeparator}{migrationName}'") == 1;
 
     private static string LastAppliedMigration(string database) =>
         LocalDb.Scalar<string>(database, "SELECT TOP 1 [MigrationId] FROM [__EFMigrationsHistory] ORDER BY [MigrationId] DESC");

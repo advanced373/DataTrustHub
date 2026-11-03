@@ -12,10 +12,11 @@ DataItems are files classified by security level.
 - Carter (endpoint auto-discovery via ICarterModule)
 - Own handler interfaces, no MediatR (ADR-0012): `ICommandHandler<TCommand, TResult>` for writes and
   `IQueryHandler<TQuery, TResult>` for reads, in `Features/_Shared/Messaging`; endpoints inject the handler
-  they call. Scrutor registers the handlers and wraps them in decorators (validation; later auditing)
+  they call. Scrutor registers the handlers and wraps them in decorators: validation for commands and
+  queries, and the audit decorator (outermost) for commands (ADR-0016)
 - FluentValidation 12 (validated by the validation decorators before the handler runs)
 - Entity Framework Core 10 with SQL Server
-- DataTrustHub.SharedKernel: Result<T>, Error, ErrorType, Entity base classes
+- DataTrustHub.SharedKernel: Result<T>, Error, ErrorType, ValidationError, UserRoles, Entity base classes
 
 ## Architecture: Clean Architecture with vertical slices (ADR-0012)
 
@@ -33,17 +34,16 @@ Use the terms of the ubiquitous language in `docs/domain/ubiquitous-language.md`
 
 ```
 DataTrustHub.Features/
-  _Shared/               <- shared pieces (messaging, decorators, extensions) — READ ONLY
+  _Shared/               <- shared pieces (messaging, auditing, extensions, JWT, seeding) — READ ONLY
   Authentication/        <- your model: study this before writing your own slice
   DataManagement/
-  Sharing/
   Administration/
-  MainView/
 ```
 
 Each use case folder contains:
 - `Constants.cs`       — route string, tag, validation thresholds, error definitions
-- `*Endpoint.cs`       — ICarterModule: request/response records + HTTP handler
+- `*Endpoint.cs`       — ICarterModule: request/response records + HTTP handler; read the caller id with
+                        `httpContext.User.GetUserId()` (`_Shared/Extensions`), never from the claims directly
 - `*Handler.cs`        — ICommandHandler or IQueryHandler: orchestrates the use case, holds no business rules
 - `*Validator.cs`      — AbstractValidator: input validation (shape of the request), not business rules
 

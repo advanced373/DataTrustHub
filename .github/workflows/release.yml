@@ -191,6 +191,25 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
+      # The host names have a random suffix and are read from Azure, never written in the repository.
+      # They are masked here, right after the sign-in and before the migration and the deploys (#154):
+      # az webapp deploy warns on stderr with the app's URL, which --output none does not hide, so a
+      # mask set only by the smoke check came too late for the public log. The values are captured,
+      # never echoed; a failed read stops the step (bash -e) and an empty one fails it, so no later
+      # step runs with an unmasked or missing host. The smoke check reads them from the step env.
+      - name: Read and mask the host names
+        run: |
+          api_host="$(az webapp show --resource-group "$RESOURCE_GROUP" --name "$API_APP_NAME" --query defaultHostName -o tsv)"
+          webapp_host="$(az webapp show --resource-group "$RESOURCE_GROUP" --name "$WEBAPP_APP_NAME" --query defaultHostName -o tsv)"
+          if [ -z "$api_host" ] || [ -z "$webapp_host" ]; then
+            echo "::error::Azure returned no host name for the API or the WebApp"
+            exit 1
+          fi
+          echo "::add-mask::$api_host"
+          echo "::add-mask::$webapp_host"
+          echo "API_HOST=$api_host" >> "$GITHUB_ENV"
+          echo "WEBAPP_HOST=$webapp_host" >> "$GITHUB_ENV"
+
       # A new throwaway JWT signing key for the API host that the bundle builds, masked before any
       # later step can print it. The bundle runs from the unpacked API package, whose appsettings.json
       # (the Jwt issuer and audience) the host reads from the working directory. Artifacts lose the
@@ -211,8 +230,9 @@ jobs:
       # auto-pauses, and its first connection fails while it resumes: the API host's own retry policy
       # covers transient errors, and this loop starts the bundle again, with a pause, until the retry
       # budget is spent. Each attempt gets only the time left in the budget, so the step fails after
-      # about three and a half minutes; the step timeout is a safety net above that. Applied
-      # migrations are recorded, so a new attempt applies only what is missing.
+      # about three and a half minutes; the step timeout is a safety net above that. No attempt starts
+      # with less than one second left (timeout 0 would mean no limit, #154). Applied migrations are
+      # recorded, so a new attempt applies only what is missing.
       - name: Apply migrations
         working-directory: ${{ runner.temp }}/api
         env:
@@ -221,23 +241,31 @@ jobs:
         run: |
           connection="Server=tcp:$SQL_HOST,1433;Database=$DATABASE_NAME;Authentication=Active Directory Default;Encrypt=True;Connect Timeout=60"
           deadline=$((SECONDS + RETRY_BUDGET_SECONDS))
-          attempt=1
-          until timeout --kill-after="$MIGRATE_KILL_AFTER_SECONDS" "$((deadline - SECONDS))" \
-            "$ARTIFACTS_DIR/migration-bundle/efbundle" --connection "$connection"; do
-            # Another attempt only if it still has time after the pause (timeout 0 would mean no limit)
-            if [ $((SECONDS + MIGRATE_PAUSE_SECONDS)) -ge "$deadline" ]; then
-              echo "::error::The migrations failed after $attempt attempt(s); see infra/README.md, step 5"
-              exit 1
-            fi
-            echo "Attempt $attempt failed; trying again in $MIGRATE_PAUSE_SECONDS s"
+          attempt=0
+          give_up() {
+            echo "::error::The migrations failed after $attempt attempt(s); see infra/README.md, step 5"
+            exit 1
+          }
+          while true; do
+            # The time left is read once and checked before it is used: timeout 0 would mean no limit
+            remaining=$((deadline - SECONDS))
+            [ "$remaining" -ge 1 ] || give_up
             attempt=$((attempt + 1))
+            if timeout --kill-after="$MIGRATE_KILL_AFTER_SECONDS" "$remaining" \
+              "$ARTIFACTS_DIR/migration-bundle/efbundle" --connection "$connection"; then
+              break
+            fi
+            # Another attempt only if it still has time after the pause
+            [ $((SECONDS + MIGRATE_PAUSE_SECONDS)) -lt "$deadline" ] || give_up
+            echo "Attempt $attempt failed; trying again in $MIGRATE_PAUSE_SECONDS s"
             sleep "$MIGRATE_PAUSE_SECONDS"
           done
           echo "Migrations applied after $attempt attempt(s)"
 
       # OneDeploy with the Microsoft Entra token of the sign-in: basic publishing credentials are
       # disabled on both apps. Startup is checked by the smoke check, not by the deployment. No
-      # output: the result names the app's hosts.
+      # output: the result names the app's hosts. The URL warning on stderr, which --output none
+      # does not hide, shows only masked hosts (#154).
       - name: Deploy the API
         run: >
           az webapp deploy --resource-group "$RESOURCE_GROUP" --name "$API_APP_NAME"
@@ -250,16 +278,11 @@ jobs:
           --src-path "$ARTIFACTS_DIR/webapp-package/webapp.zip" --type zip --track-status false
           --output none
 
-      # The host names have a random suffix and are read from Azure, never written in the repository;
-      # they are masked so the public log does not show them. /health does not touch the database, so
-      # only a cold start delays it. Both apps are probed until both answer exactly 200 (a redirect is
-      # not healthy) or the budget is spent.
+      # Probes the host names read and masked after the sign-in (#154). /health does not touch the
+      # database, so only a cold start delays it. Both apps are probed until both answer exactly 200
+      # (a redirect is not healthy) or the budget is spent.
       - name: Smoke check
         run: |
-          api_host="$(az webapp show --resource-group "$RESOURCE_GROUP" --name "$API_APP_NAME" --query defaultHostName -o tsv)"
-          webapp_host="$(az webapp show --resource-group "$RESOURCE_GROUP" --name "$WEBAPP_APP_NAME" --query defaultHostName -o tsv)"
-          echo "::add-mask::$api_host"
-          echo "::add-mask::$webapp_host"
           healthy() {
             status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
               --max-time "$SMOKE_REQUEST_TIMEOUT_SECONDS" "https://$1$HEALTH_PATH")" || true
@@ -269,8 +292,8 @@ jobs:
           api_ok=false
           webapp_ok=false
           while [ "$SECONDS" -lt "$deadline" ]; do
-            [ "$api_ok" = true ] || { healthy "$api_host" && api_ok=true && echo "The API answers $HEALTH_PATH"; }
-            [ "$webapp_ok" = true ] || { healthy "$webapp_host" && webapp_ok=true && echo "The WebApp answers $HEALTH_PATH"; }
+            [ "$api_ok" = true ] || { healthy "$API_HOST" && api_ok=true && echo "The API answers $HEALTH_PATH"; }
+            [ "$webapp_ok" = true ] || { healthy "$WEBAPP_HOST" && webapp_ok=true && echo "The WebApp answers $HEALTH_PATH"; }
             if [ "$api_ok" = true ] && [ "$webapp_ok" = true ]; then
               exit 0
             fi

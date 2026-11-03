@@ -49,6 +49,8 @@ A file or data object with a security classification.
 | Content | byte[] | File content |
 | OwnerUserId | Guid | Foreign key -> User |
 | ClassificationLevel | enum | Security level |
+| PolicyId | Guid? | The policy of a classified item; empty for a personal item |
+| ClassificationPriority | int? | Priority of the item's classification level; empty for a personal item. Check constraint `CK_DataItems_Classification` (D1): `PolicyId` and `ClassificationPriority` are both empty or both set |
 
 ### Audit_Log
 Tracks all significant system actions.

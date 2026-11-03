@@ -19,6 +19,8 @@ public partial class AddUniquenessIndexesMigrationTests
 {
     private const string MigrationName = "AddUniquenessIndexes";
     private const string PreviousMigrationName = "NormalizeUserEmails";
+    private const string NextMigrationName = "AddDataItemClassificationCheck";
+    private const string NextMigrationConstraint = "CK_DataItems_Classification";
     private const string MigrationIdSeparator = "_";
     private const string KeyColumnType = "nvarchar(256)";
     private const string FormerColumnType = "nvarchar(max)";
@@ -85,14 +87,16 @@ public partial class AddUniquenessIndexesMigrationTests
         Assert.EndsWith(MigrationIdSeparator + MigrationName, id);
     }
 
+    // It was the latest migration until #128 added AddDataItemClassificationCheck after it; its place in the order stays
     [Fact]
-    public void Migration_IsTheLatestMigration()
+    public void Migration_ComesRightBeforeAddDataItemClassificationCheck()
     {
         using var context = SqlServerContext();
+        var migrations = context.Database.GetMigrations().ToList();
 
-        var latest = context.Database.GetMigrations().Last();
+        var index = migrations.FindIndex(id => id.EndsWith(MigrationIdSeparator + MigrationName));
 
-        Assert.EndsWith(MigrationIdSeparator + MigrationName, latest);
+        Assert.EndsWith(MigrationIdSeparator + NextMigrationName, migrations[index + 1]);
     }
 
     [Fact]
@@ -101,7 +105,9 @@ public partial class AddUniquenessIndexesMigrationTests
         using var context = SqlServerContext();
         var migrations = context.Database.GetMigrations().ToList();
 
-        Assert.EndsWith(MigrationIdSeparator + PreviousMigrationName, migrations[^2]);
+        var index = migrations.FindIndex(id => id.EndsWith(MigrationIdSeparator + MigrationName));
+
+        Assert.EndsWith(MigrationIdSeparator + PreviousMigrationName, migrations[index - 1]);
     }
 
     // --- Up: the data check comes before any schema change ---
@@ -279,13 +285,17 @@ public partial class AddUniquenessIndexesMigrationTests
         Assert.Equal(KeyColumns.Length + Rules.Length, differences.Count);
     }
 
+    // Since #128 the snapshot also holds the D1 check constraint of AddDataItemClassificationCheck; nothing else
     [Fact]
-    public void TargetModel_IsTheSameAsTheModelSnapshot()
+    public void TargetModel_DiffersFromTheModelSnapshotOnlyByTheClassificationCheck()
     {
         using var context = SqlServerContext();
         var snapshot = context.GetService<IMigrationsAssembly>().ModelSnapshot!.Model;
 
-        Assert.False(Differ(context).HasDifferences(TargetModel(context, MigrationName), Relational(context, snapshot)));
+        var differences = Differ(context).GetDifferences(TargetModel(context, MigrationName), Relational(context, snapshot));
+
+        var added = Assert.IsType<AddCheckConstraintOperation>(Assert.Single(differences));
+        Assert.Equal(NextMigrationConstraint, added.Name);
     }
 
     // dotnet ef migrations has-pending-model-changes reports no changes

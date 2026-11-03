@@ -155,7 +155,10 @@ namespace DataTrustHub.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("DataItems");
+                    b.ToTable("DataItems", t =>
+                        {
+                            t.HasCheckConstraint("CK_DataItems_Classification", "([PolicyId] IS NULL AND [ClassificationPriority] IS NULL) OR ([PolicyId] IS NOT NULL AND [ClassificationPriority] IS NOT NULL)");
+                        });
                 });
 
             modelBuilder.Entity("DataTrustHub.Infrastructure.Persistance.Model.DbMembership", b =>

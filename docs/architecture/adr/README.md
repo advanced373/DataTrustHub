@@ -42,3 +42,4 @@ Status values: `Proposed`, `Accepted`, `Superseded by ADR-NNNN`, `Deprecated`.
 | [0024](0024-no-app-service-health-check-on-the-free-tier.md) | No App Service health check while the plan is on the Free tier | Accepted | 2026-11-02 |
 | [0025](0025-rate-limiting-and-audited-queries.md) | Rate limit and audit lookups that can confirm an account exists | Accepted | 2026-11-03 |
 | [0026](0026-registration-requests.md) | Sign-ups wait for approval as registration requests | Accepted | 2026-11-03 |
+| [0027](0027-notification-emails-without-a-message-broker.md) | Notification emails are sent directly through ACS, without a message broker | Accepted | 2026-11-04 |

@@ -1,3 +1,4 @@
+using DataTrustHub.Domain.Users;
 using DataTrustHub.Features._Shared.Jwt;
 using DataTrustHub.Features._Shared.Registration;
 using DataTrustHub.Features.Authentication.LoginUser;
@@ -13,7 +14,8 @@ namespace DataTrustHub.Features.Tests.Authentication;
 
 // ADR-0012 step 3c: register and login run on repositories. Register commits once, only on success (since
 // #172 it stores a registration request, not a user);
-// login never commits. The handlers are built directly with fakes, so no database is involved.
+// login commits only to replace a password hash in an older format (#167, see LoginUserRehashHandlerTests).
+// The handlers are built directly with fakes, so no database is involved.
 public class AuthenticationHandlerTests
 {
     private const string Email = "Handler.Auth@Example.com";
@@ -44,7 +46,7 @@ public class AuthenticationHandlerTests
         var added = Assert.Single(_registrationRequests.Added);
         Assert.Equal((result.Value, NormalizedEmail, _clock.UtcNow), (added.Id, added.Email, added.RequestedAt));
         Assert.NotEqual(Password, added.HashedPassword);
-        Assert.True(_hasher.VerifyHashedPassword(added.HashedPassword, Password));
+        Assert.Equal(PasswordVerificationResult.Success, _hasher.VerifyHashedPassword(added.HashedPassword, Password));
         Assert.Equal(1, _unitOfWork.SaveChangesCalls);
     }
 
@@ -143,7 +145,7 @@ public class AuthenticationHandlerTests
     private RegisterUserHandler RegisterHandler() =>
         new(_users, _registrationRequests, _hasher, _unitOfWork, Options.Create(new RegistrationOptions()), _clock);
 
-    private LoginUserHandler LoginHandler() => new(_users, _hasher, _jwtGenerator);
+    private LoginUserHandler LoginHandler() => new(_users, _hasher, _jwtGenerator, _unitOfWork);
 
     private sealed class RecordingJwtTokenGenerator : IJwtTokenGenerator
     {

@@ -21,7 +21,7 @@ reference each other **by id only**.
 |---|---|
 | `Id` | |
 | `Email` | Used to log in. Unique. Always the normalized form of an `EmailAddress` (U7) |
-| `HashedPassword` | Never the plain password (`IPasswordHasher`) |
+| `HashedPassword` | Never the plain password: a salted, slow hash (`IPasswordHasher`, U8) |
 | `Role` | `User` or `Admin` (`UserRoles`) |
 
 **Factory methods:**
@@ -33,6 +33,8 @@ Both store the normalized address (U7). Rehydration keeps the stored email as it
 **Behaviour:**
 - `PromoteToAdmin()` returns `false` if the user was already an admin.
 - `CheckCanBeDeletedBy(requesterId)`.
+- `ReplacePasswordHash(hashedPassword)` replaces the stored password hash after a re-hash on sign-in (U8);
+  an empty hash throws `ArgumentException` (a programming error).
 
 | # | Invariant / rule | Enforced in |
 |---|---|---|
@@ -43,6 +45,7 @@ Both store the normalized address (U7). Rehydration keeps the stored email as it
 | U5′ | Deleting a user also removes their clearances and memberships and soft-deletes their personal data items, all in one transaction. Their classified data items are not touched: they stay with their organization, whose organization admins can delete them (ADR-0014) | Use case: `DeleteAccount` |
 | U6 | Startup makes sure the configured admin exists, and promotes that user if needed | Use case: `AdminSeeder` |
 | U7 | An email address is normalized: surrounding whitespace trimmed and the whole address lower-cased with the invariant culture, so `" Ion@Firma.RO "` and `"ion@firma.ro"` are the same address and the same account. The normalized form is what is stored, compared, put in the token and returned. Surrounding whitespace alone does not make a request invalid | Value object: `EmailAddress`, used by `User.Register`, `User.CreateAdmin`, `IUserRepository.GetByEmailAsync` / `EmailExistsAsync`, `FindUserByEmail` and the email validators. The migration `NormalizeUserEmails` normalized the emails stored before; it fails, changing nothing, if two users would share an address |
+| U8 | A password is stored only as a salted, slow hash (PBKDF2, ASP.NET Core Identity's V3 format, which carries its own parameters). A stored hash in an older format (the unsalted SHA-256 of before) or weaker than configured still signs the user in, and is replaced by a current hash in that same sign-in, saved once. A wrong password changes nothing. An unknown email costs the same hashing work as a real check, so the response time does not reveal it (U4, ADR-0025) | Port: `IPasswordHasher` (`PasswordVerificationResult.SuccessRehashNeeded`), adapter `PasswordHasher`. Entity: `ReplacePasswordHash`. Use case: `LoginUser` |
 
 ### Value object: EmailAddress
 

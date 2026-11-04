@@ -4,6 +4,8 @@ namespace DataTrustHub.Domain.Users;
 
 public sealed class User
 {
+    private const string HashedPasswordRequired = "A user's password hash cannot be empty.";
+
     // Rebuilds a stored entity; used by the persistence mappers only (internal, visible to Infrastructure)
     internal User(Guid id, string email, string hashedPassword, string role)
     {
@@ -37,6 +39,16 @@ public sealed class User
 
         Role = UserRoles.Admin;
         return true;
+    }
+
+    // Replaces the stored password hash with a newer one, when sign-in re-hashes a password stored in an
+    // older format (U8). An empty hash is a programming error, not a business outcome
+    public void ReplacePasswordHash(string hashedPassword)
+    {
+        if (string.IsNullOrEmpty(hashedPassword))
+            throw new ArgumentException(HashedPasswordRequired, nameof(hashedPassword));
+
+        HashedPassword = hashedPassword;
     }
 
     // An administrator deleting their own account could lock everyone out

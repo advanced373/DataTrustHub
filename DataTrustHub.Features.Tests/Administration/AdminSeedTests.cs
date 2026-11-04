@@ -70,7 +70,7 @@ public class AdminSeedTests(AdminSeedTests.SeededApiFactory factory) : IClassFix
         var added = Assert.Single(fakes.Users.Added);
         Assert.Equal((AdminEmail, UserRoles.Admin), (added.Email, added.Role));
         Assert.NotEqual(AdminPassword, added.HashedPassword);
-        Assert.True(fakes.Hasher.VerifyHashedPassword(added.HashedPassword, AdminPassword));
+        Assert.Equal(PasswordVerificationResult.Success, fakes.Hasher.VerifyHashedPassword(added.HashedPassword, AdminPassword));
         Assert.Equal(1, fakes.UnitOfWork.SaveChangesCalls);
     }
 

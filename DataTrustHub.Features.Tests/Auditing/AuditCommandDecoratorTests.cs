@@ -21,6 +21,7 @@ public class AuditCommandDecoratorTests
     private const string RejectedDescription = "The probe was rejected.";
     private const string ValidationCode = "Validation.General";
     private const string FieldCode = "Probe.FieldRequired";
+    private const string NonGuidSubject = "not-a-guid";
 
     private readonly AuditDecoratorHarness _harness = new();
     private readonly Guid _actorUserId = Guid.NewGuid();
@@ -187,6 +188,63 @@ public class AuditCommandDecoratorTests
             Decorate(_ => throw new ProbeException()).Handle(new PlainProbeCommand(), default));
 
         Assert.Equal(_actorUserId, Assert.Single(_harness.AuditLog.Appended).ActorUserId);
+    }
+
+    // AC2 and AC3 of #119: the decorator reads the actor through the shared caller id rule and records the
+    // same actor as before for every claim combination
+
+    [Fact]
+    public async Task Handle_AuthenticatedWithNameIdentifierOnly_RecordsTheActor()
+    {
+        _harness.SignIn(new Claim(ClaimTypes.NameIdentifier, _actorUserId.ToString()));
+
+        await Decorate(_ => Task.FromResult(Result.Success())).Handle(new PlainProbeCommand(), default);
+
+        Assert.Equal(_actorUserId, Assert.Single(_harness.AuditLog.Appended).ActorUserId);
+    }
+
+    [Fact]
+    public async Task Handle_AuthenticatedWithSubAndNameIdentifier_RecordsTheSubAsActor()
+    {
+        _harness.SignIn(
+            new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
+            new Claim(JwtRegisteredClaimNames.Sub, _actorUserId.ToString()));
+
+        await Decorate(_ => Task.FromResult(Result.Success())).Handle(new PlainProbeCommand(), default);
+
+        Assert.Equal(_actorUserId, Assert.Single(_harness.AuditLog.Appended).ActorUserId);
+    }
+
+    [Fact]
+    public async Task Handle_AuthenticatedWithNonGuidSubAndGuidNameIdentifier_RecordsAnonymous()
+    {
+        _harness.SignIn(
+            new Claim(JwtRegisteredClaimNames.Sub, NonGuidSubject),
+            new Claim(ClaimTypes.NameIdentifier, _actorUserId.ToString()));
+
+        await Decorate(_ => Task.FromResult(Result.Success())).Handle(new PlainProbeCommand(), default);
+
+        Assert.Null(Assert.Single(_harness.AuditLog.Appended).ActorUserId);
+    }
+
+    [Fact]
+    public async Task Handle_AuthenticatedWithoutSubOrNameIdentifier_RecordsAnonymous()
+    {
+        _harness.SignIn(new Claim(ClaimTypes.Name, _actorUserId.ToString()));
+
+        await Decorate(_ => Task.FromResult(Result.Success())).Handle(new PlainProbeCommand(), default);
+
+        Assert.Null(Assert.Single(_harness.AuditLog.Appended).ActorUserId);
+    }
+
+    [Fact]
+    public async Task Handle_UnauthenticatedRequest_RecordsAnonymousEvenWithANameIdentifierClaim()
+    {
+        _harness.SignInAnonymous(new Claim(ClaimTypes.NameIdentifier, _actorUserId.ToString()));
+
+        await Decorate(_ => Task.FromResult(Result.Success())).Handle(new PlainProbeCommand(), default);
+
+        Assert.Null(Assert.Single(_harness.AuditLog.Appended).ActorUserId);
     }
 
     // --- organization and target ---

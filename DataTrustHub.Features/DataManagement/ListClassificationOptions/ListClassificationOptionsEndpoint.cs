@@ -5,8 +5,6 @@ using DataTrustHub.SharedKernel;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 
 namespace DataTrustHub.Features.DataManagement.ListClassificationOptions;
 
@@ -32,18 +30,10 @@ public class ListClassificationOptionsEndpoint : ICarterModule
         HttpContext httpContext,
         CancellationToken cancellationToken)
     {
-        var userId = ExtractUserId(httpContext.User);
+        var userId = httpContext.User.GetUserId();
         if (userId is null) return Results.Unauthorized();
 
         var result = await handler.Handle(new ListClassificationOptionsQuery(userId.Value), cancellationToken);
         return result.ToHttpResult(Results.Ok);
-    }
-
-    private static Guid? ExtractUserId(ClaimsPrincipal user)
-    {
-        var sub = user.FindFirstValue(JwtRegisteredClaimNames.Sub)
-               ?? user.FindFirstValue(ClaimTypes.NameIdentifier);
-
-        return Guid.TryParse(sub, out var id) ? id : null;
     }
 }

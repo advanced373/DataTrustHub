@@ -47,6 +47,17 @@ internal sealed class WorkflowFile
         return string.Join('\n', Block(JobIndent, start));
     }
 
+    /// <summary>The comment lines right above the first step with this name (they belong to no step's text).</summary>
+    internal string CommentAbove(string stepName)
+    {
+        var start = lines.ToList().FindIndex(line => Regex.IsMatch(line, $@"^\s*-\s*name:\s*{Regex.Escape(stepName)}\s*$"));
+        if (start < 0)
+            return string.Empty;
+
+        var comment = lines.Take(start).Reverse().TakeWhile(line => line.TrimStart().StartsWith('#')).Reverse();
+        return string.Join('\n', comment);
+    }
+
     /// <summary>The job's text without its steps: runs-on, environment, permissions, env, needs, if.</summary>
     internal string JobHeader(string name) =>
         string.Join('\n', Job(name).Split('\n').TakeWhile(line => line.Trim() != StepsKey));

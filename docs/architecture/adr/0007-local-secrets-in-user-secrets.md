@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-10-19
-- **Related:** #40
+- **Related:** #40, #172 ([ADR-0026](0026-registration-requests.md): the client key)
 
 ## Context
 
@@ -12,7 +12,9 @@ and secrets were kept in `appsettings.json`, and they do not work on another dev
 ## Decision
 
 - Secrets and machine-specific settings go in .NET User Secrets (`dotnet user-secrets --project DataTrustHub.API`):
-  `ConnectionStrings:DefaultConnection`, `AdminSeed:Email`, `AdminSeed:Password`.
+  `ConnectionStrings:DefaultConnection`, `AdminSeed:Email`, `AdminSeed:Password`. The optional client key
+  (ADR-0026) is a secret too: `Registration:TrustedClientKey` in the API's User Secrets and the same value
+  in `Api:ClientKey` in the WebApp's (`--project DataTrustHub`).
 - Each developer uses a local database, e.g. `(localdb)\MSSQLLocalDB` / `datatrusthubdb`, created with
   `dotnet ef database update --project DataTrustHub.Infrastructure --startup-project DataTrustHub.API`.
 - Deployed environments use environment variables or a secret store, never committed files.

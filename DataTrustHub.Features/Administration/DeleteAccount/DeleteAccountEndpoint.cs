@@ -5,8 +5,6 @@ using DataTrustHub.SharedKernel;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 
 namespace DataTrustHub.Features.Administration.DeleteAccount;
 
@@ -23,18 +21,10 @@ public class DeleteAccountEndpoint : ICarterModule
         HttpContext httpContext,
         CancellationToken cancellationToken)
     {
-        var requesterId = ExtractUserId(httpContext.User);
+        var requesterId = httpContext.User.GetUserId();
         if (requesterId is null) return Results.Unauthorized();
 
         var result = await handler.Handle(new DeleteAccountCommand(id, requesterId.Value), cancellationToken);
         return result.ToHttpResult(_ => Results.NoContent());
-    }
-
-    private static Guid? ExtractUserId(ClaimsPrincipal user)
-    {
-        var sub = user.FindFirstValue(JwtRegisteredClaimNames.Sub)
-               ?? user.FindFirstValue(ClaimTypes.NameIdentifier);
-
-        return Guid.TryParse(sub, out var id) ? id : null;
     }
 }

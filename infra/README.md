@@ -17,8 +17,8 @@ scripts' parameters.
 | Resource | Name | Tier and key settings |
 |---|---|---|
 | App Service plan | `DataTrustHubPlan` | F1 (free), Linux |
-| Web app, the API | `datatrusthubapi` | `DOTNETCORE\|10.0` (ADR-0020), HTTPS only, TLS 1.2 minimum, Always On off (not available on F1). After the setup: system-assigned managed identity, FTP disabled, basic publishing credentials (SCM and FTP) disabled, health check path `/health` |
-| Web app, the WebApp | `DataTrustHub` | `DOTNETCORE\|10.0`, HTTPS only, TLS 1.2 minimum, Always On off, no managed identity (it holds no secret). After the setup: FTP disabled, basic publishing credentials disabled, health check path `/health` |
+| Web app, the API | `datatrusthubapi` | `DOTNETCORE\|10.0` (ADR-0020), HTTPS only, TLS 1.2 minimum, Always On off (not available on F1). After the setup: system-assigned managed identity, FTP disabled, basic publishing credentials (SCM and FTP) disabled. No health check path: skipped on the Free tier ([ADR-0024](../docs/architecture/adr/0024-no-app-service-health-check-on-the-free-tier.md)), applied by the setup script once the plan moves to a paid tier |
+| Web app, the WebApp | `DataTrustHub` | `DOTNETCORE\|10.0`, HTTPS only, TLS 1.2 minimum, Always On off, no managed identity (its only secret is the client key, `Api__ClientKey`, below). After the setup: FTP disabled, basic publishing credentials disabled. No health check path: skipped on the Free tier ([ADR-0024](../docs/architecture/adr/0024-no-app-service-health-check-on-the-free-tier.md)), applied by the setup script once the plan moves to a paid tier |
 | Azure SQL server | `datatrusthub` | Microsoft Entra-only authentication (no SQL logins), the owner's account as Entra admin. After the setup: one firewall rule, `AllowAllWindowsAzureIps` (`0.0.0.0`–`0.0.0.0`), which lets Azure services in |
 | Azure SQL database | `datatrusthub` | Serverless `GP_S_Gen5`, on the Azure SQL free offer, auto-pause when idle |
 | Application Insights | `DataTrustHub` | Connected to both web apps through their app settings (below); its smart detection action group is created with it |
@@ -28,16 +28,19 @@ The web apps' host names have a random suffix. The scripts read them from Azure
 
 ### App settings
 
-The application secrets live in the API's App Service app settings, encrypted at rest by the
-platform, never in the repository or in CI (ADR-0021 §4). Their values are not recorded here.
+The application secrets live in the apps' App Service app settings (the WebApp holds only the client
+key), encrypted at rest by the platform, never in the repository or in CI (ADR-0021 §4). Their values
+are not recorded here.
 
 | Web app | Setting | Value | Set by |
 |---|---|---|---|
 | both | `APPLICATIONINSIGHTS_CONNECTION_STRING`, `ApplicationInsightsAgent_EXTENSION_VERSION`, `XDT_MicrosoftApplicationInsights_Mode` | Application Insights | the portal; kept by the setup script |
 | API | `ConnectionStrings__DefaultConnection` | `Server=tcp:<server>.database.windows.net,1433;Database=<database>;Authentication=Active Directory Managed Identity;Encrypt=True;Connect Timeout=60`: the API reaches SQL with its managed identity, so no password exists | setup script |
 | API | `Jwt__Secret` | random 48-byte key, base64 | setup script, generated only when missing |
-| API | `AdminSeed__Email`, `AdminSeed__Password` | the first platform admin (ADR-0006) | setup script, asked from the owner when missing |
+| API | `AdminSeed__Email`, `AdminSeed__Password` | the first platform admin (ADR-0006) | setup script, only with `-SeedAdmin`; removed by the owner after the first seed ([ADR-0022](../docs/architecture/adr/0022-seed-the-production-admin-once.md), see [Seeding the first admin](#6-seeding-the-first-admin)) |
+| API | `Registration__TrustedClientKey` | the client key: random 48-byte key, base64, the same value as the WebApp's `Api__ClientKey`. With it the API trusts the browser address the WebApp sends on register ([ADR-0026](../docs/architecture/adr/0026-registration-requests.md) §6) | setup script, generated with the WebApp's when either is missing, or with `-RotateClientKey` |
 | WebApp | `Api__BaseUrl` | `https://<API default host name>` | setup script |
+| WebApp | `Api__ClientKey` | the client key, the same value as the API's `Registration__TrustedClientKey` | setup script, together with the API's |
 
 ## Prerequisites
 
@@ -54,12 +57,14 @@ platform, never in the repository or in CI (ADR-0021 §4). Their values are not 
 3. **The deploy identity** of ADR-0018 §4, created by hand with its OIDC federated credential (#102).
 4. **The SQL script again**, with the deploy identity filled in, for the deploy user.
 5. **The first release** (#102).
+6. **Seeding the first admin**, once, with `setup.ps1 -SeedAdmin`, then removing the seed settings
+   (ADR-0022).
 
 ### 1. The setup script
 
 A PowerShell script, not bash: the owner works on Windows, and Windows PowerShell 5.1 is always
-there. It reads the admin seed password as a secure string, which it never echoes. It uses the
-Azure CLI only.
+there. With `-SeedAdmin` it reads the admin seed password as a secure string, which it never
+echoes. It uses the Azure CLI only.
 
 Run a dry run first. It prints every `az` command that would change Azure, with secrets masked,
 and changes nothing. If the CLI is signed in, it reads the current state and prints only what
@@ -77,24 +82,46 @@ The script shows the subscription and asks for confirmation (`-Force` skips it).
    - the connection string, with managed identity authentication;
    - `Jwt__Secret`, a new random key, **only if it does not exist yet**. Re-running does not
      rotate it, because rotating signs out every user. `-RotateJwtSecret` rotates it on purpose;
-   - `AdminSeed__Email` and `AdminSeed__Password`, asked from the owner only if missing.
-     The password is asked twice; an empty or malformed entry is asked again, up to three times.
-     `-OverwriteAdminSeed` asks for them again and overwrites them;
-3. sets the WebApp's `Api__BaseUrl` from the API's default host name;
+   - `AdminSeed__Email` and `AdminSeed__Password`, **only with `-SeedAdmin`** (ADR-0022): the
+     script asks the owner for both and writes them, overwriting existing values. The password is
+     asked twice; an empty or malformed entry is asked again, up to three times. In a dry run both
+     are planned masked and nothing is asked. Without `-SeedAdmin` the admin seed is neither asked
+     for nor written, whether it is set or not, and existing values are kept (see
+     [Seeding the first admin](#6-seeding-the-first-admin));
+   - `Registration__TrustedClientKey`, the client key (see step 3);
+3. sets the WebApp's `Api__BaseUrl` from the API's default host name, and its `Api__ClientKey`.
+   The client key is one new random key written to both apps in the same run, the API's
+   `Registration__TrustedClientKey` and the WebApp's `Api__ClientKey`, **only when either app
+   lacks it**; when both hold it, both are left untouched. Its value is never read back from Azure,
+   so when only one app holds it the script cannot copy it: it generates a new key and writes it to
+   both. `-RotateClientKey` replaces it on both on purpose. In a dry run it is planned masked. With
+   the key, the API's register limit counts each browser's address instead of the WebApp's
+   ([ADR-0026](../docs/architecture/adr/0026-registration-requests.md) §6). If the two apps ever hold
+   different keys (for example a rotation that stopped after the API's change), the API ignores the
+   WebApp's address header and every sign-up through the WebApp shares one budget again: run the
+   script again with `-RotateClientKey`;
 4. disables FTP and basic publishing credentials (SCM and FTP) on both apps;
-5. sets the health check path to `/health` on both apps;
+5. sets the health check path to `/health` on both apps, only when their App Service plan, read
+   from Azure, is on a paid tier. On the Free tier (F1) it skips it and says so ([ADR-0024](../docs/architecture/adr/0024-no-app-service-health-check-on-the-free-tier.md)): the
+   health check pings `/health` about once a minute, which keeps both apps awake and spends the
+   60 CPU minutes a day the plan shares between them. The release workflow's smoke check (#102)
+   is the health signal instead. Once the plan moves to a paid tier, the next run applies it. The
+   plan id is read from the web app's `serverFarmId`. A signed-out dry run, which reads nothing,
+   assumes the production tier, Free. A real run that reads an empty plan id or tier stops with an
+   error naming the step; a signed-in dry run that reads one warns naming the step, plans nothing for
+   the health check, lists the step under "A real run would stop with an error" and exits with code 1;
 6. adds the SQL firewall rule `AllowAllWindowsAzureIps` if it is missing;
 7. prints what it changed and the next step, without any secret value.
 
 It is idempotent: each step reads the current state first and changes only what differs, so a
-second run reports nothing to change. If a read fails (for example a missing permission), the
+second run reports nothing to change. After each change it reads the value back with the same
+read and stops with an error naming the step if Azure does not hold it, because `az` can exit
+without an error and change nothing; a secret setting is only checked to exist, its value is
+never read back or printed. If a read fails (for example a missing permission), the
 script stops with an error naming the step instead of taking the failure for a missing setting,
-so it never generates a new JWT signing key or asks for the admin seed by mistake. The settings
+so it never generates a new JWT signing key or client key by mistake. The settings
 are passed to `az` in a temporary JSON file, deleted right after, so that no secret is on a
 command line and `az.cmd` cannot mangle special characters in a password.
-
-**Known gap (#150):** on the first real run the health check path was not applied to either web
-app, although `az` reported no error; a second dry run still plans it.
 
 Its parameters default to the resource names above: `-ResourceGroup`, `-ApiAppName`,
 `-WebAppName`, `-SqlServerName`, `-DatabaseName`.
@@ -198,6 +225,39 @@ is missing. A broken migration is fixed forward, in a new release (ADR-0018 §5)
 again with the artifacts of the same run, after a new approval, so what reaches production is
 still what that run built and tested.
 
+### 6. Seeding the first admin
+
+The first platform admin is seeded once, after the first release has created the database schema
+([ADR-0022](../docs/architecture/adr/0022-seed-the-production-admin-once.md)):
+
+1. From PowerShell, run the setup script with `-SeedAdmin`. It asks for the admin's e-mail address
+   and password and writes `AdminSeed__Email` and `AdminSeed__Password`:
+
+   ```powershell
+   .\infra\setup.ps1 -SeedAdmin
+   ```
+
+2. The API seeds the admin on its next start, which any request triggers, for example opening the
+   site.
+3. Check that the admin can sign in.
+4. Delete both settings. This restarts the API:
+
+   ```powershell
+   az webapp config appsettings delete --name <api app> --resource-group <group> --setting-names AdminSeed__Email AdminSeed__Password
+   ```
+
+**Why.** The seeder runs at every start of the API while the settings exist, and each run opens a
+database connection to check that the admin exists. On F1 without Always On the API cold-starts
+after every deploy, restart and idle period, so each start would wake the auto-paused free database
+and spend its monthly quota. Without the settings the seeder does nothing (ADR-0006), and cold
+starts no longer touch the database. The admin's password does not stay in the app settings either.
+Forgetting the deletion costs quota, not correctness.
+
+**Recovering access.** Seed again the same way, with `-SeedAdmin`, then delete the two settings
+again. The seeder only creates an admin that does not exist; it never changes an existing user's
+password, so a forgotten password is recovered with a new admin e-mail address, not by seeding the
+same one again.
+
 ## Deliberately manual
 
 - Creating the resources: resource group, plan, web apps, SQL server, database, Application
@@ -206,21 +266,23 @@ still what that run built and tested.
   with the owner as required reviewer (#102).
 - No firewall rule for the release workflow: the GitHub-hosted runners reach the SQL server
   through `AllowAllWindowsAzureIps` (ADR-0018, amendment of 2026-10-28).
+- Deleting `AdminSeed__Email` and `AdminSeed__Password` after the first admin is seeded
+  (ADR-0022): the setup script never deletes a setting.
 
 ## Free-tier limits (ADR-0021 §6)
 
 Free tiers are accepted for the MVP, with their consequences:
 - **App Service F1:** 60 CPU minutes a day for the plan, shared by both apps; no Always On, so the
   apps sleep when idle and the first request after that is slow (cold start). When the CPU quota
-  is used up, the apps stop until the next day. A single instance: the health check reports, but
-  cannot move traffic to another instance.
+  is used up, the apps stop until the next day. No App Service health check: its pings would keep
+  both apps awake and spend the CPU quota, so the setup script skips it on the Free tier
+  ([ADR-0024](../docs/architecture/adr/0024-no-app-service-health-check-on-the-free-tier.md)); the release workflow's smoke check (#102) is the health signal.
 - **Azure SQL free offer:** a monthly quota of vCore seconds and storage. The database pauses when
   idle, and the first connection after that waits for it to resume. When the quota is used up, the
   database pauses until the next month, and production stops with it.
 - No SLA.
 
-Because of them, the code must have a health endpoint that does not touch the database and SQL
-connections that retry on transient errors (#146; until the endpoint exists, the health check
-path answers 404), and CD wakes the database with retries before migrating
-and retries its smoke check (#102). Moving to paid tiers (for example B1, and SQL billing over the
+Because of them, the code has a `/health` endpoint that does not touch the database and SQL
+connections that retry on transient errors (#146), and CD wakes the database with retries before
+migrating and retries its smoke check against `/health` (#102). Moving to paid tiers (for example B1, and SQL billing over the
 free limit) is due with the first real users.

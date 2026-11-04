@@ -9,7 +9,6 @@ namespace DataTrustHub.Features.Tests.Authentication;
 
 public class LoginUserTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
-    private const string RegisterEndpoint = "/auth/register";
     private const string LoginEndpoint = "/auth/login";
     private const string RoleClaim = "role";
     private readonly HttpClient _client = factory.CreateClient();
@@ -17,8 +16,7 @@ public class LoginUserTests(ApiFactory factory) : IClassFixture<ApiFactory>
     [Fact]
     public async Task LoginUser_WithValidCredentials_Returns200WithToken()
     {
-        await _client.PostAsJsonAsync(RegisterEndpoint,
-            new { Email = "login@example.com", Password = "Password1!" });
+        await TestUsers.CreateAsync(factory, "login@example.com", "Password1!");
 
         var response = await _client.PostAsJsonAsync(LoginEndpoint,
             new { Email = "login@example.com", Password = "Password1!" });
@@ -32,8 +30,7 @@ public class LoginUserTests(ApiFactory factory) : IClassFixture<ApiFactory>
     [Fact]
     public async Task LoginUser_WithWrongPassword_Returns401()
     {
-        await _client.PostAsJsonAsync(RegisterEndpoint,
-            new { Email = "wrongpass@example.com", Password = "Password1!" });
+        await TestUsers.CreateAsync(factory, "wrongpass@example.com", "Password1!");
 
         var response = await _client.PostAsJsonAsync(LoginEndpoint,
             new { Email = "wrongpass@example.com", Password = "WrongPassword!" });
@@ -62,8 +59,7 @@ public class LoginUserTests(ApiFactory factory) : IClassFixture<ApiFactory>
     [Fact]
     public async Task LoginUser_UnknownEmailAndWrongPassword_ReturnIdenticalResponses()
     {
-        await _client.PostAsJsonAsync(RegisterEndpoint,
-            new { Email = "same-failure@example.com", Password = "Password1!" });
+        await TestUsers.CreateAsync(factory, "same-failure@example.com", "Password1!");
 
         var unknown = await _client.PostAsJsonAsync(LoginEndpoint,
             new { Email = "same-failure-ghost@example.com", Password = "Password1!" });
@@ -81,18 +77,17 @@ public class LoginUserTests(ApiFactory factory) : IClassFixture<ApiFactory>
     public async Task LoginUser_WithValidCredentials_TokenClaimsMatchTheUser()
     {
         const string email = "Claims.User@Example.com";
-        var register = await _client.PostAsJsonAsync(RegisterEndpoint, new { Email = email, Password = "Password1!" });
-        var userId = (await register.Content.ReadFromJsonAsync<RegisterUserResponse>())!.UserId;
+        const string normalizedEmail = "claims.user@example.com";
+        var userId = await TestUsers.CreateAsync(factory, email, "Password1!");
 
         var response = await _client.PostAsJsonAsync(LoginEndpoint, new { Email = email, Password = "Password1!" });
         var token = (await response.Content.ReadFromJsonAsync<LoginUserResponse>())!.Token;
 
         var claims = new JwtSecurityTokenHandler().ReadJwtToken(token).Claims.ToList();
         Assert.Equal(userId.ToString(), claims.Single(c => c.Type == JwtRegisteredClaimNames.Sub).Value);
-        Assert.Equal(email, claims.Single(c => c.Type == JwtRegisteredClaimNames.Email).Value);
+        Assert.Equal(normalizedEmail, claims.Single(c => c.Type == JwtRegisteredClaimNames.Email).Value);
         Assert.Equal(UserRoles.User, claims.Single(c => c.Type == RoleClaim).Value);
     }
 
     private record LoginUserResponse(string Token);
-    private record RegisterUserResponse(Guid UserId);
 }

@@ -53,6 +53,20 @@ public class AdminSeedUnreachableDatabaseTests
         Assert.Contains(fakes.Logger.Entries, entry => entry.Level >= LogLevel.Error);
     }
 
+    // #121 AC5: the seeder creates a user, so it can hit the unique index of U1 (another instance, or a
+    // registration, saved the admin email first). It has no conflict error to map to: it must survive the
+    // rejection like any other failed save, log it, and try again at the next start
+    [Fact]
+    public async Task Seeder_UniqueIndexRejectsSave_DoesNotThrowAndLogsAnError()
+    {
+        var fakes = new SeederFakes(unreachableReads: 0, new UniqueViolationUnitOfWork());
+
+        var exception = await Record.ExceptionAsync(() => fakes.StartSeederAsync());
+
+        Assert.Null(exception);
+        Assert.Contains(fakes.Logger.Entries, entry => entry.Level >= LogLevel.Error);
+    }
+
     [Fact]
     public async Task Seeder_DatabaseUnreachable_LogsNoAdminPassword()
     {

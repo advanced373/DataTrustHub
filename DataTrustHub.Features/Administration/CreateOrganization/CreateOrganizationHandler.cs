@@ -22,7 +22,21 @@ public class CreateOrganizationHandler(IOrganizationRepository organizations, IU
 
         var organization = Organization.Create(command.Name);
         _organizations.Add(organization);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-        return Result.Success(organization.Id);
+        return await SaveOrganization(organization, cancellationToken);
+    }
+
+    // O1 under concurrency: a request that passed NameExistsAsync at the same time saved first, and the
+    // unique index rejects this one
+    private async Task<Result<Guid>> SaveOrganization(Organization organization, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            return Result.Success(organization.Id);
+        }
+        catch (UniqueConstraintViolationException)
+        {
+            return Result.Failure<Guid>(Errors.OrganizationNameAlreadyInUse);
+        }
     }
 }

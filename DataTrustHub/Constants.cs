@@ -36,6 +36,9 @@ internal static class ApiRoutes
     internal const string AdminOrganizationById = "admin/organizations/{0}";
     internal const string AdminOrganizationAdmins = "admin/organizations/{0}/admins";
     internal const string AdminAuditRecords = "admin/audit-records";
+    internal const string AdminRegistrationRequests = "admin/registration-requests";
+    internal const string AdminApproveRegistrationRequest = "admin/registration-requests/{0}/approve";
+    internal const string AdminRejectRegistrationRequest = "admin/registration-requests/{0}/reject";
 
     // Organization-scoped routes; the API answers 404 to a caller without the needed membership there
     internal const string MyOrganizations = "organizations/mine";
@@ -62,15 +65,26 @@ internal static class ApiRoutes
     internal const string TimeFormat = "O";
 }
 
+// The headers that carry the browser's address to the API's register limit (ADR-0026). The API defines the
+// same names; the WebApp shares them by name only, never by reference
+internal static class ApiHeaders
+{
+    internal const string ClientAddress = "X-DTH-Client-Address";
+    internal const string ClientKey = "X-DTH-Client-Key";
+}
+
 // Attribute routes of the administration pages, under /Admin/<section>
 internal static class AdminRoutes
 {
     internal const string Users = "Admin/Users";
     internal const string Organizations = "Admin/Organizations";
     internal const string Audit = "Admin/Audit";
+    internal const string RegistrationRequests = "Admin/RegistrationRequests";
     internal const string Create = "Create";
     internal const string Delete = "{id:guid}/Delete";
     internal const string AppointAdmin = "{id:guid}/AppointAdmin";
+    internal const string Approve = "{id:guid}/Approve";
+    internal const string Reject = "{id:guid}/Reject";
 }
 
 // Attribute routes of the signed-in user's organization pages, under /Organizations
@@ -157,6 +171,8 @@ internal static class AuditActions
         "CreateAccount",
         "DeleteAccount",
         "RegisterUser",
+        "ApproveRegistrationRequest",
+        "RejectRegistrationRequest",
         "LoginUser"
     ];
 }
@@ -207,6 +223,7 @@ internal static class ControllerNames
     internal const string Data = "Data";
     internal const string Admin = "Admin";
     internal const string Users = "Users";
+    internal const string RegistrationRequests = "RegistrationRequests";
     internal const string Organizations = "Organizations";
     internal const string MyOrganizations = "MyOrganizations";
     internal const string OrganizationPolicies = "OrganizationPolicies";
@@ -229,13 +246,18 @@ internal static class Messages
     internal const string UnexpectedResponse = "The API returned an unexpected response.";
     internal const string Forbidden = "You do not have permission to perform this action.";
     internal const string SessionExpired = "Your session has expired. Please sign in again.";
-    internal const string Registered = "Account created. You can now sign in.";
+    internal const string Registered =
+        "Your registration request was sent. You can sign in once an administrator approves it.";
+    internal const string TooManyRequests = "Too many requests. Try again later.";
+    internal const string TooManyRegistrationAttempts = "Too many registration attempts. Try again later.";
     internal const string FileUploaded = "File \"{0}\" uploaded.";
     internal const string FileDeleted = "File deleted.";
     internal const string DownloadFailed = "The file content could not be read.";
     internal const string LevelRequiredForPolicy = "Select a classification level for the policy.";
     internal const string LevelAboveClearance = "You can classify at most at your own clearance level on this policy.";
     internal const string AccountCreated = "Account {0} created.";
+    internal const string RegistrationApproved = "Registration of {0} approved; the account was created.";
+    internal const string RegistrationRejected = "Registration of {0} rejected.";
     internal const string AccountDeleted = "Account deleted. Its clearances were removed and its data was deleted.";
     internal const string OrganizationCreated = "Organization \"{0}\" created.";
     internal const string OrganizationDeleted = "Organization deleted.";

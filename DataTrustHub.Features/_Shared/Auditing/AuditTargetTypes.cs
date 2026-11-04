@@ -8,4 +8,5 @@ public static class AuditTargetTypes
     public const string Policy = "Policy";
     public const string Clearance = "Clearance";
     public const string DataItem = "DataItem";
+    public const string RegistrationRequest = "RegistrationRequest";
 }

@@ -14,7 +14,8 @@ a document only if the rules say so.
 
 The access rules:
 
-1. People have accounts (**users**). An **organization** is a tenant, i.e. a company on the platform.
+1. People have accounts (**users**). Signing up does not create an account: it makes a
+   **registration request** that a platform admin approves or rejects (ADR-0026). An **organization** is a tenant, i.e. a company on the platform.
    A user belongs to an organization through a **membership**, as a member, a guest or an
    organization admin (ADR-0014). The platform admin appoints an organization's first organization
    admin; an organization admin adds members and guests, lists them, changes their roles and removes
@@ -47,6 +48,10 @@ architecture that implements them is in ADR-0012 and [the architecture overview]
 | Term | Meaning | In code |
 |---|---|---|
 | **User** | A person with an account. Their role is `User` or `Admin` | `User` |
+| **Registration request** | A sign-up waiting for a platform admin's approval: the normalized email address and the password hash, never the plain password. It is not an account and nobody can log in with it; approving it creates the user, rejecting it deletes it. One pending request per email address; a request older than the pending lifetime expires and is deleted. Register answers 202 with the request's id (ADR-0026) | `RegistrationRequest`, `RegisterUser` |
+| **Approve a registration request** | The platform admin accepts a pending registration request: the user is created, role `User`, with the request's email and password hash, and the request is deleted, in one save. The requester then logs in with the password they registered with. An expired request cannot be approved (404); an email that already has an account cannot either (409), and the request stays for the admin to reject (R5) | `ApproveRegistrationRequest`, `RegistrationRequest.Approve` |
+| **Reject a registration request** | The platform admin deletes a registration request, pending or expired; no user is created and the email can register again | `RejectRegistrationRequest` |
+| **Email address** | What a user logs in with, unique per user. Always in its normalized form: surrounding whitespace trimmed and the whole address lower-cased, so `" Ion@Firma.RO "` and `"ion@firma.ro"` are the same address and the same account (U7) | `EmailAddress`, `User.Email` |
 | **Admin** | A user who manages organizations and users; policies and clearances are now managed by organization admins. Admins have no automatic access to data (need-to-know). Under ADR-0014 this role becomes the *platform admin* | `User.Role` |
 | **Platform admin** | A user with the `Admin` role. Under ADR-0014 they manage tenants only: create and delete organizations and appoint their first organization admin. Not to be confused with an organization admin | `UserRoles.Admin`, `User.IsAdmin` |
 | **Membership** | A user's membership in one organization, with a role there. A user can be a member of several organizations, with at most one membership in each | `Membership` |
@@ -60,7 +65,7 @@ architecture that implements them is in ADR-0012 and [the architecture overview]
 | **Remove a member** | An organization admin ends another user's membership in their organization. It revokes the user's clearances on the organization's policies. The last organization admin cannot be removed | `RemoveMember` |
 | **Leave an organization** | A member, guest or organization admin ends their own membership. It revokes their clearances on the organization's policies. The last organization admin cannot leave | `LeaveOrganization` |
 | **My organizations** | The organizations the signed-in user belongs to, each with the role of their membership there. A user sees only their own memberships | `ListMyOrganizations` |
-| **Find a user by email** | An organization admin looks up a user by their exact email address, to add them as a member or guest. Only an exact match: an organization admin can confirm an address they already know, but cannot list or search the users of the platform. The answer says whether the user already has a membership in the organization, and its role | `FindUserByEmail` |
+| **Find a user by email** | An organization admin looks up a user by their exact email address, to add them as a member or guest. Exact means the same normalized address, so case and surrounding spaces do not matter (U7). Only an exact match: an organization admin can confirm an address they already know, but cannot list or search the users of the platform. The answer says whether the user already has a membership in the organization, and its role | `FindUserByEmail` |
 | **Organization** | A tenant: the company that policies, clearances and classified data belong to. The word is never *group*. The old *Group* names in the API and the UI are being renamed (#91) | `Organization` |
 | **Policy** | A named area of access inside one organization. Every classified data item belongs to one policy | `Policy` |
 | **Classification level** | A named sensitivity level with a priority: Public (0), Internal, Confidential, Secret, Top Secret (4) | `ClassificationLevel` |
@@ -77,10 +82,10 @@ architecture that implements them is in ADR-0012 and [the architecture overview]
 | **Need-to-know** | An admin cannot bypass the read rule. A data item the user may not read answers 404, so its existence is not revealed | — |
 | **Download** | Opening one data item with its content (`GET /data/{id}`). Every download is recorded in the audit trail before the content is returned; if the record cannot be written, nothing is returned | `GetDataItem`, action `DataItem.Download` |
 | **Denied read** | An attempt to open a data item that exists (deleted or not) but that the read rule hides from the user. It answers 404 like a missing item, and is recorded with outcome *Denied* | `GetDataItem`, `AuditOutcome.Denied` |
-| **Audit trail** | The append-only record of who did what and who read what: every command, also a rejected or failed one, every download and every denied read (ADR-0016). Nothing in it is updated or deleted | `IAuditLog`, `AuditCommandDecorator`, `GetDataItem` |
+| **Audit trail** | The append-only record of who did what and who read what: every command, also a rejected or failed one, every audited query (ADR-0025), every download and every denied read (ADR-0016). Nothing in it is updated or deleted | `IAuditLog`, `AuditCommandDecorator`, `AuditQueryDecorator`, `GetDataItem` |
 | **Audit record** | One entry of the audit trail: when, who (or anonymous), the action, the target, the organization and the outcome. Never a payload, file content, email, password, hash or token | `AuditRecord` |
 | **Outcome** | How an audited action ended: *Succeeded*; *Rejected* by validation or a domain error, with its error code; *Denied*, a read the user may not make; *Failed*, an exception | `AuditOutcome` |
-| **Tenant-level action** | One of the platform's own use cases: `CreateOrganization`, `DeleteOrganization`, `AppointOrganizationAdmin`, `CreateAccount`, `DeleteAccount`, `RegisterUser`, `LoginUser`. Their records are the only ones the platform admin sees in the audit trail. An action inside an organization (members, policies, clearances, data items) is not tenant-level | `TenantLevelActions` (`ListAuditRecords`) |
+| **Tenant-level action** | One of the platform's own use cases: `CreateOrganization`, `DeleteOrganization`, `AppointOrganizationAdmin`, `CreateAccount`, `DeleteAccount`, `RegisterUser`, `ApproveRegistrationRequest`, `RejectRegistrationRequest`, `LoginUser`. Their records are the only ones the platform admin sees in the audit trail. An action inside an organization (members, policies, clearances, data items) is not tenant-level | `TenantLevelActions` (`ListAuditRecords`) |
 
 ## Building blocks (DDD / Clean Architecture)
 
@@ -92,13 +97,13 @@ These are the words for how the code is structured (ADR-0012).
 | **Application layer** | `DataTrustHub.Features`: one **use case** per vertical slice, as a command handler or a query handler |
 | **Infrastructure layer** | `DataTrustHub.Infrastructure`: the adapters (repositories, mappers, `DContext`) |
 | **Presentation layer** | `DataTrustHub.API` (Carter endpoints) and the WebApp |
-| **Entity** | A domain object with an identity and behaviour: `User`, `Organization`, `Policy`, `Clearance`, `Membership`, `DataItem`, and `AuditRecord`, which is only appended |
+| **Entity** | A domain object with an identity and behaviour: `User`, `RegistrationRequest`, `Organization`, `Policy`, `Clearance`, `Membership`, `DataItem`, and `AuditRecord`, which is only appended |
 | **Aggregate root** | An entity that is loaded and saved as a whole, through its own repository. Today every entity is its own aggregate root |
-| **Value object** | An immutable object defined by its values: `ClassificationLevel`, `MembershipRole`, `DeletionRights` |
+| **Value object** | An immutable object defined by its values: `EmailAddress`, `ClassificationLevel`, `MembershipRole`, `DeletionRights` |
 | **Invariant / business rule** | A rule that must always hold. A rule of one aggregate lives in an entity method (`IsReadableBy`, `MarkDeleted`, `CheckCanBeDeletedBy`). A rule that needs other aggregates or the whole set (uniqueness, references, deletion guards) is checked in the use case through repositories. Never in validators. The full list is in [aggregates.md](aggregates.md) |
-| **Factory method** | The only way to create a new entity. It applies the entity's rules: `User.Register`, `Policy.Create`, `Clearance.Grant`, `DataItem.CreateClassified` |
+| **Factory method** | The only way to create a new entity. It applies the entity's rules: `User.Register`, `RegistrationRequest.Submit`, `Policy.Create`, `Clearance.Grant`, `DataItem.CreateClassified` |
 | **Rehydration** | Rebuilding a stored entity without running its creation rules, through an `internal` constructor that only the persistence mappers can see |
-| **Domain error** | An expected rule failure, returned as a `Result` instead of thrown: `UserErrors`, `DataItemErrors`, `MembershipErrors` |
+| **Domain error** | An expected rule failure, returned as a `Result` instead of thrown: `UserErrors`, `DataItemErrors`, `MembershipErrors`, `RegistrationRequestErrors` |
 | **Port** | An interface the domain or application layer needs, implemented outside it: `I*Repository`, `IUnitOfWork`, `IPasswordHasher`, `IAuditLog` |
 | **Adapter** | The Infrastructure implementation of a port |
 | **Repository** | A port that loads and stores one aggregate as an entity. Only commands use repositories |
@@ -109,6 +114,9 @@ These are the words for how the code is structured (ADR-0012).
 | **Persistence model** | The shape of an EF table, `Db*` (`DbUser`, `DbDataItem`). It exists only in Infrastructure. Never call it an entity |
 | **Mapper** | Converts between a persistence model and an entity (Mapperly). It lives in Infrastructure |
 | **Input validation** | Checks on the shape of a request (required fields, length, format), in the slice's `*Validator`. Business rules do not go here |
-| **Decorator** | A cross-cutting step that Scrutor wraps around handlers: validation, and auditing around every command handler (outermost) |
+| **Audited query** | A read that is recorded in the audit trail like a command, because it can reveal something about other users; today only find-user-by-email (ADR-0025). Marked with `IAuditedQuery`, recorded by `AuditQueryDecorator` |
+| **Rate limit** | The most requests one caller may make to a route in a time window; over it the API answers 429. Find-user-by-email: 10 per minute per caller (ADR-0025), policy `RateLimitPolicies.UserLookup`. Register: `Registration:PermitsPerHourPerIp` per hour per client address (ADR-0026), policy `RateLimitPolicies.Registration`. For a sign-up made through the WebApp the client address is the browser's, passed with the client key |
+| **Client key** | The secret the WebApp and the API share (`Api:ClientKey`, `Registration:TrustedClientKey`). With it the API trusts the browser address the WebApp sends on register; without it the API uses the connection address (ADR-0026) |
+| **Decorator** | A cross-cutting step that Scrutor wraps around handlers: validation, and auditing (outermost) around every command handler and every audited query handler |
 | **Domain service** | A rule that needs several aggregates and belongs to none of them. There are none yet |
 | **Bounded context** | A part of the domain with its own model and language. Today there are three: Identity and Access, Access Governance and Data Management ([bounded-contexts.md](bounded-contexts.md)) |

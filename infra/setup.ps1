@@ -4,18 +4,32 @@
 
 .DESCRIPTION
     Finishes what the portal did not set on the existing production resources, with the Azure CLI only:
-      - a system-assigned managed identity on the API (the WebApp holds no secret);
-      - the API's app settings: SQL connection string (managed identity, no password), JWT signing key,
-        admin seed; existing settings, such as the Application Insights ones, are kept;
-      - the WebApp's Api__BaseUrl, read from the API's default host name;
+      - a system-assigned managed identity on the API (the WebApp needs none: its only secret is the
+        client key below);
+      - the API's app settings: SQL connection string (managed identity, no password), JWT signing key;
+        existing settings, such as the Application Insights ones, are kept;
+      - the client key shared by both apps (ADR-0026), so that the API trusts the browser address the
+        WebApp sends on register: one random key written to the API's Registration__TrustedClientKey
+        and to the WebApp's Api__ClientKey in the same run, only when either app lacks it, or with
+        -RotateClientKey. Its value is never read back, so when only one app holds it, a new key is
+        generated and written to both;
+      - the admin seed (AdminSeed__Email, AdminSeed__Password), only when asked for with -SeedAdmin:
+        the first admin is seeded once, then the owner removes both settings (ADR-0022). Without
+        -SeedAdmin the admin seed is neither asked for nor written, and existing values are kept;
+      - the WebApp's Api__BaseUrl, read from the API's default host name, and its Api__ClientKey;
       - FTP and basic publishing credentials (SCM and FTP) disabled on both apps;
-      - the health check path on both apps;
+      - the health check path on both apps, only when their App Service plan is on a paid tier: on the
+        Free tier (F1) it is skipped (see ADR-0024), because its pings keep both apps awake and spend
+        the plan's daily CPU quota; it is applied once the plan moves to a paid tier;
       - the SQL firewall rule that lets Azure services reach the server.
     Running it twice gives the same end state: every step reads the current state first and changes
-    only what differs. It never prints a secret value.
+    only what differs. After each change it reads the value back and stops with an error naming the
+    step if Azure does not hold it. It never prints a secret value.
 
 .PARAMETER WhatIf
     Dry run: prints every az command that would change Azure, with secrets masked, and changes nothing.
+    Signed in, a step at which a real run would stop (an empty App Service plan id or tier) is warned
+    about, listed in the summary, and the dry run exits with code 1.
 
 .PARAMETER Force
     Skips the confirmation prompt.
@@ -23,12 +37,22 @@
 .PARAMETER RotateJwtSecret
     Generates a new JWT signing key even if one exists. This signs out every user.
 
-.PARAMETER OverwriteAdminSeed
-    Asks for the admin seed e-mail address and password even if they are already set.
+.PARAMETER RotateClientKey
+    Generates a new client key and writes it to both apps even if both hold one (ADR-0026). Until both
+    apps have restarted with it, the API may partition sign-ups by the WebApp's address.
+
+.PARAMETER SeedAdmin
+    Asks for the admin seed e-mail address and password and writes both settings, overwriting
+    existing values: for the first admin, or to recover access (ADR-0022). In a dry run both are
+    planned masked and nothing is asked.
 
 .EXAMPLE
     .\infra\setup.ps1 -WhatIf
     .\infra\setup.ps1
+
+.EXAMPLE
+    .\infra\setup.ps1 -SeedAdmin
+    Seeds the first admin; after the API has seeded it, delete both AdminSeed settings (infra/README.md).
 #>
 [CmdletBinding()]
 param(
@@ -40,7 +64,8 @@ param(
     [switch] $WhatIf,
     [switch] $Force,
     [switch] $RotateJwtSecret,
-    [switch] $OverwriteAdminSeed
+    [switch] $RotateClientKey,
+    [switch] $SeedAdmin
 )
 
 Set-StrictMode -Version Latest
@@ -54,17 +79,23 @@ $JwtSecretSetting = 'Jwt__Secret'
 $AdminSeedEmailSetting = 'AdminSeed__Email'
 $AdminSeedPasswordSetting = 'AdminSeed__Password'
 $ApiBaseUrlSetting = 'Api__BaseUrl'
-$MaskedSettings = @($JwtSecretSetting, $AdminSeedEmailSetting, $AdminSeedPasswordSetting)
+$ApiClientKeySetting = 'Registration__TrustedClientKey'
+$WebAppClientKeySetting = 'Api__ClientKey'
+$MaskedSettings = @($JwtSecretSetting, $AdminSeedEmailSetting, $AdminSeedPasswordSetting,
+    $ApiClientKeySetting, $WebAppClientKeySetting)
 
 $ConnectionStringFormat = 'Server=tcp:{0}.database.windows.net,1433;Database={1};' +
     'Authentication=Active Directory Managed Identity;Encrypt=True;Connect Timeout=60'
 $ApiBaseUrlFormat = 'https://{0}'
 $JwtSecretByteCount = 48
+$ClientKeyByteCount = 48
 
 $SystemAssignedIdentity = '[system]'
 $SystemAssignedType = 'SystemAssigned'
 $FtpsStateDisabled = 'Disabled'
 $HealthCheckPath = '/health'
+$FreeTier = 'Free'
+$HealthCheckDecision = 'ADR-0024'
 $BasicAuthPolicies = @('scm', 'ftp')
 $BasicAuthDisabled = 'false'
 $FirewallRuleName = 'AllowAllWindowsAzureIps'
@@ -78,10 +109,13 @@ $ApiHostPlaceholder = '<API default host name>'
 $SubscriptionPlaceholder = '<not signed in>'
 $SettingsFilePlaceholder = '@<temporary settings file>'
 $SqlScriptPath = 'infra/sql/grant-roles.sql'
+$PredictedStopExitCode = 1
 
 # State of the run
 $script:IsSignedIn = $false
 $script:Changes = New-Object System.Collections.Generic.List[string]
+# Steps at which a real run would stop, found by a signed-in dry run that still goes on
+$script:PredictedStops = New-Object System.Collections.Generic.List[string]
 
 # ---------------------------------------------------------------------------------------------
 # Azure CLI helpers
@@ -128,6 +162,17 @@ function Invoke-AzChange {
     if ($LASTEXITCODE -ne 0) { throw "az failed: $Description" }
 }
 
+# After a real change, reads the changed value back with the step's own read (IsApplied) and stops
+# the script if Azure does not hold the target value: az can exit 0 without changing anything.
+# Nothing is read back in dry-run mode. The error names the step, never a value.
+function Assert-ChangeApplied {
+    param([string] $Description, [scriptblock] $IsApplied)
+    if ($WhatIf) { return }
+    if (& $IsApplied) { return }
+    throw ("Azure does not hold the change '$Description': az reported success, but reading it back " +
+        'shows a different value. The script stopped here; fix the cause and run it again.')
+}
+
 # Joins arguments for display, quoting the ones that contain spaces.
 function Format-Arguments {
     param([string[]] $Arguments)
@@ -171,13 +216,20 @@ function Confirm-Run {
 
 # Enables the system-assigned managed identity on the API, if it is not enabled yet.
 function Enable-ApiManagedIdentity {
+    if (Test-ApiManagedIdentityEnabled) { return }
+    $description = "Enable the system-assigned managed identity on $ApiAppName"
+    Invoke-AzChange $description @(
+        'webapp', 'identity', 'assign', '--resource-group', $ResourceGroup,
+        '--name', $ApiAppName, '--identities', $SystemAssignedIdentity)
+    Assert-ChangeApplied $description { Test-ApiManagedIdentityEnabled }
+}
+
+# Tells whether the API has a system-assigned managed identity.
+function Test-ApiManagedIdentityEnabled {
     $identityType = Invoke-AzRead "the managed identity of $ApiAppName" @(
         'webapp', 'show', '--resource-group', $ResourceGroup,
         '--name', $ApiAppName, '--query', 'identity.type', '--output', 'tsv')
-    if ($identityType -and ([string] $identityType).Contains($SystemAssignedType)) { return }
-    Invoke-AzChange "Enable the system-assigned managed identity on $ApiAppName" @(
-        'webapp', 'identity', 'assign', '--resource-group', $ResourceGroup,
-        '--name', $ApiAppName, '--identities', $SystemAssignedIdentity)
+    return [bool] ($identityType -and ([string] $identityType).Contains($SystemAssignedType))
 }
 
 # ---------------------------------------------------------------------------------------------
@@ -203,9 +255,10 @@ function Get-AppSettingValue {
     return $null
 }
 
-# Generates a random JWT signing key, base64-encoded.
-function New-JwtSecret {
-    $bytes = New-Object byte[] $JwtSecretByteCount
+# Generates a random key of the given number of bytes, base64-encoded: the JWT signing key or the client key.
+function New-RandomKey {
+    param([int] $ByteCount)
+    $bytes = New-Object byte[] $ByteCount
     $generator = [System.Security.Cryptography.RandomNumberGenerator]::Create()
     try { $generator.GetBytes($bytes) } finally { $generator.Dispose() }
     return [Convert]::ToBase64String($bytes)
@@ -234,25 +287,41 @@ function Add-JwtSecretSetting {
     if (($ExistingNames -contains $JwtSecretSetting) -and -not $RotateJwtSecret) { return }
     if (-not $RotateJwtSecret) { Assert-SettingNamesRead $JwtSecretSetting }
     if ($WhatIf) { $Settings[$JwtSecretSetting] = $MaskedValue; return }
-    $Settings[$JwtSecretSetting] = New-JwtSecret
+    $Settings[$JwtSecretSetting] = New-RandomKey $JwtSecretByteCount
 }
 
-# Adds the admin seed to the settings, reading each missing value from the owner.
+# Returns the client key to write to both apps (ADR-0026), or $null when both already hold it and no
+# rotation is asked for. Its value is never read back from Azure, so a key held by one app only cannot be
+# copied to the other: a new key is generated for both. Masked in a dry run.
+function Get-NewClientKey {
+    param([string[]] $ApiSettingNames, [string[]] $WebAppSettingNames)
+    $bothHoldIt = ($ApiSettingNames -contains $ApiClientKeySetting) -and
+        ($WebAppSettingNames -contains $WebAppClientKeySetting)
+    if ($bothHoldIt -and -not $RotateClientKey) { return $null }
+    if (-not $RotateClientKey) { Assert-SettingNamesRead $ApiClientKeySetting }
+    if ($WhatIf) { return $MaskedValue }
+    return New-RandomKey $ClientKeyByteCount
+}
+
+# Adds the client key to an app's settings under the given name, when one is to be written.
+function Add-ClientKeySetting {
+    param([hashtable] $Settings, [string] $SettingName, [string] $ClientKey)
+    if ($ClientKey) { $Settings[$SettingName] = $ClientKey }
+}
+
+# Adds the admin seed to the settings, only when -SeedAdmin asks for it (ADR-0022): both values are
+# read from the owner and overwrite existing ones. Without -SeedAdmin the admin seed is left as it is.
 # The password is read as a secure string and never echoed.
 function Add-AdminSeedSettings {
-    param([hashtable] $Settings, [string[]] $ExistingNames)
-    $needsEmail = $OverwriteAdminSeed -or ($ExistingNames -notcontains $AdminSeedEmailSetting)
-    $needsPassword = $OverwriteAdminSeed -or ($ExistingNames -notcontains $AdminSeedPasswordSetting)
-    if (-not $OverwriteAdminSeed -and ($needsEmail -or $needsPassword)) {
-        Assert-SettingNamesRead $AdminSeedEmailSetting
-    }
+    param([hashtable] $Settings)
+    if (-not $SeedAdmin) { return }
     if ($WhatIf) {
-        if ($needsEmail) { $Settings[$AdminSeedEmailSetting] = $MaskedValue }
-        if ($needsPassword) { $Settings[$AdminSeedPasswordSetting] = $MaskedValue }
+        $Settings[$AdminSeedEmailSetting] = $MaskedValue
+        $Settings[$AdminSeedPasswordSetting] = $MaskedValue
         return
     }
-    if ($needsEmail) { $Settings[$AdminSeedEmailSetting] = Read-AdminSeedEmail }
-    if ($needsPassword) { $Settings[$AdminSeedPasswordSetting] = Read-AdminSeedPassword }
+    $Settings[$AdminSeedEmailSetting] = Read-AdminSeedEmail
+    $Settings[$AdminSeedPasswordSetting] = Read-AdminSeedPassword
 }
 
 # Reads the admin seed e-mail address from the owner, asking again while it is empty or malformed.
@@ -316,6 +385,20 @@ function Set-AppSettings {
     $path = Write-SettingsFile $Settings
     try { Invoke-AzChange $description ($baseArguments + "@$path") }
     finally { Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue }
+    Assert-ChangeApplied $description { Test-AppSettingsApplied $AppName $Settings }
+}
+
+# Tells whether an app holds the given settings: a secret setting only has to exist (its value is
+# never read back), a non-secret one must also have the given value.
+function Test-AppSettingsApplied {
+    param([string] $AppName, [hashtable] $Settings)
+    $existingNames = Get-AppSettingNames $AppName
+    foreach ($name in $Settings.Keys) {
+        if ($existingNames -notcontains $name) { return $false }
+        if ($MaskedSettings -contains $name) { continue }
+        if ((Get-AppSettingValue $AppName $name) -ne [string] $Settings[$name]) { return $false }
+    }
+    return $true
 }
 
 # Prints the settings a dry run would write, with secrets and personal data masked.
@@ -328,31 +411,42 @@ function Write-SettingsPreview {
     }
 }
 
-# Sets the API's connection string, JWT signing key and admin seed; keeps every other setting.
+# Sets the API's connection string, JWT signing key, the client key (when one is to be written) and,
+# with -SeedAdmin, the admin seed; keeps every other setting.
 function Set-ApiAppSettings {
-    $existingNames = Get-AppSettingNames $ApiAppName
+    param([string[]] $ExistingNames, [string] $ClientKey)
     $settings = @{}
     $connectionString = $ConnectionStringFormat -f $SqlServerName, $DatabaseName
     if ((Get-AppSettingValue $ApiAppName $ConnectionStringSetting) -ne $connectionString) {
         $settings[$ConnectionStringSetting] = $connectionString
     }
-    Add-JwtSecretSetting $settings $existingNames
-    Add-AdminSeedSettings $settings $existingNames
+    Add-JwtSecretSetting $settings $ExistingNames
+    Add-ClientKeySetting $settings $ApiClientKeySetting $ClientKey
+    Add-AdminSeedSettings $settings
     Set-AppSettings $ApiAppName $settings
 }
 
-# Sets the WebApp's Api__BaseUrl to the API's default host name, read from Azure.
-function Set-WebAppApiBaseUrl {
+# Sets the WebApp's Api__BaseUrl to the API's default host name, read from Azure, and the client key
+# (when one is to be written), in one change; keeps every other setting.
+function Set-WebAppAppSettings {
+    param([string] $ClientKey)
+    $settings = @{}
+    $baseUrl = $ApiBaseUrlFormat -f (Get-ApiHostName)
+    if ((Get-AppSettingValue $WebAppName $ApiBaseUrlSetting) -ne $baseUrl) {
+        $settings[$ApiBaseUrlSetting] = $baseUrl
+    }
+    Add-ClientKeySetting $settings $WebAppClientKeySetting $ClientKey
+    Set-AppSettings $WebAppName $settings
+}
+
+# Reads the API's default host name; a dry run that reads nothing uses a placeholder.
+function Get-ApiHostName {
     $apiHostName = Invoke-AzRead "the default host name of $ApiAppName" @(
         'webapp', 'show', '--resource-group', $ResourceGroup,
         '--name', $ApiAppName, '--query', 'defaultHostName', '--output', 'tsv')
-    if (-not $apiHostName) {
-        if (-not $WhatIf) { throw "Cannot read the default host name of $ApiAppName." }
-        $apiHostName = $ApiHostPlaceholder
-    }
-    $baseUrl = $ApiBaseUrlFormat -f ([string] $apiHostName)
-    if ((Get-AppSettingValue $WebAppName $ApiBaseUrlSetting) -eq $baseUrl) { return }
-    Set-AppSettings $WebAppName @{ $ApiBaseUrlSetting = $baseUrl }
+    if ($apiHostName) { return [string] $apiHostName }
+    if (-not $WhatIf) { throw "Cannot read the default host name of $ApiAppName." }
+    return $ApiHostPlaceholder
 }
 
 # ---------------------------------------------------------------------------------------------
@@ -373,31 +467,89 @@ function Get-SiteConfigValue {
 function Disable-Ftp {
     param([string] $AppName)
     if ((Get-SiteConfigValue $AppName 'ftpsState') -eq $FtpsStateDisabled) { return }
-    Invoke-AzChange "Disable FTP on $AppName" @('webapp', 'config', 'set', '--resource-group', $ResourceGroup,
+    $description = "Disable FTP on $AppName"
+    Invoke-AzChange $description @('webapp', 'config', 'set', '--resource-group', $ResourceGroup,
         '--name', $AppName, '--ftps-state', $FtpsStateDisabled)
+    Assert-ChangeApplied $description { (Get-SiteConfigValue $AppName 'ftpsState') -eq $FtpsStateDisabled }
 }
 
-# Sets the App Service health check path of an app, if it differs.
+# Returns the pricing tier (Free, Basic, ...) of the App Service plan an app belongs to, read from Azure.
+# The Azure CLI holds the plan id in the web app's serverFarmId property. An empty plan id or tier is
+# handled by Get-UnreadPlanTier.
+function Get-AppServicePlanTier {
+    param([string] $AppName)
+    $planStep = "the App Service plan of $AppName"
+    $planId = Invoke-AzRead $planStep @(
+        'webapp', 'show', '--resource-group', $ResourceGroup,
+        '--name', $AppName, '--query', 'serverFarmId', '--output', 'tsv')
+    if (-not $planId) { return Get-UnreadPlanTier $planStep }
+    $tierStep = "the pricing tier of the App Service plan of $AppName"
+    $tier = Invoke-AzRead $tierStep @(
+        'appservice', 'plan', 'show', '--ids', ([string] $planId), '--query', 'sku.tier', '--output', 'tsv')
+    if (-not $tier) { return Get-UnreadPlanTier $tierStep }
+    return [string] $tier
+}
+
+# Handles a plan id or tier that came back empty. A real run stops with an error naming the step.
+# A signed-out dry run, which reads nothing, assumes the production tier, Free (like the placeholder
+# for the API's host name). A signed-in dry run read an empty value, so a real run would stop here:
+# it warns naming the step, records it for the summary and returns $null (tier unknown).
+function Get-UnreadPlanTier {
+    param([string] $Step)
+    $message = "Cannot read $Step."
+    if (-not $WhatIf) { throw $message }
+    if (-not $script:IsSignedIn) { return $FreeTier }
+    Write-Warning "$message A real run would stop here."
+    $script:PredictedStops.Add($message)
+    return $null
+}
+
+# Sets the App Service health check path of an app, if it differs. On the Free tier it is skipped
+# (ADR-0024): its pings keep the apps awake and spend the plan's daily CPU quota. When a signed-in dry
+# run cannot read the tier, nothing is planned: the warning already says a real run would stop.
 function Set-HealthCheckPath {
     param([string] $AppName)
+    $tier = Get-AppServicePlanTier $AppName
+    if (-not $tier) { return }
+    if ($tier -eq $FreeTier) {
+        Write-Host "  Health check of $AppName skipped: its App Service plan is on the $FreeTier tier (see $HealthCheckDecision)."
+        return
+    }
     if ((Get-SiteConfigValue $AppName 'healthCheckPath') -eq $HealthCheckPath) { return }
-    Invoke-AzChange "Set the health check path of $AppName to $HealthCheckPath" @(
+    $description = "Set the health check path of $AppName to $HealthCheckPath"
+    Invoke-AzChange $description @(
         'webapp', 'config', 'set', '--resource-group', $ResourceGroup, '--name', $AppName,
         '--generic-configurations', "healthCheckPath=$HealthCheckPath")
+    Assert-ChangeApplied $description { (Get-SiteConfigValue $AppName 'healthCheckPath') -eq $HealthCheckPath }
 }
 
 # Disables basic publishing credentials (SCM and FTP) on an app, for each policy still allowing them.
 function Disable-BasicPublishingCredentials {
     param([string] $AppName)
     foreach ($policy in $BasicAuthPolicies) {
-        $policyArguments = @('--resource-group', $ResourceGroup, '--namespace', 'Microsoft.Web',
-            '--resource-type', 'basicPublishingCredentialsPolicies', '--parent', "sites/$AppName", '--name', $policy)
-        $allowed = Invoke-AzRead "the $policy basic publishing credentials policy of $AppName" (
-            @('resource', 'show') + $policyArguments + @('--query', 'properties.allow', '--output', 'tsv'))
-        if ($allowed -eq $BasicAuthDisabled) { continue }
-        Invoke-AzChange "Disable $policy basic publishing credentials on $AppName" (
-            @('resource', 'update') + $policyArguments + @('--set', "properties.allow=$BasicAuthDisabled"))
+        if ((Get-BasicPublishingCredentialsAllowed $AppName $policy) -eq $BasicAuthDisabled) { continue }
+        $description = "Disable $policy basic publishing credentials on $AppName"
+        Invoke-AzChange $description (
+            @('resource', 'update') + (Get-PolicyArguments $AppName $policy) +
+            @('--set', "properties.allow=$BasicAuthDisabled"))
+        Assert-ChangeApplied $description {
+            (Get-BasicPublishingCredentialsAllowed $AppName $policy) -eq $BasicAuthDisabled }
     }
+}
+
+# Returns the az arguments that name one basic publishing credentials policy of an app.
+function Get-PolicyArguments {
+    param([string] $AppName, [string] $Policy)
+    return @('--resource-group', $ResourceGroup, '--namespace', 'Microsoft.Web',
+        '--resource-type', 'basicPublishingCredentialsPolicies', '--parent', "sites/$AppName", '--name', $Policy)
+}
+
+# Reads whether one basic publishing credentials policy (scm or ftp) of an app still allows them.
+function Get-BasicPublishingCredentialsAllowed {
+    param([string] $AppName, [string] $Policy)
+    return Invoke-AzRead "the $Policy basic publishing credentials policy of $AppName" (
+        @('resource', 'show') + (Get-PolicyArguments $AppName $Policy) +
+        @('--query', 'properties.allow', '--output', 'tsv'))
 }
 
 # ---------------------------------------------------------------------------------------------
@@ -406,14 +558,21 @@ function Disable-BasicPublishingCredentials {
 
 # Adds the firewall rule that lets Azure services reach the SQL server, if it is missing.
 function Add-AzureServicesFirewallRule {
-    $ruleNames = @(Invoke-AzRead "the firewall rules of SQL server $SqlServerName" @(
-        'sql', 'server', 'firewall-rule', 'list', '--resource-group', $ResourceGroup,
-        '--server', $SqlServerName, '--query', '[].name', '--output', 'tsv'))
-    if ($ruleNames -contains $FirewallRuleName) { return }
-    Invoke-AzChange "Allow Azure services through the firewall of SQL server $SqlServerName" @(
+    if (Test-AzureServicesFirewallRuleExists) { return }
+    $description = "Allow Azure services through the firewall of SQL server $SqlServerName"
+    Invoke-AzChange $description @(
         'sql', 'server', 'firewall-rule', 'create', '--resource-group', $ResourceGroup,
         '--server', $SqlServerName, '--name', $FirewallRuleName,
         '--start-ip-address', $AzureServicesAddress, '--end-ip-address', $AzureServicesAddress)
+    Assert-ChangeApplied $description { Test-AzureServicesFirewallRuleExists }
+}
+
+# Tells whether the SQL server has the firewall rule that lets Azure services in.
+function Test-AzureServicesFirewallRuleExists {
+    $ruleNames = @(Invoke-AzRead "the firewall rules of SQL server $SqlServerName" @(
+        'sql', 'server', 'firewall-rule', 'list', '--resource-group', $ResourceGroup,
+        '--server', $SqlServerName, '--query', '[].name', '--output', 'tsv'))
+    return ($ruleNames -contains $FirewallRuleName)
 }
 
 # ---------------------------------------------------------------------------------------------
@@ -429,10 +588,19 @@ function Write-Summary {
         Write-Host "${verb}:"
         foreach ($change in $script:Changes) { Write-Host "  - $change" }
     }
+    Write-PredictedStops
     Write-Host ''
     Write-Host "Next step: as the Entra admin of SQL server $SqlServerName, run $SqlScriptPath"
     Write-Host "on database $DatabaseName (for example in the portal query editor) for the API user;"
     Write-Host 'run it again after #102 for the deploy user. See infra/README.md.'
+}
+
+# Prints the steps at which a real run would stop, found by a signed-in dry run.
+function Write-PredictedStops {
+    if ($script:PredictedStops.Count -eq 0) { return }
+    Write-Host ''
+    Write-Host 'A real run would stop with an error:' -ForegroundColor Red
+    foreach ($stop in $script:PredictedStops) { Write-Host "  - $stop" -ForegroundColor Red }
 }
 
 # ---------------------------------------------------------------------------------------------
@@ -441,8 +609,11 @@ function Write-Summary {
 $subscriptionName = Get-SignedInSubscription
 Confirm-Run $subscriptionName
 Enable-ApiManagedIdentity
-Set-ApiAppSettings
-Set-WebAppApiBaseUrl
+$apiSettingNames = Get-AppSettingNames $ApiAppName
+$webAppSettingNames = Get-AppSettingNames $WebAppName
+$clientKey = Get-NewClientKey $apiSettingNames $webAppSettingNames
+Set-ApiAppSettings $apiSettingNames $clientKey
+Set-WebAppAppSettings $clientKey
 foreach ($appName in @($ApiAppName, $WebAppName)) {
     Disable-Ftp $appName
     Disable-BasicPublishingCredentials $appName
@@ -450,3 +621,4 @@ foreach ($appName in @($ApiAppName, $WebAppName)) {
 }
 Add-AzureServicesFirewallRule
 Write-Summary
+if ($script:PredictedStops.Count -gt 0) { exit $PredictedStopExitCode }

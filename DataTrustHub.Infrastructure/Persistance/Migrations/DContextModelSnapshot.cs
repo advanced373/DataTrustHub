@@ -115,6 +115,9 @@ namespace DataTrustHub.Infrastructure.Migrations
 
                     b.HasIndex("ClassificationLevelId");
 
+                    b.HasIndex("UserId", "PolicyId")
+                        .IsUnique();
+
                     b.ToTable("Clearances");
                 });
 
@@ -152,7 +155,10 @@ namespace DataTrustHub.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("DataItems");
+                    b.ToTable("DataItems", t =>
+                        {
+                            t.HasCheckConstraint("CK_DataItems_Classification", "([PolicyId] IS NULL AND [ClassificationPriority] IS NULL) OR ([PolicyId] IS NOT NULL AND [ClassificationPriority] IS NOT NULL)");
+                        });
                 });
 
             modelBuilder.Entity("DataTrustHub.Infrastructure.Persistance.Model.DbMembership", b =>
@@ -188,9 +194,13 @@ namespace DataTrustHub.Infrastructure.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
 
                     b.ToTable("Organizations");
                 });
@@ -203,14 +213,46 @@ namespace DataTrustHub.Infrastructure.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
 
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
 
+                    b.HasIndex("OrganizationId", "Name")
+                        .IsUnique();
+
                     b.ToTable("Policies");
+                });
+
+            modelBuilder.Entity("DataTrustHub.Infrastructure.Persistance.Model.DbRegistrationRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("HashedPassword")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email")
+                        .IsUnique();
+
+                    b.HasIndex("RequestedAt");
+
+                    b.ToTable("RegistrationRequests");
                 });
 
             modelBuilder.Entity("DataTrustHub.Infrastructure.Persistance.Model.DbUser", b =>
@@ -221,7 +263,8 @@ namespace DataTrustHub.Infrastructure.Migrations
 
                     b.Property<string>("Email")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
 
                     b.Property<string>("HashedPassword")
                         .IsRequired()
@@ -232,6 +275,9 @@ namespace DataTrustHub.Infrastructure.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("Email")
+                        .IsUnique();
 
                     b.ToTable("Users");
                 });

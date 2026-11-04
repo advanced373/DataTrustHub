@@ -4,6 +4,7 @@ using DataTrustHub.Domain.DataItems;
 using DataTrustHub.Domain.Memberships;
 using DataTrustHub.Domain.Organizations;
 using DataTrustHub.Domain.Policies;
+using DataTrustHub.Domain.Registrations;
 using DataTrustHub.Domain.Users;
 
 namespace DataTrustHub.Features.Tests.Administration.Helpers;
@@ -33,6 +34,16 @@ internal sealed class UniqueViolationUnitOfWork : IUnitOfWork
         SaveChangesCalls++;
         throw new UniqueConstraintViolationException(new InvalidOperationException());
     }
+}
+
+// A save that fails for a reason other than a unique index (e.g. the database is gone): a use case must not
+// turn it into its conflict error (#121)
+internal sealed class FailingUnitOfWork : IUnitOfWork
+{
+    internal const string FailureMessage = "Simulated save failure that is not a unique-index violation.";
+
+    public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
+        throw new InvalidOperationException(FailureMessage);
 }
 
 internal sealed class FakeMembershipRepository : IMembershipRepository
@@ -210,13 +221,13 @@ internal sealed class FakeUserRepository : IUserRepository
         Task.FromResult(Stored.SingleOrDefault(u => u.Id == id));
 
     public Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken) =>
-        Task.FromResult(Stored.SingleOrDefault(u => u.Email == email));
+        Task.FromResult(Stored.SingleOrDefault(u => u.Email == EmailAddress.From(email).Value));
 
     public Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken) =>
         Task.FromResult(Stored.Any(u => u.Id == id));
 
     public Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken) =>
-        Task.FromResult(Stored.Any(u => u.Email == email));
+        Task.FromResult(Stored.Any(u => u.Email == EmailAddress.From(email).Value));
 
     public void Add(User user) => Added.Add(user);
 
@@ -258,6 +269,45 @@ internal sealed class FakeDataItemRepository : IDataItemRepository
     public Task UpdateAsync(DataItem dataItem, CancellationToken cancellationToken)
     {
         Updated.Add(dataItem);
+        return Task.CompletedTask;
+    }
+}
+
+// Registration requests in memory, with the port's semantics: emails compared normalized (U7), the purge
+// deletes the requests made before the given time at once (outside the unit of work) and is recorded
+internal sealed class FakeRegistrationRequestRepository : IRegistrationRequestRepository
+{
+    internal List<RegistrationRequest> Stored { get; } = [];
+    internal List<RegistrationRequest> Added { get; } = [];
+    internal List<RegistrationRequest> Removed { get; } = [];
+    internal List<DateTime> PurgeCutoffs { get; } = [];
+
+    internal RegistrationRequest Seed(string email, DateTime requestedAt)
+    {
+        var request = RegistrationRequest.Submit(email, FakePasswordHasher.HashPrefix + email, requestedAt);
+        Stored.Add(request);
+        return request;
+    }
+
+    public Task<RegistrationRequest?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
+        Task.FromResult(Stored.SingleOrDefault(r => r.Id == id));
+
+    public Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken) =>
+        Task.FromResult(Stored.Any(r => r.Email == EmailAddress.From(email).Value));
+
+    public Task<int> CountAsync(CancellationToken cancellationToken) => Task.FromResult(Stored.Count);
+
+    public Task<int> RemoveExpiredAsync(DateTime requestedBefore, CancellationToken cancellationToken)
+    {
+        PurgeCutoffs.Add(requestedBefore);
+        return Task.FromResult(Stored.RemoveAll(r => r.RequestedAt < requestedBefore));
+    }
+
+    public void Add(RegistrationRequest request) => Added.Add(request);
+
+    public Task RemoveAsync(RegistrationRequest request, CancellationToken cancellationToken)
+    {
+        Removed.Add(request);
         return Task.CompletedTask;
     }
 }

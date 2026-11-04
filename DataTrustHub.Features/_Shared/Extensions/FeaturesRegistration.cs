@@ -2,12 +2,17 @@ using Carter;
 using DataTrustHub.Features._Shared.Auditing;
 using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Features._Shared.Jwt;
+using DataTrustHub.Features._Shared.RateLimiting;
+using DataTrustHub.Features._Shared.Registration;
 using DataTrustHub.Features._Shared.Seeding;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 
@@ -22,6 +27,8 @@ public static class FeaturesRegistration
         services.AddCarter();
         RegisterHandlers(services);
         RegisterAuditing(services);
+        RegisterRateLimiting(services);
+        RegisterRegistration(services, configuration);
         RegisterJwt(services, configuration);
         RegisterAdminSeeding(services, configuration);
         return services;
@@ -35,7 +42,8 @@ public static class FeaturesRegistration
 
     // Scrutor: Scan registers every slice handler, Decorate wraps each one in its decorators. The last one
     // registered is the outermost (ADR-0012): the audit decorator wraps validation, so it also records
-    // rejected input (ADR-0016).
+    // rejected input (ADR-0016). Queries get the same order; only those marked IAuditedQuery leave a record
+    // (ADR-0025).
     private static void RegisterHandlers(IServiceCollection services)
     {
         services.Scan(scan => scan
@@ -50,6 +58,7 @@ public static class FeaturesRegistration
         services.Decorate(typeof(ICommandHandler<,>), typeof(CommandValidationDecorator<,>));
         services.Decorate(typeof(ICommandHandler<,>), typeof(AuditCommandDecorator<,>));
         services.Decorate(typeof(IQueryHandler<,>), typeof(QueryValidationDecorator<,>));
+        services.Decorate(typeof(IQueryHandler<,>), typeof(AuditQueryDecorator<,>));
 
         services.AddValidatorsFromAssembly(
             typeof(FeaturesRegistration).Assembly,
@@ -61,6 +70,29 @@ public static class FeaturesRegistration
     {
         services.AddHttpContextAccessor();
         services.AddScoped<AuditScope>();
+    }
+
+    // Endpoints opt in with RequireRateLimiting; the API adds the middleware after authorization, so the
+    // caller is known when the request is partitioned (ADR-0025)
+    private static void RegisterRateLimiting(IServiceCollection services) =>
+        services.AddRateLimiter(options =>
+        {
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            options.AddPolicy(RateLimitPolicies.UserLookup, UserLookupRateLimit.Partition);
+            options.AddPolicy(RateLimitPolicies.Registration, RegistrationRateLimit.Partition);
+        });
+
+    // The sign-up limits are checked when the host starts, so a value below 1 or a too short trusted client key
+    // stops it (ADR-0026). The clock is a TimeProvider, so tests can replace it; the host gets the system clock
+    // unless one is registered
+    private static void RegisterRegistration(IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<RegistrationOptions>()
+            .Bind(configuration.GetSection(RegistrationOptions.SectionName))
+            .ValidateDataAnnotations()
+            .Validate(options => options.HasAcceptableTrustedClientKey(), RegistrationOptions.TrustedClientKeyTooShortMessage)
+            .ValidateOnStart();
+        services.TryAddSingleton(TimeProvider.System);
     }
 
     // The signing key comes from User Secrets or the environment, never from appsettings.json (ADR-0007);

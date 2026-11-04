@@ -19,6 +19,7 @@ namespace DataTrustHub.Features.Tests.Administration;
 public class AdminSeedTests(AdminSeedTests.SeededApiFactory factory) : IClassFixture<AdminSeedTests.SeededApiFactory>
 {
     private const string AdminEmail = "seeded-admin@example.com";
+    private const string VariantAdminEmail = " Seeded-Admin@EXAMPLE.com ";
     private const string AdminPassword = "SeededPassword1!";
     private const string LoginEndpoint = "/auth/login";
 
@@ -101,6 +102,30 @@ public class AdminSeedTests(AdminSeedTests.SeededApiFactory factory) : IClassFix
         Assert.Empty(fakes.Users.Added);
         Assert.Empty(fakes.Users.Updated);
         Assert.Equal(0, fakes.UnitOfWork.SaveChangesCalls);
+    }
+
+    // AC6 of #123: the configured email is a case and space variant of the stored, normalized one (U7)
+    [Fact]
+    public async Task Seeder_UnknownVariantEmail_AddsAdminWithTheNormalizedEmail()
+    {
+        var fakes = new SeederFakes();
+
+        await fakes.CreateSeeder(VariantAdminEmail, AdminPassword).RunToCompletionAsync();
+
+        Assert.Equal(AdminEmail, Assert.Single(fakes.Users.Added).Email);
+    }
+
+    [Fact]
+    public async Task Seeder_VariantOfAStoredNonAdminsEmail_PromotesThatUserAndAddsNone()
+    {
+        var fakes = new SeederFakes();
+        var user = fakes.Users.Seed(AdminEmail);
+
+        await fakes.CreateSeeder(VariantAdminEmail, AdminPassword).RunToCompletionAsync();
+
+        Assert.Same(user, Assert.Single(fakes.Users.Updated));
+        Assert.Equal(UserRoles.Admin, user.Role);
+        Assert.Empty(fakes.Users.Added);
     }
 
     [Theory]

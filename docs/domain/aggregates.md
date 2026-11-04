@@ -20,7 +20,7 @@ reference each other **by id only**.
 | Attribute | Notes |
 |---|---|
 | `Id` | |
-| `Email` | Used to log in. Unique |
+| `Email` | Used to log in. Unique. Always the normalized form of an `EmailAddress` (U7) |
 | `HashedPassword` | Never the plain password (`IPasswordHasher`) |
 | `Role` | `User` or `Admin` (`UserRoles`) |
 
@@ -28,18 +28,58 @@ reference each other **by id only**.
 - `Register(email, hashedPassword)` creates a `User`.
 - `CreateAdmin(email, hashedPassword)` creates an `Admin`.
 
+Both store the normalized address (U7). Rehydration keeps the stored email as it is.
+
 **Behaviour:**
 - `PromoteToAdmin()` returns `false` if the user was already an admin.
 - `CheckCanBeDeletedBy(requesterId)`.
 
 | # | Invariant / rule | Enforced in |
 |---|---|---|
-| U1 | An email belongs to at most one user | Use case: `RegisterUser`, `CreateAccount` (`EmailExistsAsync`) |
-| U2 | An email is at most 256 characters; a password is at least 8 | Validator: `RegisterUser` |
+| U1 | An email belongs to at most one user, case-insensitive, ignoring surrounding spaces | Use case: `RegisterUser` (which refuses an email that has an account, and creates a registration request, not a user), `CreateAccount` (`EmailExistsAsync`, which compares the normalized address, U7). Database: unique index on `Email` (`nvarchar(256)`, the stored normalized form); when two concurrent requests both pass the check, the save fails with `UniqueConstraintViolationException`, and `CreateAccount` answers `Account.EmailAlreadyInUse` (409). The admin seed at startup does not map it: it logs the failed seed and promotes the existing user at the next start |
+| U2 | An email is at most 256 characters, counted on the trimmed address; a password is at least 8 | Validator: `RegisterUser`, `CreateAccount` |
 | U3 | A user cannot delete their own account, so an admin cannot lock everyone out | Entity: `CheckCanBeDeletedBy` → `Account.CannotDeleteOwnAccount` |
 | U4 | Login gives the same error for an unknown email and a wrong password, so it does not reveal which emails exist | Use case: `LoginUser` → `User.InvalidCredentials` |
 | U5′ | Deleting a user also removes their clearances and memberships and soft-deletes their personal data items, all in one transaction. Their classified data items are not touched: they stay with their organization, whose organization admins can delete them (ADR-0014) | Use case: `DeleteAccount` |
 | U6 | Startup makes sure the configured admin exists, and promotes that user if needed | Use case: `AdminSeeder` |
+| U7 | An email address is normalized: surrounding whitespace trimmed and the whole address lower-cased with the invariant culture, so `" Ion@Firma.RO "` and `"ion@firma.ro"` are the same address and the same account. The normalized form is what is stored, compared, put in the token and returned. Surrounding whitespace alone does not make a request invalid | Value object: `EmailAddress`, used by `User.Register`, `User.CreateAdmin`, `IUserRepository.GetByEmailAsync` / `EmailExistsAsync`, `FindUserByEmail` and the email validators. The migration `NormalizeUserEmails` normalized the emails stored before; it fails, changing nothing, if two users would share an address |
+
+### Value object: EmailAddress
+
+Source: `Domain/Users/EmailAddress.cs`. It is an immutable `record (Value)`; `EmailAddress.From(email)`
+applies the rule U7 and is the only place that implements it. `User.Email` and `RegistrationRequest.Email`
+hold its `Value`.
+
+## RegistrationRequest
+
+*Context: Identity and Access.* A sign-up waiting for a platform admin's approval (ADR-0026). It is not an
+account: nobody can log in with it, and `Users` holds approved accounts only. Source:
+`Domain/Registrations/RegistrationRequest.cs`.
+
+| Attribute | Notes |
+|---|---|
+| `Id` | Returned by register (202) |
+| `Email` | Always the normalized form of an `EmailAddress` (U7) |
+| `HashedPassword` | Never the plain password (`IPasswordHasher`) |
+| `RequestedAt` | When it was submitted, in UTC |
+
+**Factory method:** `Submit(email, hashedPassword, requestedAt)` stores the normalized address (U7). The time
+comes from code (`TimeProvider`), so a time that is not UTC throws.
+
+**Behaviour:** `IsExpired(now, lifetime)` is true when the request is older than the lifetime.
+`Approve(now, lifetime)` returns the new `User` (R5), or `RegistrationRequest.NotFound` when the request has
+expired.
+
+The limits come from the `Registration` settings: `PendingRequestLifetimeDays` (default 14),
+`PermitsPerHourPerIp` (default 5) and `MaxPendingRequests` (default 100), each at least 1.
+
+| # | Invariant / rule | Enforced in |
+|---|---|---|
+| R1 | One pending registration request per email address, case-insensitive, ignoring surrounding spaces; an email that already has an account cannot register (U1) | Use case: `RegisterUser` (`IUserRepository.EmailExistsAsync` → `User.EmailAlreadyInUse`, then `IRegistrationRequestRepository.EmailExistsAsync` → `Registration.AlreadyPending`, both 409). Database: unique index on `Email`; a concurrent request that passed the check fails with `UniqueConstraintViolationException`, answered `Registration.AlreadyPending` |
+| R2 | A request older than `PendingRequestLifetimeDays` has expired: it is deleted, no longer counts, and its email can register again | Use cases: `RegisterUser` and `ListRegistrationRequests` purge expired requests first (`RemoveExpiredAsync`, a set-based delete that runs at once, outside the unit of work); entity: `IsExpired` |
+| R3 | At most `MaxPendingRequests` pending requests: when that many are pending, register answers 503 `Registration.QueueFull` and saves nothing. A soft cap: concurrent registers can pass it by a few | Use case: `RegisterUser` (`CountAsync`, after the purge) |
+| R4 | One client address may register at most `PermitsPerHourPerIp` times an hour; over it the answer is 429 | Rate limit policy `RateLimitPolicies.Registration` on `POST /auth/register` |
+| R5 | Approving a request creates exactly one user, role `User`, with the request's normalized email and its password hash, reused as it is (never hashed again), and deletes the request, in one save. An unknown or expired request is not approved (404 `RegistrationRequest.NotFound`; an expired one is left for the purge). An email that already has an account is not approved (409 `User.EmailAlreadyInUse`) and the request stays, for the platform admin to reject | Entity: `Approve` (expiry, the user). Use case: `ApproveRegistrationRequest` (`IUserRepository.EmailExistsAsync`; a concurrent account that breaks the unique index on save fails with `UniqueConstraintViolationException`, answered `User.EmailAlreadyInUse`) |
 
 ## Organization
 
@@ -55,7 +95,7 @@ reference each other **by id only**.
 
 | # | Invariant / rule | Enforced in |
 |---|---|---|
-| O1 | Organization names are unique | Use case: `CreateOrganization` (`NameExistsAsync`) |
+| O1 | Organization names are unique | Use case: `CreateOrganization` (`NameExistsAsync`) → `Organization.NameAlreadyInUse` (409). Database: unique index on `Name` (`nvarchar(256)`); when two concurrent requests both pass the check, the save fails with `UniqueConstraintViolationException`, and `CreateOrganization` answers `Organization.NameAlreadyInUse` too |
 | O2 | An organization that still has policies cannot be deleted | Use case: `DeleteOrganization` (`AnyInOrganizationAsync`) |
 | O3 | Deleting an organization also removes its memberships, in the same transaction | Use case: `DeleteOrganization` (`ListForOrganizationAsync`) |
 
@@ -75,7 +115,7 @@ reference each other **by id only**.
 | # | Invariant / rule | Enforced in |
 |---|---|---|
 | P1 | A policy belongs to an existing organization | Use case: `CreatePolicy`. The organization comes from the route, and the caller must be an organization admin there (C6); deleting an organization ends its memberships (O3), so that check also proves the organization exists (`Organization.NotFound` otherwise) |
-| P2 | Policy names are unique within an organization | Use case: `CreatePolicy` (`NameExistsInOrganizationAsync`) → `Policy.NameAlreadyInUse` (409) |
+| P2 | Policy names are unique within an organization | Use case: `CreatePolicy` (`NameExistsInOrganizationAsync`) → `Policy.NameAlreadyInUse` (409). Database: unique index on (`OrganizationId`, `Name`), `Name` `nvarchar(256)`; when two concurrent requests both pass the check, the save fails with `UniqueConstraintViolationException`, and `CreatePolicy` answers `Policy.NameAlreadyInUse` too |
 | P3 | A policy on which clearances are still granted cannot be deleted | Use case: `DeletePolicy` (`AnyForPolicyAsync`) → `Policy.HasClearances` (409) |
 | C6 (policies) | Only an organization admin of X creates, lists, reads and deletes X's policies. The platform admin does not manage policies (ADR-0014) | Use case + authorization: `CreatePolicy`, `ListPolicies`, `GetPolicy`, `DeletePolicy` on `/organizations/{organizationId}/policies`, checked first (`IsOrgAdminAsync`) → `Organization.NotFound` (404) for anyone else, the platform admin included. A policy of another organization answers `Policy.NotFound` (404), so it is not revealed. For clearances, see C6 (clearances) |
 
@@ -100,7 +140,7 @@ level's priority is at least `priority`.
 |---|---|---|
 | C1 | A clearance covers its own level and every lower level, on its policy only | Entity: `Allows` |
 | C2 | A clearance references an existing user and an existing policy of the organization | Use case: `CreateClearance` (`IPolicyRepository.GetByIdAsync` and the policy's `OrganizationId`, `IUserRepository.ExistsAsync`) → `Clearance.PolicyNotFound` (404, also for a policy of another organization, so it is not revealed), `Clearance.UserNotFound` (404) |
-| C3 | A user holds at most one clearance per policy | Use case: `CreateClearance` (`IClearanceRepository.ExistsAsync`) → `Clearance.AlreadyGranted` (409) |
+| C3 | A user holds at most one clearance per policy | Use case: `CreateClearance` (`IClearanceRepository.ExistsAsync`) → `Clearance.AlreadyGranted` (409). Database: unique index on (`UserId`, `PolicyId`); when two concurrent requests both pass the check, the save fails with `UniqueConstraintViolationException`, and `CreateClearance` answers `Clearance.AlreadyGranted` too |
 | C4 | A level's priority is never negative | Validator: `CreateClearance` |
 | C5 | A clearance on a policy of organization X is granted only to a user with a membership in X: a member, a guest or an organization admin (ADR-0014) | Use case: `CreateClearance` (`IMembershipRepository.ExistsAsync`) → `Clearance.UserNotMember` (409) |
 | C6 (clearances) | Only an organization admin of X grants, lists, reads and revokes clearances on X's policies. The platform admin does not manage clearances (ADR-0014) | Use case + authorization: `CreateClearance`, `ListClearances`, `GetClearance`, `DeleteClearance` on `/organizations/{organizationId}/clearances`, checked first (`IsOrgAdminAsync`) → `Organization.NotFound` (404) for anyone else, the platform admin included. A clearance on a policy of another organization answers `Clearance.NotFound` (404), and the list shows only clearances on the organization's policies, so neither is revealed |
@@ -220,7 +260,7 @@ name.
 
 | # | Invariant / rule | Enforced in |
 |---|---|---|
-| D1 | A data item is either personal (no policy, no level) or classified (policy and a standard level together). A partial or unknown classification is rejected, never downgraded to personal | Entity: the two factory methods. Use case: `AddDataItem` (`DataItem.IncompleteClassification`, `DataItem.UnknownClassificationLevel`), and Validator |
+| D1 | A data item is either personal (no policy, no level) or classified (policy and a standard level together). A partial or unknown classification is rejected, never downgraded to personal | Entity: the two factory methods. Use case: `AddDataItem` (`DataItem.IncompleteClassification`, `DataItem.UnknownClassificationLevel`), and Validator. Database: check constraint `CK_DataItems_Classification` (`PolicyId` and `ClassificationPriority` both empty or both set, soft-deleted rows included); the factories make it unreachable from the use cases, so a violation is not mapped to a domain error |
 | D2 | An owner may classify only under a policy they hold a clearance on, and at most at that clearance's level | Entity: `CreateClassified` → `DataItem.NotCleared` (400) |
 | D3′ | **Read rule:** a classified item is readable only by a holder of a clearance on its policy at or above its level; its owner has no special right on it. A personal item is readable only by its owner. A deleted item is readable by no one (ADR-0014) | Entity: `IsReadableBy`. Its SQL form is `DataAccess.VisibleTo`, used by list and download. `ReadRuleEquivalenceTests` proves both forms agree (#99) |
 | D4 | **Need-to-know:** admins have no bypass. An unreadable item answers 404 (`DataItem.NotFound`), so its existence is not revealed | Entity (D3′) and use cases `GetDataItem`, `ListDataItems` |
@@ -259,7 +299,7 @@ outcome, errorCode)`. Its arguments come from code, not from user input, so a br
 | A6 | No foreign keys: a record outlives the users, organizations and data items it names | Database: table `AuditRecords`, indexed on `OccurredAt` and on (`OrganizationId`, `OccurredAt`) |
 | A7 | **Data access is audited by the read use case:** every download, and every denied read (an item that exists, deleted or not, but the read rule hides), leaves a `DataItem.Download` record on the `DataItem`, with the organization of its policy when that policy exists. A denied read records `Denied` with `DataItem.NotFound`; the answer stays the same 404, so existence is not revealed. A missing item is not an access and leaves no record. Lists are not audited | Use case: `GetDataItem` (the download), through `IAuditLog` |
 | A8 | **Downloads fail closed:** the record is appended before the content is returned; if the audit write fails, the request fails and no content leaves. A denied read whose record cannot be written is logged (action, outcome, target, actor and exception type only) and still answers 404, so a failing audit store does not reveal existence. Commands differ: their change is already saved, so a failed audit write is only logged (A4) | Use case: `GetDataItem` |
-| A9 | **Who sees what:** an organization admin sees their organization's records (`OrganizationId` is the organization); the platform admin sees the tenant-level actions only (`CreateOrganization`, `DeleteOrganization`, `AppointOrganizationAdmin`, `CreateAccount`, `DeleteAccount`, `RegisterUser`, `LoginUser`), never a tenant's trail. Anyone else gets `404 Organization.NotFound` (organization trail) or `403` (platform trail). Both list the newest 200 records first, filtered by actor, action and date range; the only thing returned about a user is the actor's email | Use cases: `ListOrganizationAuditRecords` (`IsOrgAdminAsync` first), `ListAuditRecords` (`/admin`, platform admin role) |
+| A9 | **Who sees what:** an organization admin sees their organization's records (`OrganizationId` is the organization); the platform admin sees the tenant-level actions only (`CreateOrganization`, `DeleteOrganization`, `AppointOrganizationAdmin`, `CreateAccount`, `DeleteAccount`, `RegisterUser`, `ApproveRegistrationRequest`, `RejectRegistrationRequest`, `LoginUser`), never a tenant's trail. Anyone else gets `404 Organization.NotFound` (organization trail) or `403` (platform trail). Both list the newest 200 records first, filtered by actor, action and date range; the only thing returned about a user is the actor's email | Use cases: `ListOrganizationAuditRecords` (`IsOrgAdminAsync` first), `ListAuditRecords` (`/admin`, platform admin role) |
 | A10 | A user never sees their own records through these routes: no route lists a user's records for that user, only for an organization admin or the platform admin, because a record of a refused read can name the organization of an item the user may not read (need-to-know, ADR-0011) | Use cases: no "my records" route; each route is scoped by role, not by actor |
 
 The organization and the target come from the command, when it declares them (`IOrganizationScopedCommand`,
@@ -286,5 +326,7 @@ These are findings, not decisions. Each one needs an issue before it changes.
   (`CountOrgAdminsAsync`). Two organization admins who demote or remove each other, or leave, at the
   same moment can both pass the count and leave the organization with none. The platform admin can
   then appoint one again.
-- **Uniqueness is checked, not constrained:** U1, O1 and P2 are checked before saving. Two concurrent
-  requests can both pass unless the database has a unique index.
+- **Uniqueness is checked first, then constrained:** U1, O1, P2, C3 and M1 are checked before saving
+  and enforced by a unique index. The index compares under the column collation, as the checks do:
+  with SQL Server's default case-insensitive collation, O1 and P2 names that differ only in letter case
+  or trailing spaces count as the same name. No uniqueness rule is only checked any more.

@@ -36,7 +36,21 @@ public class CreatePolicyHandler(
 
         var policy = Policy.Create(command.Name, command.OrganizationId);
         _policies.Add(policy);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-        return Result.Success(policy.Id);
+        return await SavePolicy(policy, cancellationToken);
+    }
+
+    // P2 under concurrency: a request that passed NameExistsInOrganizationAsync at the same time saved
+    // first, and the unique index rejects this one
+    private async Task<Result<Guid>> SavePolicy(Policy policy, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            return Result.Success(policy.Id);
+        }
+        catch (UniqueConstraintViolationException)
+        {
+            return Result.Failure<Guid>(Errors.PolicyNameAlreadyInUse);
+        }
     }
 }

@@ -45,8 +45,22 @@ public class CreateClearanceHandler(
 
         var clearance = GrantClearance(command);
         await _clearances.AddAsync(clearance, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-        return Result.Success(clearance.Id);
+        return await SaveClearance(clearance, cancellationToken);
+    }
+
+    // C3 under concurrency: a request that passed IClearanceRepository.ExistsAsync at the same time saved
+    // first, and the unique index rejects this one
+    private async Task<Result<Guid>> SaveClearance(Clearance clearance, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            return Result.Success(clearance.Id);
+        }
+        catch (UniqueConstraintViolationException)
+        {
+            return Result.Failure<Guid>(Errors.AlreadyGranted);
+        }
     }
 
     // The checks in the order of the contract; null when the clearance may be granted

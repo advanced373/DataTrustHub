@@ -4,13 +4,17 @@ using Xunit;
 
 namespace DataTrustHub.Features.Tests.AzureSetup;
 
-// #101 AC1 (Jwt__Secret generated only if missing, -RotateJwtSecret, admin seed only if missing,
-// Api__BaseUrl read from Azure) and AC2 (dry run: prints the change commands with secrets masked, changes
-// nothing, uses placeholders when signed out). infra/setup.ps1 runs only with -WhatIf, against a fake az;
-// the real Azure CLI is never on PATH (see SetupScriptDryRun).
+// #101 AC1 (Jwt__Secret generated only if missing, -RotateJwtSecret, Api__BaseUrl read from Azure) and AC2
+// (dry run: prints the change commands with secrets masked, changes nothing, uses placeholders when signed
+// out); #147 AC1-AC3 (the admin seed is planned only with -SeedAdmin, masked, overwriting existing values,
+// ADR-0022). infra/setup.ps1 runs only with -WhatIf, against a fake az; the real Azure CLI is never on PATH
+// (see SetupScriptDryRun).
 public class SetupScriptDryRunTests
 {
     private const string AppSettingsSetCommand = "webapp config appsettings set";
+    private const string AppSettingsDeleteCommand = "webapp config appsettings delete";
+    private const string ManagedIdentityAuthentication = "Authentication=Active Directory Managed Identity";
+    private const string AdminSeedPrompt = "Admin seed";
     private const string MaskedValue = "***";
     private const string ApiHostPlaceholder = "<API default host name>";
     private const string AccountShowCommand = "account show";
@@ -49,14 +53,36 @@ public class SetupScriptDryRunTests
         Assert.Contains(ApiHostPlaceholder, value);
     }
 
-    [Theory]
-    [InlineData(DryRunScenario.JwtSecretSetting)]
-    [InlineData(DryRunScenario.AdminSeedEmailSetting)]
-    [InlineData(DryRunScenario.AdminSeedPasswordSetting)]
-    public void DryRun_SignedOut_PlansSecretSettingMasked(string settingName)
+    [Fact]
+    public void DryRun_SignedOut_PlansJwtSecretMasked()
     {
         var result = SetupScriptDryRun.Run(DryRunScenario.SignedOut, SetupScriptDryRun.WhatIfSwitch);
 
+        Assert.Equal(MaskedValue, SettingValue(result, DryRunScenario.JwtSecretSetting));
+    }
+
+    // #147 AC1: without -SeedAdmin the admin seed is never planned, even when the dry run assumes nothing is set
+    [Theory]
+    [InlineData(DryRunScenario.AdminSeedEmailSetting)]
+    [InlineData(DryRunScenario.AdminSeedPasswordSetting)]
+    public void DryRun_SignedOut_DoesNotPlanAdminSeed(string settingName)
+    {
+        var result = SetupScriptDryRun.Run(DryRunScenario.SignedOut, SetupScriptDryRun.WhatIfSwitch);
+
+        Assert.True(result.ExitCode == 0, result.Output);
+        Assert.DoesNotContain(settingName, result.Output);
+    }
+
+    // #147 AC2: -SeedAdmin plans both settings masked and, with stdin closed and -NonInteractive, asks nothing
+    [Theory]
+    [InlineData(DryRunScenario.AdminSeedEmailSetting)]
+    [InlineData(DryRunScenario.AdminSeedPasswordSetting)]
+    public void DryRun_SignedOutAndSeedAdmin_PlansAdminSeedMasked(string settingName)
+    {
+        var result = SetupScriptDryRun.Run(DryRunScenario.SignedOut,
+            SetupScriptDryRun.WhatIfSwitch, SetupScriptDryRun.SeedAdminSwitch);
+
+        Assert.True(result.ExitCode == 0, result.Output);
         Assert.Equal(MaskedValue, SettingValue(result, settingName));
     }
 
@@ -104,6 +130,7 @@ public class SetupScriptDryRunTests
         Assert.Equal(MaskedValue, SettingValue(result, DryRunScenario.JwtSecretSetting));
     }
 
+    // #147 AC1: an existing admin seed is neither planned again nor deleted
     [Theory]
     [InlineData(DryRunScenario.AdminSeedEmailSetting)]
     [InlineData(DryRunScenario.AdminSeedPasswordSetting)]
@@ -111,7 +138,109 @@ public class SetupScriptDryRunTests
     {
         var result = SetupScriptDryRun.Run(DryRunScenario.SecretsAlreadySet, SetupScriptDryRun.WhatIfSwitch);
 
+        Assert.True(result.ExitCode == 0, result.Output);
         Assert.DoesNotContain(settingName, result.Output);
+    }
+
+    [Fact]
+    public void DryRun_AdminSeedExists_PlansNoAppSettingsDelete()
+    {
+        var result = SetupScriptDryRun.Run(DryRunScenario.SecretsAlreadySet, SetupScriptDryRun.WhatIfSwitch);
+
+        Assert.True(result.ExitCode == 0, result.Output);
+        Assert.DoesNotContain(AppSettingsDeleteCommand, result.Output);
+    }
+
+    // #147 AC1: a missing admin seed is not planned either (the old contract planned it)
+    [Theory]
+    [InlineData(DryRunScenario.AdminSeedEmailSetting)]
+    [InlineData(DryRunScenario.AdminSeedPasswordSetting)]
+    public void DryRun_AdminSeedMissing_DoesNotPlanAdminSeed(string settingName)
+    {
+        var result = SetupScriptDryRun.Run(DryRunScenario.NothingSetYet, SetupScriptDryRun.WhatIfSwitch);
+
+        Assert.True(result.ExitCode == 0, result.Output);
+        Assert.DoesNotContain(settingName, result.Output);
+    }
+
+    // #147 AC1: the rest of the plan is unchanged when the admin seed is missing
+    [Fact]
+    public void DryRun_AdminSeedMissing_StillPlansJwtSecretAndConnectionString()
+    {
+        var result = SetupScriptDryRun.Run(DryRunScenario.NothingSetYet, SetupScriptDryRun.WhatIfSwitch);
+
+        Assert.Equal(MaskedValue, SettingValue(result, DryRunScenario.JwtSecretSetting));
+        Assert.Contains(ManagedIdentityAuthentication, SettingValue(result, DryRunScenario.ConnectionStringSetting));
+    }
+
+    // #147 AC2: -SeedAdmin writes both settings even when they are missing
+    [Theory]
+    [InlineData(DryRunScenario.AdminSeedEmailSetting)]
+    [InlineData(DryRunScenario.AdminSeedPasswordSetting)]
+    public void DryRun_AdminSeedMissingAndSeedAdmin_PlansAdminSeedMasked(string settingName)
+    {
+        var result = SetupScriptDryRun.Run(DryRunScenario.NothingSetYet,
+            SetupScriptDryRun.WhatIfSwitch, SetupScriptDryRun.SeedAdminSwitch);
+
+        Assert.True(result.ExitCode == 0, result.Output);
+        Assert.Equal(MaskedValue, SettingValue(result, settingName));
+    }
+
+    // #147 AC2: -SeedAdmin overwrites an existing admin seed
+    [Theory]
+    [InlineData(DryRunScenario.AdminSeedEmailSetting)]
+    [InlineData(DryRunScenario.AdminSeedPasswordSetting)]
+    public void DryRun_AdminSeedExistsAndSeedAdmin_PlansAdminSeedMasked(string settingName)
+    {
+        var result = SetupScriptDryRun.Run(DryRunScenario.SecretsAlreadySet,
+            SetupScriptDryRun.WhatIfSwitch, SetupScriptDryRun.SeedAdminSwitch);
+
+        Assert.True(result.ExitCode == 0, result.Output);
+        Assert.Equal(MaskedValue, SettingValue(result, settingName));
+    }
+
+    // #147 AC2: -SeedAdmin does not touch the JWT signing key, which exists
+    [Fact]
+    public void DryRun_AdminSeedExistsAndSeedAdmin_DoesNotPlanJwtSecret()
+    {
+        var result = SetupScriptDryRun.Run(DryRunScenario.SecretsAlreadySet,
+            SetupScriptDryRun.WhatIfSwitch, SetupScriptDryRun.SeedAdminSwitch);
+
+        Assert.True(result.ExitCode == 0, result.Output);
+        Assert.DoesNotContain(DryRunScenario.JwtSecretSetting, result.Output);
+    }
+
+    [Fact]
+    public void DryRun_SignedInAndSeedAdmin_RunsNoAzCommandThatChangesAzure()
+    {
+        var result = SetupScriptDryRun.Run(DryRunScenario.SecretsAlreadySet,
+            SetupScriptDryRun.WhatIfSwitch, SetupScriptDryRun.SeedAdminSwitch);
+
+        Assert.True(result.ExitCode == 0, result.Output);
+        Assert.NotEmpty(result.AzCalls);
+        Assert.DoesNotContain(result.AzCalls, call => ChangeVerb.IsMatch(call));
+    }
+
+    // #147 AC3: the admin seed lines carry only the mask, and no prompt text reaches the output
+    [Fact]
+    public void DryRun_SeedAdmin_PrintsNoAdminSeedPrompt()
+    {
+        var result = SetupScriptDryRun.Run(DryRunScenario.NothingSetYet,
+            SetupScriptDryRun.WhatIfSwitch, SetupScriptDryRun.SeedAdminSwitch);
+
+        Assert.True(result.ExitCode == 0, result.Output);
+        Assert.DoesNotContain(AdminSeedPrompt, result.Output, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void DryRun_AppSettingsReadFailsAndSeedAdmin_PlansNoAppSettingsSet()
+    {
+        var result = SetupScriptDryRun.Run(DryRunScenario.AppSettingsUnreadable,
+            SetupScriptDryRun.WhatIfSwitch, SetupScriptDryRun.SeedAdminSwitch);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.DoesNotContain(AppSettingsSetCommand, result.Output);
+        Assert.DoesNotContain(DryRunScenario.AdminSeedEmailSetting + "=", result.Output);
     }
 
     // The connection string is not a secret (managed identity, no password): it is still planned
@@ -120,8 +249,7 @@ public class SetupScriptDryRunTests
     {
         var result = SetupScriptDryRun.Run(DryRunScenario.SecretsAlreadySet, SetupScriptDryRun.WhatIfSwitch);
 
-        Assert.Contains("Authentication=Active Directory Managed Identity",
-            SettingValue(result, DryRunScenario.ConnectionStringSetting));
+        Assert.Contains(ManagedIdentityAuthentication, SettingValue(result, DryRunScenario.ConnectionStringSetting));
     }
 
     [Fact]

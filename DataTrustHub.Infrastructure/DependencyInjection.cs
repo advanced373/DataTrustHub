@@ -11,6 +11,7 @@ using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.Infrastructure.Persistance.Auditing;
 using DataTrustHub.Infrastructure.Persistance.Repositories;
 using DataTrustHub.Infrastructure.Services;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -35,6 +36,8 @@ namespace DataTrustHub.Infrastructure
                         errorNumbersToAdd: null));
             });
 
+            // The hasher reads its iteration count from PasswordHasherOptions; Identity's default unless a host configures it
+            services.AddOptions<PasswordHasherOptions>();
             services.AddSingleton<IPasswordHasher, PasswordHasher>();
             AddRepositories(services);
             AddAuditLog(services);

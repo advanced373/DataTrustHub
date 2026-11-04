@@ -46,7 +46,7 @@ public class CreateAccountTests(AdminApiFactory factory) : IClassFixture<AdminAp
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
         Assert.Equal((normalizedEmail, UserRoles.User), (stored.Email, stored.Role));
         Assert.NotEqual(ValidPassword, stored.HashedPassword);
-        Assert.True(hasher.VerifyHashedPassword(stored.HashedPassword, ValidPassword));
+        Assert.Equal(PasswordVerificationResult.Success, hasher.VerifyHashedPassword(stored.HashedPassword, ValidPassword));
     }
 
     [Fact]

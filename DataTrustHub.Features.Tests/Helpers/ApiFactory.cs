@@ -1,5 +1,6 @@
 using DataTrustHub.Infrastructure.Persistance;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -10,6 +11,10 @@ namespace DataTrustHub.Features.Tests.Helpers;
 
 public class ApiFactory : WebApplicationFactory<Program>
 {
+    // The host's real password hasher (#167), with fewer PBKDF2 iterations than Identity's default (100 000) so
+    // the many users the suite signs in do not slow it down. The hasher's own tests use the default
+    internal const int TestPasswordHashIterationCount = 1_000;
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         // Tests must not pick up the developer's User Secrets (e.g. a seeded admin)
@@ -27,6 +32,8 @@ public class ApiFactory : WebApplicationFactory<Program>
             var dbName = Guid.NewGuid().ToString();
             services.AddDbContext<DContext>(options =>
                 options.UseInMemoryDatabase(dbName));
+
+            services.Configure<PasswordHasherOptions>(options => options.IterationCount = TestPasswordHashIterationCount);
         });
     }
 

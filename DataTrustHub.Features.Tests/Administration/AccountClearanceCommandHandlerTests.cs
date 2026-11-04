@@ -49,7 +49,7 @@ public class AccountClearanceCommandHandlerTests
         var added = Assert.Single(_users.Added);
         Assert.Equal((result.Value, NormalizedEmail, UserRoles.User), (added.Id, added.Email, added.Role));
         Assert.NotEqual(Password, added.HashedPassword);
-        Assert.True(_hasher.VerifyHashedPassword(added.HashedPassword, Password));
+        Assert.Equal(PasswordVerificationResult.Success, _hasher.VerifyHashedPassword(added.HashedPassword, Password));
         Assert.Equal(1, _unitOfWork.SaveChangesCalls);
     }
 

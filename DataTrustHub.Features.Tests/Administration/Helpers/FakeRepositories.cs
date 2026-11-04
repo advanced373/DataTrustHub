@@ -312,13 +312,26 @@ internal sealed class FakeRegistrationRequestRepository : IRegistrationRequestRe
     }
 }
 
-// A recognisable, reversible "hash" so tests can tell a hashed password from a plain one
+// A recognisable, reversible "hash" so tests can tell a hashed password from a plain one. A hash with the
+// legacy prefix stands for a password hash in an older format: it verifies as SuccessRehashNeeded (#167).
+// Counts the HashPassword calls, so a test can see the timing-equalising work of sign-in
 internal sealed class FakePasswordHasher : IPasswordHasher
 {
     internal const string HashPrefix = "hashed:";
+    internal const string LegacyHashPrefix = "legacy:";
 
-    public string HashPassword(string password) => HashPrefix + password;
+    internal int HashPasswordCalls { get; private set; }
 
-    public bool VerifyHashedPassword(string hashedPassword, string providedPassword) =>
-        hashedPassword == HashPassword(providedPassword);
+    public string HashPassword(string password)
+    {
+        HashPasswordCalls++;
+        return HashPrefix + password;
+    }
+
+    public PasswordVerificationResult VerifyHashedPassword(string hashedPassword, string providedPassword)
+    {
+        if (hashedPassword == HashPrefix + providedPassword) return PasswordVerificationResult.Success;
+        if (hashedPassword == LegacyHashPrefix + providedPassword) return PasswordVerificationResult.SuccessRehashNeeded;
+        return PasswordVerificationResult.Failed;
+    }
 }

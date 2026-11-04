@@ -80,7 +80,7 @@ public class RegisterUserTests(RegistrationApiFactory factory) : IClassFixture<R
         var stored = Assert.Single(await StoredRequestsAsync(email));
         Assert.DoesNotContain(Password, stored.HashedPassword);
         using var scope = factory.Services.CreateScope();
-        Assert.True(scope.ServiceProvider.GetRequiredService<IPasswordHasher>().VerifyHashedPassword(stored.HashedPassword, Password));
+        Assert.Equal(PasswordVerificationResult.Success, scope.ServiceProvider.GetRequiredService<IPasswordHasher>().VerifyHashedPassword(stored.HashedPassword, Password));
     }
 
     // --- AC2: a pending request cannot log in ---

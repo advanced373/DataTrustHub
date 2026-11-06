@@ -20,6 +20,7 @@ internal static class Constants
 internal static class TenantLevelActions
 {
     internal const string CreateOrganization = "CreateOrganization";
+    internal const string RenameOrganization = "RenameOrganization";
     internal const string DeleteOrganization = "DeleteOrganization";
     internal const string AppointOrganizationAdmin = "AppointOrganizationAdmin";
     internal const string CreateAccount = "CreateAccount";
@@ -32,6 +33,7 @@ internal static class TenantLevelActions
     internal static readonly string[] All =
     [
         CreateOrganization,
+        RenameOrganization,
         DeleteOrganization,
         AppointOrganizationAdmin,
         CreateAccount,

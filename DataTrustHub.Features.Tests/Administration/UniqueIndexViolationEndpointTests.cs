@@ -55,6 +55,22 @@ public class UniqueIndexViolationEndpointTests(ConcurrentSaveApiFactory factory)
         Assert.False(await OrganizationStoredAsync(name));
     }
 
+    // --- #23 AC7 (O1): two concurrent renames to the same name ---
+
+    [Fact]
+    public async Task RenameOrganization_UniqueIndexRejectsSave_Returns409OrganizationNameAlreadyInUse()
+    {
+        var (platformAdmin, organizationId) = await CreateOrganizationWithoutMembersAsync(factory, $"unique_rename_{Guid.NewGuid():N}");
+        var name = $"Unique rename {Guid.NewGuid():N}";
+        factory.ConcurrentSave.SavedFirstByAnotherRequest();
+
+        var response = await platformAdmin.PutAsJsonAsync($"{OrganizationsEndpoint}/{organizationId}", new { Name = name });
+
+        await ErrorAssert.HasErrorAsync(response, HttpStatusCode.Conflict,
+            AdminErrorCodes.OrganizationNameAlreadyInUse, AdminErrorMessages.OrganizationNameAlreadyInUse);
+        Assert.False(await OrganizationStoredAsync(name));
+    }
+
     // --- AC3 (P2) ---
 
     [Fact]

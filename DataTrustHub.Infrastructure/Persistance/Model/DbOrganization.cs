@@ -7,7 +7,7 @@ namespace DataTrustHub.Infrastructure.Persistance.Model
     [Index(nameof(Name), IsUnique = true)]
     public class DbOrganization: DbEntity
     {
-        // The validator of CreateOrganization caps a name at this length
+        // The validators of CreateOrganization and RenameOrganization cap a name at this length
         public const int NameMaxLength = 256;
 
         [MaxLength(NameMaxLength)]

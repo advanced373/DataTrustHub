@@ -1,9 +1,8 @@
 using DataTrustHub.Domain.Auditing;
+using DataTrustHub.Domain.ReadModels.DataItems;
 using DataTrustHub.Features._Shared.Auditing;
 using DataTrustHub.Features._Shared.Messaging;
-using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.SharedKernel;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace DataTrustHub.Features.DataManagement.GetDataItem;
@@ -14,10 +13,13 @@ public record GetDataItemQuery(Guid DataItemId, Guid RequesterId);
 // audit record (ADR-0016 point 2). The record is appended before the content is returned and a failed audit
 // write propagates, so no content leaves without its record (fail closed). A denied read whose record
 // cannot be written is logged and still answers 404, so a failing audit store does not reveal existence
-public class GetDataItemHandler(DContext db, IAuditLog auditLog, ILogger<GetDataItemHandler> logger)
+public class GetDataItemHandler(
+    IDataItemQueries dataItemQueries,
+    IAuditLog auditLog,
+    ILogger<GetDataItemHandler> logger)
     : IQueryHandler<GetDataItemQuery, Result<GetDataItemResponse>>
 {
-    private readonly DContext _db = db;
+    private readonly IDataItemQueries _dataItemQueries = dataItemQueries;
     private readonly IAuditLog _auditLog = auditLog;
     private readonly ILogger<GetDataItemHandler> _logger = logger;
 
@@ -26,52 +28,35 @@ public class GetDataItemHandler(DContext db, IAuditLog auditLog, ILogger<GetData
         GetDataItemQuery query,
         CancellationToken cancellationToken)
     {
-        var readable = await FindReadableAsync(query, cancellationToken);
+        var readable = await _dataItemQueries.FindReadableAsync(
+            query.DataItemId, query.RequesterId, cancellationToken);
         if (readable is not null)
         {
             await AppendAsync(query, readable.OrganizationId, AuditOutcome.Succeeded, null, cancellationToken);
-            return Result.Success(readable.Item);
+            return Result.Success(ToResponse(readable));
         }
 
         await AppendDeniedIfExistsAsync(query, cancellationToken);
         return Result.Failure<GetDataItemResponse>(Errors.DataItemNotFound);
     }
 
-    // The item under the read rule, with its policy's organization for the audit record (null for personal)
-    private Task<ReadableItem?> FindReadableAsync(GetDataItemQuery query, CancellationToken cancellationToken)
-    {
-        var deletable = _db.DataItems.DeletableBy(_db, query.RequesterId);
-        return (
-                from candidate in _db.DataItems.AsNoTracking().VisibleTo(_db, query.RequesterId)
-                where candidate.Id == query.DataItemId
-                join policy in _db.Policies on candidate.PolicyId equals policy.Id into policies
-                from policy in policies.DefaultIfEmpty()
-                select new ReadableItem(
-                    new GetDataItemResponse(
-                        candidate.Id,
-                        candidate.Name,
-                        candidate.Size,
-                        candidate.SecurityMarking,
-                        candidate.Content,
-                        candidate.ClassificationPriority,
-                        policy == null ? null : policy.Name,
-                        candidate.OwnerUserId == query.RequesterId,
-                        deletable.Any(other => other.Id == candidate.Id)),
-                    policy == null ? null : policy.OrganizationId))
-            .FirstOrDefaultAsync(cancellationToken);
-    }
+    private static GetDataItemResponse ToResponse(ReadableDataItem item) =>
+        new(
+            item.Id,
+            item.Name,
+            item.Size,
+            item.SecurityMarking,
+            item.Content,
+            item.ClassificationPriority,
+            item.PolicyName,
+            item.IsOwner,
+            item.CanDelete);
 
     // A row that exists (deleted or not) but is hidden by the read rule is a denied read; a missing row is
     // not an access and leaves no record. The organization is set while the item's policy still exists
     private async Task AppendDeniedIfExistsAsync(GetDataItemQuery query, CancellationToken cancellationToken)
     {
-        var hidden = await _db.DataItems.AsNoTracking()
-            .Where(item => item.Id == query.DataItemId)
-            .Select(item => new HiddenItem(_db.Policies
-                .Where(policy => policy.Id == item.PolicyId)
-                .Select(policy => (Guid?)policy.OrganizationId)
-                .FirstOrDefault()))
-            .FirstOrDefaultAsync(cancellationToken);
+        var hidden = await _dataItemQueries.FindDeniedReadTargetAsync(query.DataItemId, cancellationToken);
 
         if (hidden is null) return;
 
@@ -122,8 +107,4 @@ public class GetDataItemHandler(DContext db, IAuditLog auditLog, ILogger<GetData
 
         return _auditLog.AppendAsync(record, cancellationToken);
     }
-
-    private sealed record ReadableItem(GetDataItemResponse Item, Guid? OrganizationId);
-
-    private sealed record HiddenItem(Guid? OrganizationId);
 }

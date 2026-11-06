@@ -1,5 +1,5 @@
-using DataTrustHub.Features.DataManagement;
 using DataTrustHub.Features.Tests.DataManagement.Helpers;
+using DataTrustHub.Infrastructure.Persistance.ReadModels;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 using static DataTrustHub.Features.Tests.DataManagement.Helpers.ReadRuleScenario;

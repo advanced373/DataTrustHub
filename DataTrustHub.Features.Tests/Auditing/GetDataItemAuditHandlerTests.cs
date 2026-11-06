@@ -1,10 +1,13 @@
 using DataTrustHub.Domain.Auditing;
+using DataTrustHub.Domain.ReadModels.DataItems;
 using DataTrustHub.Features._Shared.Auditing;
 using DataTrustHub.Features.DataManagement.GetDataItem;
 using DataTrustHub.Features.Tests.Auditing.Helpers;
+using DataTrustHub.Features.Tests.Helpers;
 using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.Infrastructure.Persistance.Model;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Xunit;
 
@@ -13,7 +16,7 @@ namespace DataTrustHub.Features.Tests.Auditing;
 // #24 step 2 on the GetDataItem handler alone, with a fake audit log: what each download and denied read records,
 // and that a failed audit write propagates before any content is returned (fail closed), while on a denied read
 // it is logged and the answer stays "not found"
-public class GetDataItemAuditHandlerTests
+public sealed class GetDataItemAuditHandlerTests : IDisposable
 {
     private const string DownloadAction = "DataItem.Download";
     private const string DataItemNotFoundCode = "DataItem.NotFound";
@@ -32,6 +35,16 @@ public class GetDataItemAuditHandlerTests
     private readonly CapturingLoggerProvider logs = new();
     private readonly Guid ownerId = Guid.NewGuid();
     private readonly Guid organizationId = Guid.NewGuid();
+    private readonly ServiceProvider readSide;
+
+    // One read-side container per test (xUnit builds a new instance for each), disposed with the context
+    public GetDataItemAuditHandlerTests() => readSide = ReadSide.Over(db);
+
+    public void Dispose()
+    {
+        readSide.Dispose();
+        db.Dispose();
+    }
 
     // --- AC1 ---
 
@@ -230,7 +243,10 @@ public class GetDataItemAuditHandlerTests
     // --- helpers ---
 
     private GetDataItemHandler CreateHandler(IAuditLog log) =>
-        new(db, log, LoggerFactory.Create(builder => builder.AddProvider(logs)).CreateLogger<GetDataItemHandler>());
+        new(
+            readSide.GetRequiredService<IDataItemQueries>(),
+            log,
+            LoggerFactory.Create(builder => builder.AddProvider(logs)).CreateLogger<GetDataItemHandler>());
 
     private Task<DataTrustHub.SharedKernel.Result<GetDataItemResponse>> HandleAsync(Guid itemId, Guid requesterId) =>
         CreateHandler(auditLog).Handle(new GetDataItemQuery(itemId, requesterId), CancellationToken.None);

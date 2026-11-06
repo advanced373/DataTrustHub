@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using NetArchTest.Rules;
 using Xunit;
 using static DataTrustHub.Features.Tests.Architecture.ArchitectureConstants;
@@ -22,8 +23,10 @@ public class DomainModelTests
     [Fact]
     public void Entities_ShouldHaveNoPublicSetters()
     {
+        // Read models are flat records for display, not entities (ADR-0012 step 4): their init setters change nothing
         var entities = DomainAssembly.GetTypes()
             .Where(type => type.IsClass && type.GetProperty(EntityKeyProperty) is not null)
+            .Where(type => !Regex.IsMatch(type.Namespace ?? string.Empty, NamespaceOrChildren(ReadModelsNamespace)))
             .ToList();
 
         var publicSetters = entities

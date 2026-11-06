@@ -276,7 +276,7 @@ name.
 *Cross-cutting: the audit trail (ADR-0016).* One entry of the audit trail: who did what, on which
 target, in which organization, with which outcome. Source: `Domain/Auditing/AuditRecord.cs`. It is not
 changed by any use case; it is only appended through the `IAuditLog` port, and read by the two audit
-trail queries (A9).
+trail queries (A9) through the read-side port `IAuditRecordQueries`, which has no write method.
 
 | Attribute | Notes |
 |---|---|

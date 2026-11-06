@@ -1,4 +1,4 @@
-using DataTrustHub.Infrastructure.Persistance.Model;
+using DataTrustHub.Domain.Auditing;
 
 namespace DataTrustHub.Features.Administration.ListAuditRecords;
 
@@ -10,7 +10,7 @@ internal static class Constants
     // The newest records only; no paging in the MVP
     internal const int MaxRecords = 200;
 
-    internal const int ActionMaxLength = DbAuditRecord.ActionMaxLength;
+    internal const int ActionMaxLength = AuditRecord.ActionMaxLength;
 }
 
 // The tenant-level actions: the platform's own use cases, the only ones the platform admin sees. Actions

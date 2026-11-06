@@ -5,6 +5,9 @@ namespace DataTrustHub.Domain.Auditing;
 // tokens. Targets and organizations are referenced by id only, and the record outlives them
 public sealed class AuditRecord
 {
+    // The longest action name the trail stores; also the limit of the action filter of the trail queries
+    public const int ActionMaxLength = 128;
+
     private const string ActionRequired = "An audit record needs an action.";
     private const string IncompleteTarget = "An audit record's target type and target id are set together.";
     private const string ErrorCodeOnSuccess = "A succeeded audit record has no error code.";

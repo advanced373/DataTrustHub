@@ -48,13 +48,13 @@ authorization policies.
   `DContext` or `Db*` types.
 - **Queries** (read only) in DataManagement read through the `IDataItemQueries` and
   `IClassificationOptionQueries` ports. In Administration, the organization, membership, policy,
-  clearance, account, user lookup and registration request queries (`GetOrganization`,
+  clearance, account, user lookup, registration request and audit record queries (`GetOrganization`,
   `ListOrganizations`, `ListMembers`, `ListMyOrganizations`, `GetPolicy`, `ListPolicies`, `GetClearance`,
-  `ListClearances`, `GetAccount`, `ListAccounts`, `FindUserByEmail`, `ListRegistrationRequests`) read
-  through the `IOrganizationQueries`, `IMembershipQueries`, `IPolicyQueries`, `IClearanceQueries`,
-  `IUserQueries` and `IRegistrationRequestQueries` ports; only the audit record queries
-  (`ListAuditRecords`, `ListOrganizationAuditRecords`) still read `DContext` with `AsNoTracking`, and move
-  behind an `I*Queries` port in the last part of ADR-0012 step 4 (#74).
+  `ListClearances`, `GetAccount`, `ListAccounts`, `FindUserByEmail`, `ListRegistrationRequests`,
+  `ListAuditRecords`, `ListOrganizationAuditRecords`) read through the `IOrganizationQueries`,
+  `IMembershipQueries`, `IPolicyQueries`, `IClearanceQueries`, `IUserQueries`,
+  `IRegistrationRequestQueries` and `IAuditRecordQueries` ports. No query handler reads `DContext` any
+  more (ADR-0012 step 4, #74).
 
 ## Slice anatomy
 

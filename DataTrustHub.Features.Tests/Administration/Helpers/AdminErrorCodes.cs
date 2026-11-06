@@ -18,6 +18,7 @@ internal static class AdminErrorCodes
     internal const string ClearanceNotFound = "Clearance.NotFound";
     internal const string ClearanceUserNotMember = "Clearance.UserNotMember";
     internal const string ClearanceCannotGrantSelf = "Clearance.CannotGrantSelf";
+    internal const string ClearanceCannotChangeOwn = "Clearance.CannotChangeOwn";
     internal const string MembershipUserNotFound = "Membership.UserNotFound";
     internal const string MembershipAlreadyMember = "Membership.AlreadyMember";
     internal const string MembershipGuestRoleIsFixed = "Membership.GuestRoleIsFixed";
@@ -49,6 +50,8 @@ internal static class AdminErrorMessages
     internal const string ClearanceUserNotMember = "The user is not a member or guest of this organization.";
     internal const string ClearanceCannotGrantSelf =
         "An organization admin cannot grant a clearance to themselves. Another organization admin must grant it.";
+    internal const string ClearanceCannotChangeOwn =
+        "An organization admin cannot change their own clearance. Another organization admin must change it.";
     internal const string MembershipUserNotFound = "The specified user does not exist.";
     internal const string MembershipAlreadyMember = "The user is already a member of this organization.";
     internal const string MembershipCannotAppointSelf = "You cannot appoint yourself as organization admin.";

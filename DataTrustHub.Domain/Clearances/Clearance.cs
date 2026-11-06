@@ -26,6 +26,13 @@ public sealed class Clearance
     public static Clearance Grant(string name, Guid userId, Guid policyId, ClassificationLevel level) =>
         new(Guid.NewGuid(), name, userId, policyId, level);
 
+    // The user and the policy never change: to move a clearance, revoke it and grant a new one (ADR-0029)
+    public void Change(string name, ClassificationLevel level)
+    {
+        Name = name;
+        Level = level;
+    }
+
     // True when this clearance lets its user read data classified at priority on policyId
     public bool Allows(Guid policyId, int priority) => PolicyId == policyId && Level.Priority >= priority;
 }

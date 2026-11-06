@@ -9,7 +9,7 @@ using static DataTrustHub.Features.Tests.Administration.Helpers.MembershipSetup;
 
 namespace DataTrustHub.Features.Tests.Administration;
 
-// AC1 of #95 step 3b (ADR-0014, C6 for clearances): every clearance route requires an authenticated caller who is an
+// AC1 of #95 step 3b and AC4 of #23 (UpdateClearance) (ADR-0014, C6 for clearances): every clearance route requires an authenticated caller who is an
 // organization admin of the route's organization, checked first; everyone else gets 404 Organization.NotFound,
 // the platform admin included. AC5: the platform admin's /admin/clearances routes are gone.
 public class ClearanceAccessTests(ApiFactory factory) : IClassFixture<ApiFactory>
@@ -17,10 +17,12 @@ public class ClearanceAccessTests(ApiFactory factory) : IClassFixture<ApiFactory
     private const string CreateRoute = "Create";
     private const string ListRoute = "List";
     private const string GetRoute = "Get";
+    private const string UpdateRoute = "Update";
     private const string DeleteRoute = "Delete";
+    private const string UpdatedName = "Access updated clearance";
 
-    private static readonly string[] AllRoutes = [CreateRoute, ListRoute, GetRoute, DeleteRoute];
-    private static readonly string[] ClearanceRoutes = [GetRoute, DeleteRoute];
+    private static readonly string[] AllRoutes = [CreateRoute, ListRoute, GetRoute, UpdateRoute, DeleteRoute];
+    private static readonly string[] ClearanceRoutes = [GetRoute, UpdateRoute, DeleteRoute];
 
     public static TheoryData<string> Routes => new(AllRoutes);
 
@@ -217,6 +219,10 @@ public class ClearanceAccessTests(ApiFactory factory) : IClassFixture<ApiFactory
             CreateRoute => PostClearanceAsync(caller, organizationId, target.UngrantedUserId, target.Grant.PolicyId),
             ListRoute => caller.GetAsync(ClearancesEndpoint(organizationId)),
             GetRoute => caller.GetAsync(ClearanceEndpoint(organizationId, target.ClearanceId)),
+            UpdateRoute => caller.PutAsJsonAsync(ClearanceEndpoint(organizationId, target.ClearanceId), new
+            {
+                Name = UpdatedName, ClassificationLevelName = DefaultLevelName, ClassificationLevelPriority = DefaultLevelPriority
+            }),
             DeleteRoute => caller.DeleteAsync(ClearanceEndpoint(organizationId, target.ClearanceId)),
             _ => throw new ArgumentOutOfRangeException(nameof(route), route, null)
         };

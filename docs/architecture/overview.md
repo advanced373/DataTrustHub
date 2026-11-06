@@ -46,8 +46,9 @@ authorization policies.
 - **Commands** (change state) load an aggregate through its `I*Repository`, call the entity's behaviour
   (business rules live in the entities) and save once with `IUnitOfWork.SaveChangesAsync`. They never see
   `DContext` or `Db*` types.
-- **Queries** (read only) still read `DContext` with `AsNoTracking`. Moving them behind `I*Queries` ports
-  is ADR-0012 step 4 (#74).
+- **Queries** (read only) in DataManagement read through the `IDataItemQueries` and
+  `IClassificationOptionQueries` ports. Administration queries still read `DContext` with `AsNoTracking`
+  and move behind `I*Queries` ports in the later parts of ADR-0012 step 4 (#74).
 
 ## Slice anatomy
 

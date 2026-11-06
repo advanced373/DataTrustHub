@@ -19,6 +19,8 @@ internal static class ArchitectureConstants
     internal const string ApplicationNamespace = "DataTrustHub.Application";
     internal const string DomainNamespace = "DataTrustHub.Domain";
     internal const string InfrastructureNamespace = "DataTrustHub.Infrastructure";
+    // The read side: the I*Queries ports and the read models they return (ADR-0012 step 4)
+    internal const string ReadModelsNamespace = DomainNamespace + NamespaceSeparator + "ReadModels";
 
     // Commercially licensed libraries the solution must not depend on (ADR-0012)
     internal const string MediatRNamespace = "MediatR";

@@ -1,37 +1,29 @@
 using DataTrustHub.Domain.Clearances;
+using DataTrustHub.Domain.ReadModels.ClassificationOptions;
 using DataTrustHub.Features._Shared.Messaging;
-using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.SharedKernel;
-using Microsoft.EntityFrameworkCore;
 
 namespace DataTrustHub.Features.DataManagement.ListClassificationOptions;
 
 public record ListClassificationOptionsQuery(Guid UserId);
 
-public class ListClassificationOptionsHandler(DContext db)
+public class ListClassificationOptionsHandler(IClassificationOptionQueries classificationOptionQueries)
     : IQueryHandler<ListClassificationOptionsQuery, Result<ClassificationOptionsResponse>>
 {
-    private readonly DContext _db = db;
+    private readonly IClassificationOptionQueries _classificationOptionQueries = classificationOptionQueries;
 
     // One entry per policy the user holds a clearance on, with their highest priority there
     public async Task<Result<ClassificationOptionsResponse>> Handle(
         ListClassificationOptionsQuery query,
         CancellationToken cancellationToken)
     {
-        var policies = await (
-                from clearance in _db.Clearances.AsNoTracking()
-                where clearance.UserId == query.UserId
-                join policy in _db.Policies on clearance.PolicyId equals policy.Id
-                join organization in _db.Organizations on policy.OrganizationId equals organization.Id
-                group clearance.ClassificationLevel.Priority
-                    by new { policy.Id, policy.Name, OrganizationName = organization.Name } into byPolicy
-                select new ClassificationPolicyOption(
-                    byPolicy.Key.Id, byPolicy.Key.Name, byPolicy.Key.OrganizationName, byPolicy.Max()))
-            .ToListAsync(cancellationToken);
-
-        var ordered = policies.OrderBy(p => p.OrganizationName).ThenBy(p => p.PolicyName).ToList();
-        return Result.Success(new ClassificationOptionsResponse(StandardLevels(), ordered));
+        var clearedPolicies = await _classificationOptionQueries.ListClearedPoliciesAsync(query.UserId, cancellationToken);
+        var policies = clearedPolicies.Select(ToOption).ToList();
+        return Result.Success(new ClassificationOptionsResponse(StandardLevels(), policies));
     }
+
+    private static ClassificationPolicyOption ToOption(ClearedPolicy policy) =>
+        new(policy.PolicyId, policy.PolicyName, policy.OrganizationName, policy.MaxPriority);
 
     private static IReadOnlyList<ClassificationLevelOption> StandardLevels() =>
         ClassificationLevel.Standard.Select(level => new ClassificationLevelOption(level.Name, level.Priority)).ToList();

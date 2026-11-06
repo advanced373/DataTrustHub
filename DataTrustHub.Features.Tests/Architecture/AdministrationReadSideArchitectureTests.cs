@@ -1,109 +1,20 @@
-using System.Text.RegularExpressions;
 using DataTrustHub.Domain.Memberships;
 using DataTrustHub.Domain.ReadModels.Memberships;
 using DataTrustHub.Domain.ReadModels.Organizations;
-using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Features.Administration.GetOrganization;
 using DataTrustHub.Features.Administration.ListMembers;
 using DataTrustHub.Features.Administration.ListMyOrganizations;
 using DataTrustHub.Features.Administration.ListOrganizations;
-using DataTrustHub.Features.Tests.Build.Helpers;
-using DataTrustHub.Features.Tests.Helpers;
-using DataTrustHub.SharedKernel;
-using Microsoft.Extensions.DependencyInjection;
-using NetArchTest.Rules;
 using Xunit;
-using static DataTrustHub.Features.Tests.Architecture.ArchitectureConstants;
 
 namespace DataTrustHub.Features.Tests.Architecture;
 
 // #74 (ADR-0012 step 4, part 4b): the organization and membership queries of Administration read through the
-// read-side ports. AC1: the four slices (get organization, list organizations, list members, my organizations) do not
-// see DContext, a persistence model (Db*), Infrastructure or EF Core. AC2: the new ports and read models live in
-// Domain/ReadModels free of EF Core and Infrastructure, their Infrastructure adapters are registered, and every
-// handler of the four slices resolves from the API container
-public class AdministrationReadSideArchitectureTests(ApiFactory factory) : IClassFixture<ApiFactory>
+// read-side ports: the exact constructor dependencies of the four handlers. The layering rule
+// (FeaturesPersistenceIsolationTests) and the ports and read models (ReadSideArchitectureTests) are checked
+// project-wide (#74 step 5)
+public class AdministrationReadSideArchitectureTests
 {
-    private const string AdministrationFolder = "Administration";
-    private const string AdministrationNamespace = FeaturesRoot + NamespaceSeparator + AdministrationFolder;
-    private const string FeaturesProjectFolder = "DataTrustHub.Features";
-    private const string SourcePattern = "*.cs";
-
-    private static readonly string[] SliceFolders =
-        ["GetOrganization", "ListOrganizations", "ListMembers", "ListMyOrganizations"];
-
-    // What a source file of the four slices must not name: the context, a persistence model, the Infrastructure
-    // namespace or EF Core
-    private static readonly Regex PersistenceReference =
-        new(@"\bDContext\b|\bDb[A-Z]\w*|DataTrustHub\.Infrastructure|Microsoft\.EntityFrameworkCore", RegexOptions.CultureInvariant);
-
-    private static readonly Type[] Handlers =
-        [typeof(GetOrganizationHandler), typeof(ListOrganizationsHandler), typeof(ListMembersHandler), typeof(ListMyOrganizationsHandler)];
-
-    private static readonly Type[] Ports = [typeof(IOrganizationQueries), typeof(IMembershipQueries)];
-
-    private static readonly Type[] ReadModels =
-        [typeof(OrganizationEntry), typeof(OrganizationMember), typeof(MyOrganization)];
-
-    // The plain values a read model may hold (nullable forms included)
-    private static readonly Type[] PrimitiveValues =
-        [typeof(Guid), typeof(string), typeof(int), typeof(long), typeof(bool)];
-
-    public static TheoryData<Type> HandlerTypes() => new(Handlers);
-
-    public static TheoryData<string> SliceFolderNames() => new(SliceFolders);
-
-    public static TheoryData<Type> PortTypes() => new(Ports);
-
-    public static TheoryData<Type> ReadModelTypes() => new(ReadModels);
-
-    // --- AC1: the four handlers and their slices ---
-
-    [Theory]
-    [MemberData(nameof(HandlerTypes))]
-    public void Handler_ShouldNotDependOnInfrastructureOrEntityFramework(Type handler)
-    {
-        var result = Types.InAssembly(FeaturesAssembly)
-            .That().HaveName(handler.Name)
-            .ShouldNot().HaveDependencyOnAny(InfrastructureNamespace, EntityFrameworkNamespace)
-            .GetResult();
-
-        Assert.Single(Types.InAssembly(FeaturesAssembly).That().HaveName(handler.Name).GetTypes());
-        ArchitectureAssert.Passed(result, $"{handler.Name} must not depend on DContext, Db* types, Infrastructure or EF Core");
-    }
-
-    [Theory]
-    [MemberData(nameof(SliceFolderNames))]
-    public void SliceTypes_ShouldNotDependOnInfrastructureOrEntityFramework(string sliceFolder)
-    {
-        var selection = Types.InAssembly(FeaturesAssembly)
-            .That().ResideInNamespaceMatching(NamespaceOrChildren(SliceNamespace(sliceFolder)));
-        ArchitectureAssert.NotEmpty(selection, $"the {sliceFolder} types");
-
-        var result = selection
-            .ShouldNot().HaveDependencyOnAny(InfrastructureNamespace, EntityFrameworkNamespace)
-            .GetResult();
-
-        ArchitectureAssert.Passed(result, $"{sliceFolder} must not depend on DContext, Db* types, Infrastructure or EF Core");
-    }
-
-    // Reads the source too, so an unused using directive, which leaves no trace in the assembly, is caught
-    [Theory]
-    [MemberData(nameof(SliceFolderNames))]
-    public void SliceSourceFiles_DoNotNamePersistenceTypesInfrastructureOrEntityFramework(string sliceFolder)
-    {
-        var files = SourceFiles(sliceFolder).ToList();
-        Assert.NotEmpty(files);
-
-        var offenders = files
-            .SelectMany(file => file.Text.Split('\n').Select((line, index) => (file.Path, Line: index + 1, Text: line)))
-            .Where(line => !IsComment(line.Text) && PersistenceReference.IsMatch(line.Text))
-            .Select(line => $"{line.Path}:{line.Line}: {line.Text.Trim()}")
-            .ToList();
-
-        ArchitectureAssert.Passed(offenders, $"{sliceFolder} source must not name DContext, Db*, Infrastructure or EF Core");
-    }
-
     [Fact]
     public void GetOrganizationHandler_DependsOnlyOnTheOrganizationQueries()
     {
@@ -131,132 +42,6 @@ public class AdministrationReadSideArchitectureTests(ApiFactory factory) : IClas
         Assert.Equal(new HashSet<Type> { typeof(IMembershipQueries) }, ConstructorDependencies(typeof(ListMyOrganizationsHandler)));
     }
 
-    // --- AC2: ports and read models in Domain/ReadModels, adapters in Infrastructure ---
-
-    [Theory]
-    [MemberData(nameof(PortTypes))]
-    public void Port_IsAnInterfaceInDomainReadModels(Type port)
-    {
-        Assert.True(port.IsInterface);
-        Assert.Same(DomainAssembly, port.Assembly);
-        Assert.Matches(NamespaceOrChildren(ReadModelsNamespace), port.Namespace);
-    }
-
-    [Theory]
-    [MemberData(nameof(PortTypes))]
-    public void Port_ShouldNotDependOnEntityFrameworkOrInfrastructure(Type port)
-    {
-        AssertNoPersistenceDependency(port);
-    }
-
-    [Theory]
-    [MemberData(nameof(ReadModelTypes))]
-    public void ReadModel_IsASealedRecordInDomainReadModels(Type readModel)
-    {
-        Assert.Same(DomainAssembly, readModel.Assembly);
-        Assert.Matches(NamespaceOrChildren(ReadModelsNamespace), readModel.Namespace);
-        Assert.NotNull(readModel.GetMethod("<Clone>$"));
-        Assert.True(readModel.IsSealed);
-    }
-
-    [Theory]
-    [MemberData(nameof(ReadModelTypes))]
-    public void ReadModel_ShouldNotDependOnEntityFrameworkOrInfrastructure(Type readModel)
-    {
-        AssertNoPersistenceDependency(readModel);
-    }
-
-    [Theory]
-    [MemberData(nameof(ReadModelTypes))]
-    public void ReadModel_HoldsOnlyPrimitiveValues(Type readModel)
-    {
-        var nonPrimitive = readModel.GetProperties()
-            .Where(property => !PrimitiveValues.Contains(Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType))
-            .Select(property => $"{readModel.Name}.{property.Name}: {property.PropertyType.Name}")
-            .ToList();
-
-        ArchitectureAssert.Passed(nonPrimitive, "A read model holds only primitive values");
-    }
-
-    // The read models are separate from the HTTP response records, which stay in the slices
-    [Theory]
-    [MemberData(nameof(ReadModelTypes))]
-    public void ReadModel_IsNotAFeaturesType(Type readModel)
-    {
-        Assert.NotSame(FeaturesAssembly, readModel.Assembly);
-        Assert.DoesNotMatch(NamespaceOrChildren(AdministrationNamespace), readModel.Namespace!);
-    }
-
-    [Theory]
-    [MemberData(nameof(PortTypes))]
-    public void Port_HasAnInternalSealedImplementationInInfrastructure(Type port)
-    {
-        var adapter = Assert.Single(
-            InfrastructureAssembly.GetTypes(),
-            type => type is { IsClass: true, IsAbstract: false } && port.IsAssignableFrom(type));
-
-        Assert.True(adapter.IsSealed);
-        Assert.False(adapter.IsPublic);
-    }
-
-    [Theory]
-    [MemberData(nameof(PortTypes))]
-    public void Port_ResolvesFromTheApiContainerToItsInfrastructureAdapter(Type port)
-    {
-        using var scope = factory.Services.CreateScope();
-
-        var adapter = scope.ServiceProvider.GetRequiredService(port);
-
-        Assert.Same(InfrastructureAssembly, adapter.GetType().Assembly);
-    }
-
-    // Scoped like the context it reads: one adapter per request scope, a different one in another scope
-    [Theory]
-    [MemberData(nameof(PortTypes))]
-    public void Port_IsRegisteredAsScoped(Type port)
-    {
-        using var first = factory.Services.CreateScope();
-        using var second = factory.Services.CreateScope();
-
-        Assert.Same(first.ServiceProvider.GetRequiredService(port), first.ServiceProvider.GetRequiredService(port));
-        Assert.NotSame(first.ServiceProvider.GetRequiredService(port), second.ServiceProvider.GetRequiredService(port));
-    }
-
-    // Endpoints inject the handler interface they call, so each one resolving means each endpoint resolves its handler
-    [Fact]
-    public void OrganizationAndMembershipQueryHandlers_ResolveFromTheApiContainer()
-    {
-        using var scope = factory.Services.CreateScope();
-        var services = scope.ServiceProvider;
-
-        Assert.NotNull(services.GetRequiredService<IQueryHandler<GetOrganizationQuery, Result<GetOrganizationResponse>>>());
-        Assert.NotNull(services.GetRequiredService<IQueryHandler<ListOrganizationsQuery, Result<IReadOnlyList<OrganizationSummary>>>>());
-        Assert.NotNull(services.GetRequiredService<IQueryHandler<ListMembersQuery, Result<IReadOnlyList<MemberSummary>>>>());
-        Assert.NotNull(services.GetRequiredService<IQueryHandler<ListMyOrganizationsQuery, Result<IReadOnlyList<MyOrganizationSummary>>>>());
-    }
-
-    private static void AssertNoPersistenceDependency(Type type)
-    {
-        var result = Types.InAssembly(type.Assembly)
-            .That().HaveName(type.Name).And().ResideInNamespace(type.Namespace)
-            .ShouldNot().HaveDependencyOnAny(EntityFrameworkNamespace, InfrastructureNamespace, FeaturesRoot)
-            .GetResult();
-
-        ArchitectureAssert.Passed(result, $"{type.Name} must not depend on EF Core, Infrastructure or Features");
-    }
-
-    private static string SliceNamespace(string sliceFolder) =>
-        AdministrationNamespace + NamespaceSeparator + sliceFolder;
-
     private static HashSet<Type> ConstructorDependencies(Type handler) =>
         handler.GetConstructors().Single().GetParameters().Select(p => p.ParameterType).ToHashSet();
-
-    private static bool IsComment(string line) => line.TrimStart().StartsWith("//", StringComparison.Ordinal);
-
-    private static IEnumerable<(string Path, string Text)> SourceFiles(string sliceFolder)
-    {
-        var root = Path.Combine(SolutionFiles.RepositoryRoot, FeaturesProjectFolder, AdministrationFolder, sliceFolder);
-        return Directory.EnumerateFiles(root, SourcePattern, SearchOption.AllDirectories)
-            .Select(path => (Path.GetRelativePath(root, path).Replace('\\', '/'), File.ReadAllText(path)));
-    }
 }

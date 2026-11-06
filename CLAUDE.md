@@ -24,11 +24,13 @@ DataItems are files classified by security level.
 Four layers, dependencies pointing inward: API → Features → Domain ← Infrastructure.
 
 - **Domain layer** (`DataTrustHub.Domain`): entities, value objects, domain errors and the ports
-  (`I*Repository`, `IUnitOfWork`, `IPasswordHasher`). Business rules (invariants) live here, in entity
-  methods. No EF Core.
+  (`I*Repository`, `IUnitOfWork`, `IPasswordHasher`, and the read-side ports `I*Queries` with their read
+  models in `Domain/ReadModels`). Business rules (invariants) live here, in entity methods. No EF Core.
 - **Application layer** (`DataTrustHub.Features`): one use case per vertical slice, organized by feature.
+  It depends on the Domain ports only, never on Infrastructure types or EF Core.
 - **Infrastructure layer** (`DataTrustHub.Infrastructure`): adapters for the ports: repositories,
-  Mapperly mappers between persistence models (`Db*`) and entities, `DContext` as the unit of work.
+  Mapperly mappers between persistence models (`Db*`) and entities, `DContext` as the unit of work, and
+  the internal `I*Queries` implementations in `Persistance/ReadModels`.
 - **Presentation layer** (`DataTrustHub.API`, the WebApp).
 
 Use the terms of the ubiquitous language in `docs/domain/ubiquitous-language.md`.
@@ -49,10 +51,15 @@ Each use case folder contains:
 - `*Validator.cs`      — AbstractValidator: input validation (shape of the request), not business rules
 
 How a handler works:
-- **Command** (changes state): load the aggregate through its repository, call the entity's behaviour,
-  save once with `IUnitOfWork.SaveChangesAsync`. Never `DContext`, `Db*` or EF Core.
-- **Query** (reads only): reads `DContext` with `AsNoTracking` for now. ADR-0012 step 4 moves queries to
-  read models behind `I*Queries` ports; after that no handler sees `DContext`.
+- **Command** (changes state): repositories and `IUnitOfWork`. Load the aggregate through its repository,
+  call the entity's behaviour, save once with `IUnitOfWork.SaveChangesAsync`.
+- **Query** (reads only): read-side ports `I*Queries` from `Domain/ReadModels`, never `DContext`. They
+  return read models (sealed records of primitive values), not entities. For the caller's access check a
+  query may also load an aggregate through its repository (for example the caller's membership through
+  `IMembershipRepository`); it never changes or saves it. One exception: `ListRegistrationRequests`
+  calls `IRegistrationRequestRepository.RemoveExpiredAsync` before reading, the lazy purge of ADR-0026 §5.
+- No handler uses `DContext`, `Db*` or EF Core (ADR-0012); the architecture tests enforce this for the
+  whole project.
 
 ## Rule 1 — Strict isolation
 
@@ -74,11 +81,12 @@ Do NOT run Add-Migration without the orchestrator designating you as "Database O
 ## What you can import
 
 - DataTrustHub.SharedKernel — Result<T>, Error, ErrorType, ValidationError
-- DataTrustHub.Domain — entities, domain errors and ports (`I*Repository`, `IUnitOfWork`, `IPasswordHasher`),
-  all registered in DI
-- DataTrustHub.Infrastructure.Persistance.DContext and the persistence models (`Db*`) — query handlers only,
-  until ADR-0012 step 4
+- DataTrustHub.Domain — entities, domain errors and ports (`I*Repository`, `IUnitOfWork`, `IPasswordHasher`,
+  the read-side ports `I*Queries` and their read models), all registered in DI
 - NuGet packages already in DataTrustHub.Features.csproj
+
+Never import anything from DataTrustHub.Infrastructure (`DContext`, the persistence models `Db*`, the
+read-side implementations) or Microsoft.EntityFrameworkCore, in any handler, command or query.
 
 ## Code style rules (enforced in every PR)
 

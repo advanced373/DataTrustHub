@@ -7,32 +7,16 @@ using DataTrustHub.Domain.Users;
 using DataTrustHub.Features._Shared.Auditing;
 using DataTrustHub.Features.DataManagement.AddDataItem;
 using DataTrustHub.Features.DataManagement.DeleteDataItem;
-using NetArchTest.Rules;
 using Xunit;
-using static DataTrustHub.Features.Tests.Architecture.ArchitectureConstants;
 
 namespace DataTrustHub.Features.Tests.Architecture;
 
-// ADR-0012 step 3a: the DataManagement command handlers work on domain entities through repositories.
-// Scoped to these two handlers; the other slices move off DContext in later steps.
+// ADR-0012 step 3a: the DataManagement command handlers work on domain entities through repositories: their exact
+// constructor dependencies. That no Features type depends on Infrastructure or EF Core is the project-wide rule in
+// FeaturesPersistenceIsolationTests (#74 step 5)
 public class DataItemCommandDependencyTests
 {
     private static readonly Type[] CommandHandlers = [typeof(AddDataItemHandler), typeof(DeleteDataItemHandler)];
-
-    [Fact]
-    public void DataItemCommandHandlers_ShouldNotDependOnInfrastructureOrEntityFramework()
-    {
-        var selection = Types.InAssembly(FeaturesAssembly)
-            .That().HaveName(nameof(AddDataItemHandler))
-            .Or().HaveName(nameof(DeleteDataItemHandler));
-        ArchitectureAssert.NotEmpty(selection, "the DataManagement command handlers");
-
-        var result = selection
-            .ShouldNot().HaveDependencyOnAny(InfrastructureNamespace, EntityFrameworkNamespace)
-            .GetResult();
-
-        ArchitectureAssert.Passed(result, "DataManagement command handlers must not depend on Infrastructure or EF Core");
-    }
 
     // #24 step 1: the use case also reads the policy's organization and fills the audit scope (ADR-0016)
     [Fact]

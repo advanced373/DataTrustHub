@@ -18,4 +18,7 @@ public sealed class Policy
     public Guid OrganizationId { get; private set; }
 
     public static Policy Create(string name, Guid organizationId) => new(Guid.NewGuid(), name, organizationId);
+
+    // The name stays unique within the organization (P2); the use case checks it before saving
+    public void Rename(string name) => Name = name;
 }

@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using DataTrustHub.Features.Tests.Administration.Helpers;
 using Xunit;
 using static DataTrustHub.Features.Tests.Administration.Helpers.AdminSetup;
@@ -122,6 +123,17 @@ public class MembershipCallerWithoutSubjectTests(NoSubjectApiFactory factory) : 
         var client = factory.CreateClient();
 
         var response = await client.DeleteAsync(PolicyEndpoint(Guid.NewGuid(), Guid.NewGuid()));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    // #23 (RenamePolicy)
+    [Fact]
+    public async Task RenamePolicy_CallerWithoutSubject_Returns401()
+    {
+        var client = factory.CreateClient();
+
+        var response = await client.PutAsJsonAsync(PolicyEndpoint(Guid.NewGuid(), Guid.NewGuid()), new { Name = "No subject policy" });
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }

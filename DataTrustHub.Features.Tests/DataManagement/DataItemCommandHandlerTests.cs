@@ -505,6 +505,8 @@ public class DataItemCommandHandlerTests
 
         public Task AddAsync(Clearance clearance, CancellationToken cancellationToken) => throw new NotSupportedException();
 
+        public Task UpdateAsync(Clearance clearance, CancellationToken cancellationToken) => throw new NotSupportedException();
+
         public Task RemoveAsync(Clearance clearance, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 

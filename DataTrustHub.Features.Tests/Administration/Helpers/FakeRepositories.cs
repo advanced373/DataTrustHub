@@ -187,6 +187,7 @@ internal sealed class FakeClearanceRepository : IClearanceRepository
     internal HashSet<Guid> PoliciesWithClearances { get; } = [];
     internal List<Clearance> Stored { get; } = [];
     internal List<Clearance> Added { get; } = [];
+    internal List<Clearance> Updated { get; } = [];
     internal List<Clearance> Removed { get; } = [];
 
     internal Clearance Seed(Guid userId, Guid policyId)
@@ -211,6 +212,12 @@ internal sealed class FakeClearanceRepository : IClearanceRepository
     public Task AddAsync(Clearance clearance, CancellationToken cancellationToken)
     {
         Added.Add(clearance);
+        return Task.CompletedTask;
+    }
+
+    public Task UpdateAsync(Clearance clearance, CancellationToken cancellationToken)
+    {
+        Updated.Add(clearance);
         return Task.CompletedTask;
     }
 

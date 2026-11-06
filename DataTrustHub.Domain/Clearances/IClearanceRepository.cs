@@ -13,5 +13,8 @@ public interface IClearanceRepository
     // Reuses a stored level with the same name and priority instead of storing a duplicate
     Task AddAsync(Clearance clearance, CancellationToken cancellationToken);
 
+    // Copies the name and the level onto the stored clearance; a new level is matched like in AddAsync
+    Task UpdateAsync(Clearance clearance, CancellationToken cancellationToken);
+
     Task RemoveAsync(Clearance clearance, CancellationToken cancellationToken);
 }

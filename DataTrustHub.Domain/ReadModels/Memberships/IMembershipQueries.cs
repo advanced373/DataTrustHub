@@ -10,4 +10,7 @@ public interface IMembershipQueries
     // The user's own memberships, ordered by organization name, then organization id; a membership whose
     // organization no longer exists is left out
     Task<IReadOnlyList<MyOrganization>> ListMyOrganizationsAsync(Guid userId, CancellationToken cancellationToken);
+
+    // The role of the user's membership in the organization, or null when they have none there
+    Task<string?> FindRoleAsync(Guid userId, Guid organizationId, CancellationToken cancellationToken);
 }

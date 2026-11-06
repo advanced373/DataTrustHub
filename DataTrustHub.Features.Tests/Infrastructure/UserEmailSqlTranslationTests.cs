@@ -78,7 +78,7 @@ public class UserEmailSqlTranslationTests(SqliteApiFactory factory) : IClassFixt
 
     // --- through the API ---
 
-    // Register and log in go through the repository above; find user by email reads DContext itself
+    // Register and log in go through the repository above; find user by email reads through the read side (IUserQueries)
     [Fact]
     public async Task FindUserByEmail_OnSqlite_CaseOrSpaceVariant_ReturnsTheNormalizedEmail()
     {

@@ -26,6 +26,26 @@ public class ManageOrganizationsTests(ApiFactory factory) : IClassFixture<ApiFac
         Assert.Equal("Listed organization", organization!.Name);
     }
 
+    // #74 part 4b, AC3: the list is ordered by name, whatever the order of creation
+    [Fact]
+    public async Task ListOrganizations_Admin_ReturnsOrganizationsOrderedByName()
+    {
+        var admin = await CreateAdminAsync("organizations_order_admin@example.com");
+        var laterId = await CreateOrganizationAsync(admin, "organizations_order_z");
+        var earlierId = await CreateOrganizationAsync(admin, "organizations_order_a");
+        var middleId = await CreateOrganizationAsync(admin, "organizations_order_m");
+
+        var organizations = (await admin.GetFromJsonAsync<List<OrganizationResponse>>(OrganizationsEndpoint))!;
+
+        Assert.Equal(
+            [
+                new OrganizationResponse(earlierId, "organizations_order_a"),
+                new OrganizationResponse(middleId, "organizations_order_m"),
+                new OrganizationResponse(laterId, "organizations_order_z")
+            ],
+            organizations.Where(o => o.Id == laterId || o.Id == earlierId || o.Id == middleId));
+    }
+
     [Fact]
     public async Task GetOrganization_Missing_Returns404()
     {

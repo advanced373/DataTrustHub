@@ -47,6 +47,13 @@ Every piece of work has an issue, and the issue always reflects reality, both on
 - Move it to **Done** on the board.
 - Split work (`Refs #N`): comment on progress, and close the issue only when the last part is merged.
 - Never leave an issue closed when its work isn't done. Reopen it, or create a follow-up issue and link it.
+- **Delete the branch.** Every merged branch is deleted, on GitHub and locally:
+  - GitHub deletes the head branch on merge (the repo setting `deleteBranchOnMerge` is on). If
+    `git ls-remote --heads origin <branch>` still shows it, run `git push origin --delete <branch>`.
+  - Locally: `git worktree remove ../wt-<slug>`, then `git branch -D <branch>` (`-D`, because squash
+    merges are not seen as merged), then `git fetch --prune`.
+  - If an open PR uses the branch as its base, retarget that PR first (section 1). Deleting its base by hand closes it.
+  - In every status sync, delete any merged branch that is still there.
 
 ### Every session and every status report
 - Before reporting status, sync: `gh pr list --state all --limit 20`. Close any issue whose final PR is merged but which is still open, update any issue whose state lags behind, and check the board matches.

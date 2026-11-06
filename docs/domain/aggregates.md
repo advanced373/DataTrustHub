@@ -98,7 +98,7 @@ The limits come from the `Registration` settings: `PendingRequestLifetimeDays` (
 
 | # | Invariant / rule | Enforced in |
 |---|---|---|
-| O1 | Organization names are unique | Use case: `CreateOrganization` (`NameExistsAsync`) → `Organization.NameAlreadyInUse` (409). Database: unique index on `Name` (`nvarchar(256)`); when two concurrent requests both pass the check, the save fails with `UniqueConstraintViolationException`, and `CreateOrganization` answers `Organization.NameAlreadyInUse` too |
+| O1 | Organization names are unique | Use cases: `CreateOrganization` (`NameExistsAsync`) and `RenameOrganization` (`NameExistsForOtherAsync`, which looks only at the other organizations) → `Organization.NameAlreadyInUse` (409); renaming an organization to its current name, or to a new letter case or spacing of it, is not a conflict. Database: unique index on `Name` (`nvarchar(256)`); when two concurrent requests both pass the check, the save fails with `UniqueConstraintViolationException`, and `CreateOrganization` and `RenameOrganization` answer `Organization.NameAlreadyInUse` too |
 | O2 | An organization that still has policies cannot be deleted | Use case: `DeleteOrganization` (`AnyInOrganizationAsync`) |
 | O3 | Deleting an organization also removes its memberships, in the same transaction | Use case: `DeleteOrganization` (`ListForOrganizationAsync`) |
 

@@ -15,7 +15,16 @@ internal sealed class OrganizationRepository(DContext db) : IOrganizationReposit
     public Task<bool> NameExistsAsync(string name, CancellationToken cancellationToken) =>
         db.Organizations.AnyAsync(o => o.Name == name, cancellationToken);
 
+    public Task<bool> NameExistsForOtherAsync(string name, Guid excludingOrganizationId, CancellationToken cancellationToken) =>
+        db.Organizations.AnyAsync(o => o.Id != excludingOrganizationId && o.Name == name, cancellationToken);
+
     public void Add(Organization organization) => db.Organizations.Add(organization.ToDb());
+
+    public async Task UpdateAsync(Organization organization, CancellationToken cancellationToken)
+    {
+        var row = await db.Organizations.FirstAsync(o => o.Id == organization.Id, cancellationToken);
+        organization.CopyTo(row);
+    }
 
     public async Task RemoveAsync(Organization organization, CancellationToken cancellationToken) =>
         db.Organizations.Remove(await db.Organizations.FirstAsync(o => o.Id == organization.Id, cancellationToken));

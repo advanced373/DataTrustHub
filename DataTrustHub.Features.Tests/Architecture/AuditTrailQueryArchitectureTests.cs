@@ -20,7 +20,8 @@ public class AuditTrailQueryArchitectureTests(ApiFactory factory) : IClassFixtur
     private const string CommandSuffix = "Command";
 
     // The tenant-level actions that name the organization they act on
-    private static readonly string[] OrganizationScopedTenantLevelActions = [AppointOrganizationAdminAction, DeleteOrganizationAction];
+    private static readonly string[] OrganizationScopedTenantLevelActions =
+        [AppointOrganizationAdminAction, RenameOrganizationAction, DeleteOrganizationAction];
 
     public static TheoryData<string> TenantLevelActionNames() => new(TenantLevelActions);
 
@@ -59,7 +60,7 @@ public class AuditTrailQueryArchitectureTests(ApiFactory factory) : IClassFixtur
 
     [Theory]
     [MemberData(nameof(TenantLevelActionNames))]
-    public void TenantLevelAction_IsOrganizationScopedOnlyForTheAppointmentAndTheOrganizationsDeletion(string action)
+    public void TenantLevelAction_IsOrganizationScopedOnlyForTheAppointmentAndTheOrganizationsRenameAndDeletion(string action)
     {
         var isOrganizationScoped = typeof(IOrganizationScopedCommand).IsAssignableFrom(CommandType(action));
 

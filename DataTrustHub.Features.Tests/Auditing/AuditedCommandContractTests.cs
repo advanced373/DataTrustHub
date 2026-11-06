@@ -10,6 +10,7 @@ using DataTrustHub.Features.Administration.DeleteOrganization;
 using DataTrustHub.Features.Administration.DeletePolicy;
 using DataTrustHub.Features.Administration.LeaveOrganization;
 using DataTrustHub.Features.Administration.RemoveMember;
+using DataTrustHub.Features.Administration.RenameOrganization;
 using DataTrustHub.Features.Authentication.LoginUser;
 using DataTrustHub.Features.Authentication.RegisterUser;
 using DataTrustHub.Features.DataManagement.DeleteDataItem;
@@ -44,7 +45,8 @@ public class AuditedCommandContractTests
         new DeleteOrganizationCommand(OrganizationId),
         new DeletePolicyCommand(OrganizationId, CallerId, SubjectId),
         new LeaveOrganizationCommand(OrganizationId, CallerId),
-        new RemoveMemberCommand(OrganizationId, CallerId, SubjectId)
+        new RemoveMemberCommand(OrganizationId, CallerId, SubjectId),
+        new RenameOrganizationCommand(OrganizationId, Name)
     };
 
     // Every targeted command with the target type and id it must declare
@@ -54,6 +56,7 @@ public class AuditedCommandContractTests
         { new DeleteClearanceCommand(OrganizationId, CallerId, SubjectId), AuditTargetTypes.Clearance, SubjectId },
         { new DeletePolicyCommand(OrganizationId, CallerId, SubjectId), AuditTargetTypes.Policy, SubjectId },
         { new DeleteOrganizationCommand(OrganizationId), AuditTargetTypes.Organization, OrganizationId },
+        { new RenameOrganizationCommand(OrganizationId, Name), AuditTargetTypes.Organization, OrganizationId },
         { new DeleteAccountCommand(SubjectId, CallerId), AuditTargetTypes.User, SubjectId },
         { new AddMemberCommand(OrganizationId, CallerId, SubjectId, Role), AuditTargetTypes.User, SubjectId },
         { new AppointOrganizationAdminCommand(OrganizationId, CallerId, SubjectId), AuditTargetTypes.User, SubjectId },

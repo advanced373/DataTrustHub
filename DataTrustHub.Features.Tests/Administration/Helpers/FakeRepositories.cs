@@ -96,6 +96,7 @@ internal sealed class FakeOrganizationRepository : IOrganizationRepository
 {
     internal List<Organization> Stored { get; } = [];
     internal List<Organization> Added { get; } = [];
+    internal List<Organization> Updated { get; } = [];
     internal List<Organization> Removed { get; } = [];
 
     internal Organization Seed(string name)
@@ -114,7 +115,16 @@ internal sealed class FakeOrganizationRepository : IOrganizationRepository
     public Task<bool> NameExistsAsync(string name, CancellationToken cancellationToken) =>
         Task.FromResult(Stored.Any(o => o.Name == name));
 
+    public Task<bool> NameExistsForOtherAsync(string name, Guid excludingOrganizationId, CancellationToken cancellationToken) =>
+        Task.FromResult(Stored.Any(o => o.Id != excludingOrganizationId && o.Name == name));
+
     public void Add(Organization organization) => Added.Add(organization);
+
+    public Task UpdateAsync(Organization organization, CancellationToken cancellationToken)
+    {
+        Updated.Add(organization);
+        return Task.CompletedTask;
+    }
 
     public Task RemoveAsync(Organization organization, CancellationToken cancellationToken)
     {

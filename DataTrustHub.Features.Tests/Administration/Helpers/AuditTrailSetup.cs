@@ -36,6 +36,7 @@ internal static class AuditTrailSetup
 
     // Tenant-level actions: the platform's own use cases
     internal const string CreateOrganizationAction = "CreateOrganization";
+    internal const string RenameOrganizationAction = "RenameOrganization";
     internal const string DeleteOrganizationAction = "DeleteOrganization";
     internal const string AppointOrganizationAdminAction = "AppointOrganizationAdmin";
     internal const string CreateAccountAction = "CreateAccount";
@@ -47,7 +48,7 @@ internal static class AuditTrailSetup
 
     internal static readonly string[] TenantLevelActions =
     [
-        CreateOrganizationAction, DeleteOrganizationAction, AppointOrganizationAdminAction,
+        CreateOrganizationAction, RenameOrganizationAction, DeleteOrganizationAction, AppointOrganizationAdminAction,
         CreateAccountAction, DeleteAccountAction, RegisterUserAction, ApproveRegistrationRequestAction,
         RejectRegistrationRequestAction, LoginUserAction
     ];

@@ -33,4 +33,11 @@ internal sealed class MembershipQueries(DContext db) : IMembershipQueries
             .Select(row => new MyOrganization(
                 row.Membership.OrganizationId, row.Name, row.Membership.Id, row.Membership.Role))
             .ToListAsync(cancellationToken);
+
+    public Task<string?> FindRoleAsync(Guid userId, Guid organizationId, CancellationToken cancellationToken) =>
+        db.Memberships
+            .AsNoTracking()
+            .Where(membership => membership.UserId == userId && membership.OrganizationId == organizationId)
+            .Select(membership => membership.Role)
+            .FirstOrDefaultAsync(cancellationToken);
 }

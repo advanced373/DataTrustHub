@@ -15,6 +15,12 @@ internal sealed class PolicyRepository(DContext db) : IPolicyRepository
     public Task<bool> NameExistsInOrganizationAsync(string name, Guid organizationId, CancellationToken cancellationToken) =>
         db.Policies.AnyAsync(p => p.Name == name && p.OrganizationId == organizationId, cancellationToken);
 
+    public Task<bool> NameExistsForOtherInOrganizationAsync(
+        string name, Guid organizationId, Guid excludingPolicyId, CancellationToken cancellationToken) =>
+        db.Policies.AnyAsync(
+            p => p.Id != excludingPolicyId && p.Name == name && p.OrganizationId == organizationId,
+            cancellationToken);
+
     public Task<bool> AnyInOrganizationAsync(Guid organizationId, CancellationToken cancellationToken) =>
         db.Policies.AnyAsync(p => p.OrganizationId == organizationId, cancellationToken);
 
@@ -29,6 +35,12 @@ internal sealed class PolicyRepository(DContext db) : IPolicyRepository
         var row = policy.ToDb();
         row.ClassificationLevels = [];
         db.Policies.Add(row);
+    }
+
+    public async Task UpdateAsync(Policy policy, CancellationToken cancellationToken)
+    {
+        var row = await db.Policies.FirstAsync(p => p.Id == policy.Id, cancellationToken);
+        policy.CopyTo(row);
     }
 
     public async Task RemoveAsync(Policy policy, CancellationToken cancellationToken) =>

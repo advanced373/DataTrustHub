@@ -86,6 +86,23 @@ public class UniqueIndexViolationEndpointTests(ConcurrentSaveApiFactory factory)
         Assert.DoesNotContain(await StoredPoliciesAsync(factory), p => p.OrganizationId == scenario.OrganizationId);
     }
 
+    // --- #23 AC8 (P2): two concurrent renames of policies of one organization to the same name ---
+
+    [Fact]
+    public async Task RenamePolicy_UniqueIndexRejectsSave_Returns409PolicyNameAlreadyInUse()
+    {
+        var scenario = await CreateOrganizationWithOrgAdminAsync(factory, $"unique_policy_rename_{Guid.NewGuid():N}");
+        var policyId = await CreatePolicyAsync(scenario.OrgAdmin, "Unique rename old policy", scenario.OrganizationId);
+        var name = $"Unique rename policy {Guid.NewGuid():N}";
+        factory.ConcurrentSave.SavedFirstByAnotherRequest();
+
+        var response = await scenario.OrgAdmin.PutAsJsonAsync(PolicyEndpoint(scenario.OrganizationId, policyId), new { Name = name });
+
+        await ErrorAssert.HasErrorAsync(response, HttpStatusCode.Conflict,
+            AdminErrorCodes.PolicyNameAlreadyInUse, AdminErrorMessages.PolicyNameAlreadyInUse);
+        Assert.DoesNotContain(await StoredPoliciesAsync(factory), p => p.Name == name);
+    }
+
     // --- AC4 (C3) ---
 
     [Fact]

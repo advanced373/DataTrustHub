@@ -7,9 +7,10 @@ namespace DataTrustHub.Infrastructure.Persistance.ReadModels;
 // (ADR-0014, D3'): a non-deleted personal item (no policy) is visible to its owner only; a
 // non-deleted classified item is visible only to holders of a clearance on the item's policy with a
 // priority at least the item's, the owner included. Personal items match no clearance, because their
-// policy is NULL. The Admin role grants nothing here (need-to-know). Public, so the equivalence tests can
-// hold each SQL form against its entity form (#99).
-public static class DataAccess
+// policy is NULL. The Admin role grants nothing here (need-to-know). Internal, so no Features handler can
+// call it (ADR-0012 step 5); the equivalence tests reach it through InternalsVisibleTo to hold each SQL
+// form against its entity form (#99).
+internal static class DataAccess
 {
     public static IQueryable<DbDataItem> VisibleTo(this IQueryable<DbDataItem> items, DContext db, Guid userId) =>
         items.Where(item => !item.IsDeleted

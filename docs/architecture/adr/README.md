@@ -43,3 +43,4 @@ Status values: `Proposed`, `Accepted`, `Superseded by ADR-NNNN`, `Deprecated`.
 | [0025](0025-rate-limiting-and-audited-queries.md) | Rate limit and audit lookups that can confirm an account exists | Accepted | 2026-11-03 |
 | [0026](0026-registration-requests.md) | Sign-ups wait for approval as registration requests | Accepted | 2026-11-03 |
 | [0027](0027-notification-emails-without-a-message-broker.md) | Notification emails are sent directly through ACS, without a message broker | Accepted | 2026-11-04 |
+| [0028](0028-pbkdf2-password-hashing-with-rehash-on-sign-in.md) | Passwords are hashed with PBKDF2 (ASP.NET Core Identity) and re-hashed on sign-in | Accepted | 2026-11-04 |

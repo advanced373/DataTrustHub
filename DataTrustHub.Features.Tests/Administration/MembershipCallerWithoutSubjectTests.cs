@@ -180,6 +180,20 @@ public class MembershipCallerWithoutSubjectTests(NoSubjectApiFactory factory) : 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    // #23 (UpdateClearance)
+    [Fact]
+    public async Task UpdateClearance_CallerWithoutSubject_Returns401()
+    {
+        var client = factory.CreateClient();
+
+        var response = await client.PutAsJsonAsync(ClearanceEndpoint(Guid.NewGuid(), Guid.NewGuid()), new
+        {
+            Name = "No subject clearance", ClassificationLevelName = DefaultLevelName, ClassificationLevelPriority = DefaultLevelPriority
+        });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
     // --- organization pages (#95 step 5a) ---
 
     [Fact]

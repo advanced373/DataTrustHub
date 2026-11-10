@@ -144,11 +144,11 @@ level's priority is at least `priority`.
 | C1 | A clearance covers its own level and every lower level, on its policy only | Entity: `Allows` |
 | C2 | A clearance references an existing user and an existing policy of the organization | Use case: `CreateClearance` (`IPolicyRepository.GetByIdAsync` and the policy's `OrganizationId`, `IUserRepository.ExistsAsync`) → `Clearance.PolicyNotFound` (404, also for a policy of another organization, so it is not revealed), `Clearance.UserNotFound` (404) |
 | C3 | A user holds at most one clearance per policy | Use case: `CreateClearance` (`IClearanceRepository.ExistsAsync`) → `Clearance.AlreadyGranted` (409). Database: unique index on (`UserId`, `PolicyId`); when two concurrent requests both pass the check, the save fails with `UniqueConstraintViolationException`, and `CreateClearance` answers `Clearance.AlreadyGranted` too |
-| C4 | A level's priority is never negative | Validator: `CreateClearance` |
+| C4 | A level's priority is never negative | Validator: `CreateClearance`, `UpdateClearance` |
 | C5 | A clearance on a policy of organization X is granted only to a user with a membership in X: a member, a guest or an organization admin (ADR-0014) | Use case: `CreateClearance` (`IMembershipRepository.ExistsAsync`) → `Clearance.UserNotMember` (409) |
-| C6 (clearances) | Only an organization admin of X grants, lists, reads and revokes clearances on X's policies. The platform admin does not manage clearances (ADR-0014) | Use case + authorization: `CreateClearance`, `ListClearances`, `GetClearance`, `DeleteClearance` on `/organizations/{organizationId}/clearances`, checked first (`IsOrgAdminAsync`) → `Organization.NotFound` (404) for anyone else, the platform admin included. A clearance on a policy of another organization answers `Clearance.NotFound` (404), and the list shows only clearances on the organization's policies, so neither is revealed |
+| C6 (clearances) | Only an organization admin of X grants, lists, reads, changes and revokes clearances on X's policies. The platform admin does not manage clearances (ADR-0014) | Use case + authorization: `CreateClearance`, `ListClearances`, `GetClearance`, `UpdateClearance`, `DeleteClearance` on `/organizations/{organizationId}/clearances`, checked first (`IsOrgAdminAsync`) → `Organization.NotFound` (404) for anyone else, the platform admin included. A clearance on a policy of another organization answers `Clearance.NotFound` (404), and the list shows only clearances on the organization's policies, so neither is revealed |
 | C7 | Ending a membership in an organization revokes every clearance of that user on the organization's policies, in the same transaction; clearances on other organizations' policies stay (ADR-0014) | Use case: `RemoveMember`, `LeaveOrganization` (`ClearanceRevocation`, through `IPolicyRepository.ListIdsInOrganizationAsync`); `DeleteAccount` removes all the user's clearances |
-| C8 | An organization admin cannot grant a clearance to themselves (four-eyes); another organization admin of the same organization must grant it. Revoking one's own clearance is allowed, because it only removes access (ADR-0014) | Use case: `CreateClearance` (the user is the caller) → `Clearance.CannotGrantSelf` (409) |
+| C8 | An organization admin cannot grant a clearance to themselves (four-eyes); another organization admin of the same organization must grant it. Nor can they change their own clearance, because raising one's own level is the same as granting oneself access (ADR-0029). Revoking one's own clearance is allowed, because it only removes access (ADR-0014) | Use case: `CreateClearance` (the user is the caller) → `Clearance.CannotGrantSelf` (409); `UpdateClearance` (the clearance's user is the caller) → `Clearance.CannotChangeOwn` (409) |
 
 **Grant a clearance** (`CreateClearance`, an organization admin of the organization) checks, in this
 order: the caller is an organization admin there (C6, `Organization.NotFound`), the policy exists and
@@ -161,6 +161,14 @@ must grant it; so an organization with a single organization admin cannot clear 
 **Revoke a clearance** (`DeleteClearance`, an organization admin of the organization) removes a
 clearance on one of the organization's policies; the classification level stays, because other
 clearances may share it.
+
+**Change a clearance** (`UpdateClearance`, an organization admin of the organization) gives a clearance
+on one of the organization's policies a new name and classification level. It checks, in this order: the
+caller is an organization admin there (C6, `Organization.NotFound`), the clearance exists on a policy of
+the organization (C6, `Clearance.NotFound`), and its user is not the caller (C8,
+`Clearance.CannotChangeOwn`). The user and the policy never change: to move a clearance, revoke it and
+grant a new one (ADR-0029). A stored level with the same name and priority is reused, and the old level
+stays for the other clearances that share it. The new level applies to data access right away (C1).
 
 ### Value object: ClassificationLevel
 

@@ -31,6 +31,20 @@ internal sealed class ClearanceRepository(DContext db) : IClearanceRepository
         db.Clearances.Add(row);
     }
 
+    // The old level row is never edited, because other clearances may share it; a different level points
+    // the clearance at a stored level with the same name and priority, or at a new one
+    public async Task UpdateAsync(Clearance clearance, CancellationToken cancellationToken)
+    {
+        var row = await db.Clearances.Include(c => c.ClassificationLevel)
+            .FirstAsync(c => c.Id == clearance.Id, cancellationToken);
+        row.Name = clearance.Name;
+        if (row.ClassificationLevel.Name == clearance.Level.Name
+            && row.ClassificationLevel.Priority == clearance.Level.Priority) return;
+
+        row.ClassificationLevel = await FindLevelAsync(clearance.Level, cancellationToken)
+            ?? new DbClassificationLevel { Name = clearance.Level.Name, Priority = clearance.Level.Priority };
+    }
+
     // The level row stays: other clearances may share it
     public async Task RemoveAsync(Clearance clearance, CancellationToken cancellationToken) =>
         db.Clearances.Remove(await db.Clearances.FirstAsync(c => c.Id == clearance.Id, cancellationToken));

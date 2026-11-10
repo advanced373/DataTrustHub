@@ -50,17 +50,28 @@ internal sealed class UnreachableUnitOfWork : IUnitOfWork
         throw UnreachableDatabase.Failure();
 }
 
-// Records every log entry with its rendered message, so a test can check what was logged and at which level
+// Records every log entry with its rendered message, its structured values and its exception, and every scope,
+// so a test can check what was logged, at which level, and that no personal data reached the log
 internal sealed class CapturingLogger<T> : ILogger<T>
 {
-    internal List<(LogLevel Level, string Message, Exception? Exception)> Entries { get; } = [];
+    internal List<(LogLevel Level, string Message, Exception? Exception, IReadOnlyList<KeyValuePair<string, object?>> Values)>
+        Entries { get; } = [];
 
-    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+    internal List<string> Scopes { get; } = [];
+
+    public IDisposable? BeginScope<TState>(TState state) where TState : notnull
+    {
+        Scopes.Add(string.Join("; ", [state.ToString(), .. ValuesOf(state).Select(value => $"{value.Key}={value.Value}")]));
+        return null;
+    }
 
     public bool IsEnabled(LogLevel logLevel) => true;
 
     public void Log<TState>(
         LogLevel logLevel, EventId eventId, TState state, Exception? exception,
         Func<TState, Exception?, string> formatter) =>
-        Entries.Add((logLevel, formatter(state, exception), exception));
+        Entries.Add((logLevel, formatter(state, exception), exception, ValuesOf(state)));
+
+    private static IReadOnlyList<KeyValuePair<string, object?>> ValuesOf<TState>(TState state) =>
+        state is IEnumerable<KeyValuePair<string, object?>> values ? [.. values] : [];
 }

@@ -1,6 +1,6 @@
 # ADR-0009: GitFlow with small, stacked PRs and explicit issue tracking
 
-- **Status:** Accepted
+- **Status:** Accepted; the stacked-PR rule is superseded by ADR-0030
 - **Date:** 2026-10-19
 - **Related:** #22, #42, [`datatrusthub-workflow` skill](../../../.claude/skills/datatrusthub-workflow/SKILL.md)
 

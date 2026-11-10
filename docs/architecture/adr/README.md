@@ -24,7 +24,7 @@ Status values: `Proposed`, `Accepted`, `Superseded by ADR-NNNN`, `Deprecated`.
 | [0006](0006-roles-in-jwt-and-admin-seeding.md) | User roles in the JWT, first admin seeded from configuration | Accepted | 2026-10-19, amended by ADR-0022 |
 | [0007](0007-local-secrets-in-user-secrets.md) | Local configuration and secrets in User Secrets | Accepted | 2026-10-19 |
 | [0008](0008-secure-legacy-controllers-until-replaced.md) | Secure the legacy API controllers until VSA slices replace them | Superseded by [0010](0010-port-legacy-endpoints-and-remove-the-layered-code.md) | 2026-10-19 |
-| [0009](0009-gitflow-and-small-stacked-prs.md) | GitFlow with small, stacked PRs and explicit issue tracking | Accepted | 2026-10-19 |
+| [0009](0009-gitflow-and-small-stacked-prs.md) | GitFlow with small, stacked PRs and explicit issue tracking | Accepted; stacking superseded by ADR-0030 | 2026-10-19 |
 | [0010](0010-port-legacy-endpoints-and-remove-the-layered-code.md) | Port the legacy endpoints to VSA slices and remove the layered code | Accepted | 2026-10-20 |
 | [0011](0011-data-access-by-policy-and-classification-level.md) | Data access by policy and classification level, need-to-know | Accepted | 2026-10-21 |
 | [0012](0012-clean-architecture-with-vertical-slices.md) | Clean Architecture with vertical slices, repositories for commands, and no MediatR | Accepted | 2026-10-21 |
@@ -45,3 +45,4 @@ Status values: `Proposed`, `Accepted`, `Superseded by ADR-NNNN`, `Deprecated`.
 | [0027](0027-notification-emails-without-a-message-broker.md) | Notification emails are sent directly through ACS, without a message broker | Accepted | 2026-11-04 |
 | [0028](0028-pbkdf2-password-hashing-with-rehash-on-sign-in.md) | Passwords are hashed with PBKDF2 (ASP.NET Core Identity) and re-hashed on sign-in | Accepted | 2026-11-04 |
 | [0029](0029-what-may-be-updated-on-organizations-policies-and-clearances.md) | What may be updated on organizations, policies and clearances, and by whom | Accepted | 2026-11-06 |
+| [0030](0030-independent-prs-instead-of-stacks.md) | Every PR is independent and targets `develop`; no stacked PRs | Accepted | 2026-11-10 |

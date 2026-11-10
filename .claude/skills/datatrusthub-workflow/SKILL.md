@@ -15,11 +15,13 @@ them: issues, PR size, ADRs and the board.
 ## 1. Small PRs
 
 - Keep each PR to roughly 100–350 changed lines, not counting generated EF migration `*.Designer.cs` files.
-- Split larger work into a stack. Each PR targets the previous PR's branch, builds on its own and passes tests. Its body says `**Stacked on #N**` and the merge order.
-- Plan the split before coding, and commit per slice.
-- Never bundle docs or unrelated cleanups with a code change.
-- Schema changes stack on the PR that holds the latest migration, so the EF snapshot stays linear.
-- When a PR merges, retarget any PR stacked on it to `develop` (`gh pr edit N --base develop`).
+- **No stacked PRs (ADR-0030).** Every PR branches from `develop` and targets `develop`. A PR's base is never another feature branch.
+- Every open PR must be mergeable in any order: it builds, passes the tests and does not conflict with the other open PRs.
+- Split larger work into independent slices (one use case or one feature folder per PR). Plan the split before coding.
+- Shared groundwork (a domain method, a port, a shared type) gets its own PR first. Open the slices that need it only after it is merged, from an updated `develop`.
+- When B needs A, B waits: write it locally if you like, but open it only after A is merged and B is rebased on `develop`.
+- Never bundle docs or unrelated cleanups with a code change. Code PRs must not depend on a docs PR to build.
+- At most one open PR adds an EF migration at a time, so the model snapshot stays linear.
 
 ## 2. Issue lifecycle: always update, always close
 
@@ -52,7 +54,7 @@ Every piece of work has an issue, and the issue always reflects reality, both on
     `git ls-remote --heads origin <branch>` still shows it, run `git push origin --delete <branch>`.
   - Locally: `git worktree remove ../wt-<slug>`, then `git branch -D <branch>` (`-D`, because squash
     merges are not seen as merged), then `git fetch --prune`.
-  - If an open PR uses the branch as its base, retarget that PR first (section 1). Deleting its base by hand closes it.
+  - If an open PR still uses the branch as its base (an old stack), retarget it first with `gh pr edit N --base develop`. Deleting its base by hand closes it.
   - In every status sync, delete any merged branch that is still there.
 
 ### Every session and every status report

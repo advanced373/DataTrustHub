@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using DataTrustHub.Domain.Auditing;
 using Microsoft.EntityFrameworkCore;
 
 namespace DataTrustHub.Infrastructure.Persistance.Model
@@ -9,7 +10,7 @@ namespace DataTrustHub.Infrastructure.Persistance.Model
     [Index(nameof(OrganizationId), nameof(OccurredAt))]
     public class DbAuditRecord: DbEntity
     {
-        public const int ActionMaxLength = 128;
+        public const int ActionMaxLength = AuditRecord.ActionMaxLength;
         public const int TargetTypeMaxLength = 64;
         public const int OutcomeMaxLength = 16;
         public const int ErrorCodeMaxLength = 256;

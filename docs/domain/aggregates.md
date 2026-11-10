@@ -284,14 +284,14 @@ name.
 *Cross-cutting: the audit trail (ADR-0016).* One entry of the audit trail: who did what, on which
 target, in which organization, with which outcome. Source: `Domain/Auditing/AuditRecord.cs`. It is not
 changed by any use case; it is only appended through the `IAuditLog` port, and read by the two audit
-trail queries (A9).
+trail queries (A9) through the read-side port `IAuditRecordQueries`, which has no write method.
 
 | Attribute | Notes |
 |---|---|
 | `Id` | |
 | `OccurredAt` | When the command or access completed, in UTC |
 | `ActorUserId` | The user who did it (by id); empty for an anonymous action (register, log in) |
-| `Action` | The command name without the `Command` suffix, e.g. `DeleteDataItem`, or the access name `DataItem.Download` |
+| `Action` | The command name without the `Command` suffix, e.g. `DeleteDataItem`, or the access name `DataItem.Download`; at most 128 characters (`AuditRecord.ActionMaxLength`) |
 | `TargetType`, `TargetId` | What the action was on, e.g. `DataItem` and its id; both set or both empty |
 | `OrganizationId` | The organization the action ran in, when there is one (by id) |
 | `Outcome` | An `AuditOutcome`: `Succeeded`, `Rejected`, `Denied` or `Failed`, stored by name |

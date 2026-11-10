@@ -1,4 +1,4 @@
-using DataTrustHub.Infrastructure.Persistance.Model;
+using DataTrustHub.Domain.Auditing;
 using DataTrustHub.SharedKernel;
 
 namespace DataTrustHub.Features.Administration.ListOrganizationAuditRecords;
@@ -11,7 +11,7 @@ internal static class Constants
     // The newest records only; no paging in the MVP
     internal const int MaxRecords = 200;
 
-    internal const int ActionMaxLength = DbAuditRecord.ActionMaxLength;
+    internal const int ActionMaxLength = AuditRecord.ActionMaxLength;
 }
 
 internal static class Errors

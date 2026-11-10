@@ -5,6 +5,7 @@ using DataTrustHub.Domain.DataItems;
 using DataTrustHub.Domain.Memberships;
 using DataTrustHub.Domain.Organizations;
 using DataTrustHub.Domain.Policies;
+using DataTrustHub.Domain.ReadModels.Auditing;
 using DataTrustHub.Domain.ReadModels.ClassificationOptions;
 using DataTrustHub.Domain.ReadModels.Clearances;
 using DataTrustHub.Domain.ReadModels.DataItems;
@@ -79,6 +80,7 @@ namespace DataTrustHub.Infrastructure
             services.AddScoped<IClearanceQueries, ClearanceQueries>();
             services.AddScoped<IUserQueries, UserQueries>();
             services.AddScoped<IRegistrationRequestQueries, RegistrationRequestQueries>();
+            services.AddScoped<IAuditRecordQueries, AuditRecordQueries>();
         }
 
         // Scoped like the context options it builds its own short-lived context from; it never shares the

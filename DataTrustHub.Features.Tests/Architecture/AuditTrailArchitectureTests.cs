@@ -3,6 +3,7 @@ using DataTrustHub.Domain.Auditing;
 using DataTrustHub.Features._Shared.Auditing;
 using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.Features.Administration.FindUserByEmail;
+using DataTrustHub.Features.Authentication.LoginUser;
 using DataTrustHub.Features.DataManagement.AddDataItem;
 using DataTrustHub.Features.DataManagement.DeleteDataItem;
 using DataTrustHub.SharedKernel;
@@ -12,7 +13,7 @@ using static DataTrustHub.Features.Tests.Architecture.ArchitectureConstants;
 namespace DataTrustHub.Features.Tests.Architecture;
 
 // #24 step 1 (ADR-0016): the audit log port is append-only (AC2), every command can be audited (AC5), and
-// only the two use cases of AC6 and the find-by-email lookup (#122, ADR-0025) fill the audit scope
+// only the two use cases of AC6, the find-by-email lookup (#122, ADR-0025) and the sign-in (#134) fill the audit scope
 public class AuditTrailArchitectureTests
 {
     private const string AppendAsyncName = "AppendAsync";
@@ -59,9 +60,10 @@ public class AuditTrailArchitectureTests
         Assert.All(resultTypes, t => Assert.True(typeof(Result).IsAssignableFrom(t), t.Name));
     }
 
-    // AC6: "Do not add AuditScope anywhere else"; #122 adds FindUserByEmail, which sets the found user as target
+    // AC6: "Do not add AuditScope anywhere else"; #122 adds FindUserByEmail, which sets the found user as target,
+    // and #134 adds LoginUser, which sets the signed-in user as actor
     [Fact]
-    public void OnlyAddAndDeleteDataItemAndFindUserByEmailHandlers_DependOnAuditScope()
+    public void OnlyAddAndDeleteDataItemFindUserByEmailAndLoginUserHandlers_DependOnAuditScope()
     {
         var dependents = FeaturesAssembly.GetTypes()
             .Where(t => t.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
@@ -69,7 +71,9 @@ public class AuditTrailArchitectureTests
             .Where(t => !t.IsGenericType)
             .ToHashSet();
 
-        Assert.Equal(new HashSet<Type> { typeof(AddDataItemHandler), typeof(DeleteDataItemHandler), typeof(FindUserByEmailHandler) }, dependents);
+        Assert.Equal(
+            new HashSet<Type> { typeof(AddDataItemHandler), typeof(DeleteDataItemHandler), typeof(FindUserByEmailHandler), typeof(LoginUserHandler) },
+            dependents);
     }
 
     [Fact]

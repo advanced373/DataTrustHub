@@ -247,6 +247,99 @@ public class AuditCommandDecoratorTests
         Assert.Null(Assert.Single(_harness.AuditLog.Appended).ActorUserId);
     }
 
+    // AC5 of #134: an actor the handler puts in the audit scope wins over the claim; without one the claim is used
+
+    [Fact]
+    public async Task Handle_HandlerSetsActorOnAnonymousRequest_RecordsTheScopesActor()
+    {
+        _harness.SignInAnonymous();
+        var handler = Decorate(_ =>
+        {
+            _harness.AuditScope.SetActor(_actorUserId);
+            return Task.FromResult(Result.Success());
+        });
+
+        await handler.Handle(new PlainProbeCommand(), default);
+
+        Assert.Equal(_actorUserId, Assert.Single(_harness.AuditLog.Appended).ActorUserId);
+    }
+
+    [Fact]
+    public async Task Handle_HandlerSetsActorWithoutRequest_RecordsTheScopesActor()
+    {
+        var handler = Decorate(_ =>
+        {
+            _harness.AuditScope.SetActor(_actorUserId);
+            return Task.FromResult(Result.Success());
+        });
+
+        await handler.Handle(new PlainProbeCommand(), default);
+
+        Assert.Equal(_actorUserId, Assert.Single(_harness.AuditLog.Appended).ActorUserId);
+    }
+
+    [Fact]
+    public async Task Handle_HandlerSetsActorOnAuthenticatedRequest_ScopesActorWinsOverTheClaim()
+    {
+        var scopeActorUserId = Guid.NewGuid();
+        _harness.SignIn(new Claim(JwtRegisteredClaimNames.Sub, _actorUserId.ToString()));
+        var handler = Decorate(_ =>
+        {
+            _harness.AuditScope.SetActor(scopeActorUserId);
+            return Task.FromResult(Result.Success());
+        });
+
+        await handler.Handle(new PlainProbeCommand(), default);
+
+        Assert.Equal(scopeActorUserId, Assert.Single(_harness.AuditLog.Appended).ActorUserId);
+    }
+
+    [Fact]
+    public async Task Handle_HandlerSetsOnlyTarget_KeepsTheClaimAsActor()
+    {
+        _harness.SignIn(new Claim(JwtRegisteredClaimNames.Sub, _actorUserId.ToString()));
+        var handler = Decorate(_ =>
+        {
+            _harness.AuditScope.SetTarget(new AuditTarget(AuditTargetTypes.DataItem, _targetId));
+            return Task.FromResult(Result.Success());
+        });
+
+        await handler.Handle(new PlainProbeCommand(), default);
+
+        Assert.Equal(_actorUserId, Assert.Single(_harness.AuditLog.Appended).ActorUserId);
+    }
+
+    [Fact]
+    public async Task Handle_HandlerSetsActorThenRejects_RecordsTheScopesActor()
+    {
+        var error = Error.Problem(RejectedCode, RejectedDescription);
+        var handler = Decorate(_ =>
+        {
+            _harness.AuditScope.SetActor(_actorUserId);
+            return Task.FromResult(Result.Failure(error));
+        });
+
+        await handler.Handle(new PlainProbeCommand(), default);
+
+        var record = Assert.Single(_harness.AuditLog.Appended);
+        Assert.Equal(((Guid?)_actorUserId, AuditOutcome.Rejected), (record.ActorUserId, record.Outcome));
+    }
+
+    [Fact]
+    public async Task Handle_HandlerSetsActorThenThrows_RecordsTheScopesActor()
+    {
+        var handler = Decorate(_ =>
+        {
+            _harness.AuditScope.SetActor(_actorUserId);
+            throw new ProbeException();
+        });
+
+        await Assert.ThrowsAsync<ProbeException>(() => handler.Handle(new PlainProbeCommand(), default));
+
+        var record = Assert.Single(_harness.AuditLog.Appended);
+        Assert.Equal(((Guid?)_actorUserId, AuditOutcome.Failed), (record.ActorUserId, record.Outcome));
+    }
+
     // --- organization and target ---
 
     [Fact]

@@ -70,8 +70,11 @@ internal abstract class AuditDecorator<TRequest, TResult>(
             DateTime.UtcNow, FindActorUserId(), action, target?.Type, target?.Id, organizationId, outcome, errorCode);
     }
 
-    // The authenticated user's sub claim; null when anonymous (register, log in)
-    private Guid? FindActorUserId()
+    // The actor the handler put in the audit scope (a successful sign-in); otherwise the caller's claim
+    private Guid? FindActorUserId() => auditScope.ActorUserId ?? FindAuthenticatedUserId();
+
+    // The authenticated user's sub claim; null when anonymous (register, a rejected sign-in)
+    private Guid? FindAuthenticatedUserId()
     {
         var user = httpContextAccessor.HttpContext?.User;
         if (user?.Identity?.IsAuthenticated != true) return null;

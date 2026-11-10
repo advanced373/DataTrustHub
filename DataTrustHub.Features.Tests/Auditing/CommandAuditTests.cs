@@ -20,7 +20,8 @@ using static DataTrustHub.Features.Tests.Administration.Helpers.MembershipSetup;
 namespace DataTrustHub.Features.Tests.Auditing;
 
 // AC5, AC6 and AC7 of #24 step 1 through the API: real commands leave one audit record each, with the
-// actor from the JWT, the organization and the target; register and log in are anonymous and hold no email;
+// actor from the JWT, the organization and the target; register and a rejected log in are anonymous, a successful
+// log in has the signed-in user as actor (#134), and none holds an email;
 // queries leave none. Tests in a class run one after another, so "the records added by this request" is exact
 public class CommandAuditTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
@@ -31,6 +32,7 @@ public class CommandAuditTests(ApiFactory factory) : IClassFixture<ApiFactory>
     private const string Password = "Password1!";
     private const string WrongPassword = "WrongPassword1!";
     private const string UnknownRole = "Overlord";
+    private const string InvalidEmail = "not-an-email";
     private const int Confidential = 2;
     private const int Secret = 3;
 
@@ -44,18 +46,19 @@ public class CommandAuditTests(ApiFactory factory) : IClassFixture<ApiFactory>
     private const string DataItemNotFoundCode = "DataItem.NotFound";
     private const string DataItemNotClearedCode = "DataItem.NotCleared";
 
-    // --- AC7: log in is anonymous and holds no email (register: RegisterUserAuditTests, on SQLite since #172) ---
+    // --- #134: a successful sign-in is recorded with the signed-in user as its actor; a rejected one stays
+    // anonymous. Neither holds the email (register: RegisterUserAuditTests, on SQLite since #172) ---
 
     [Fact]
-    public async Task Login_Succeeded_RecordsAnonymousWithoutEmail()
+    public async Task Login_Succeeded_RecordsTheSignedInUserAsActorWithoutEmail()
     {
         var email = NewEmail("audit_login");
-        await TestUsers.CreateAsync(factory, email, Password);
+        var userId = await TestUsers.CreateAsync(factory, email, Password);
 
-        var records = await RecordsAddedByAsync(() => factory.CreateClient().PostAsJsonAsync(LoginEndpoint, new { Email = email, Password }));
+        var records = await RecordsAddedByAsync(() => LoginAsync(factory.CreateClient(), email, Password));
 
         var record = Assert.Single(records);
-        AssertRecord(record, LoginUserAction, null, SucceededOutcome, null);
+        AssertRecord(record, LoginUserAction, userId, SucceededOutcome, null);
         AssertNoTargetOrOrganization(record);
         AssertHoldsNo(record, email);
     }
@@ -66,12 +69,48 @@ public class CommandAuditTests(ApiFactory factory) : IClassFixture<ApiFactory>
         var email = NewEmail("audit_login_wrong");
         await TestUsers.CreateAsync(factory, email, Password);
 
-        var records = await RecordsAddedByAsync(() =>
-            factory.CreateClient().PostAsJsonAsync(LoginEndpoint, new { Email = email, Password = WrongPassword }));
+        var records = await RecordsAddedByAsync(() => LoginAsync(factory.CreateClient(), email, WrongPassword));
 
         var record = Assert.Single(records);
         AssertRecord(record, LoginUserAction, null, RejectedOutcome, AuthErrorCodes.InvalidCredentials);
         AssertHoldsNo(record, email);
+    }
+
+    [Fact]
+    public async Task Login_UnknownEmail_RecordsRejectedAnonymousWithoutEmail()
+    {
+        var email = NewEmail("audit_login_unknown");
+
+        var records = await RecordsAddedByAsync(() => LoginAsync(factory.CreateClient(), email, Password));
+
+        var record = Assert.Single(records);
+        AssertRecord(record, LoginUserAction, null, RejectedOutcome, AuthErrorCodes.InvalidCredentials);
+        AssertHoldsNo(record, email);
+    }
+
+    [Fact]
+    public async Task Login_InvalidEmail_RecordsTheValidationRejectionAnonymousWithoutEmail()
+    {
+        var records = await RecordsAddedByAsync(() => LoginAsync(factory.CreateClient(), InvalidEmail, Password));
+
+        var record = Assert.Single(records);
+        AssertRecord(record, LoginUserAction, null, RejectedOutcome, ValidationCode);
+        AssertHoldsNo(record, InvalidEmail);
+    }
+
+    // AC5: the actor the sign-in sets wins over the token the caller already carries
+    [Fact]
+    public async Task Login_AuthenticatedCallerSignsInAsAnotherUser_RecordsTheSignedInUserAsActor()
+    {
+        var (caller, callerId) = await CreateUserAsync(factory, "audit_login_caller");
+        var email = NewEmail("audit_login_other");
+        var userId = await TestUsers.CreateAsync(factory, email, Password);
+
+        var records = await RecordsAddedByAsync(() => LoginAsync(caller, email, Password));
+
+        var record = Assert.Single(records);
+        Assert.NotEqual(callerId, userId);
+        AssertRecord(record, LoginUserAction, userId, SucceededOutcome, null);
     }
 
     // --- AC6: the data item commands ---
@@ -262,6 +301,9 @@ public class CommandAuditTests(ApiFactory factory) : IClassFixture<ApiFactory>
     // --- helpers ---
 
     private static string NewEmail(string prefix) => $"{prefix}_{Guid.NewGuid():N}@example.com";
+
+    private static Task<HttpResponseMessage> LoginAsync(HttpClient client, string email, string password) =>
+        client.PostAsJsonAsync(LoginEndpoint, new { Email = email, Password = password });
 
     // The audit records a request added: the trail before it, compared with the trail after it
     private async Task<List<DbAuditRecord>> RecordsAddedByAsync(Func<Task<HttpResponseMessage>> request)

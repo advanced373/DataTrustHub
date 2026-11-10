@@ -6,6 +6,7 @@ using DataTrustHub.Domain.Abstractions;
 using DataTrustHub.Domain.Users;
 using DataTrustHub.Features.Tests.Helpers;
 using DataTrustHub.Infrastructure.Persistance;
+using DataTrustHub.Infrastructure.Persistance.Model;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -19,6 +20,8 @@ public class LoginUserRehashTests(ApiFactory factory) : IClassFixture<ApiFactory
     private const string LoginEndpoint = "/auth/login";
     private const string Password = "Password1!";
     private const byte IdentityV3FormatMarker = 0x01;
+    private const string LoginUserAction = "LoginUser";
+    private const string SucceededOutcome = "Succeeded";
 
     private readonly HttpClient _client = factory.CreateClient();
 
@@ -76,6 +79,22 @@ public class LoginUserRehashTests(ApiFactory factory) : IClassFixture<ApiFactory
         Assert.Equal(legacyHash, await StoredHashAsync(email));
     }
 
+    // AC3 of #134: the sign-in that replaces the hash is recorded with the signed-in user as its actor
+    [Fact]
+    public async Task LoginUser_LegacyHashedUser_RecordsTheSignedInUserAsActor()
+    {
+        const string email = "legacy.actor@example.com";
+        await SeedLegacyUserAsync(email);
+        var userId = await TestUsers.GetIdAsync(factory, email);
+
+        await _client.PostAsJsonAsync(LoginEndpoint, new { Email = email, Password });
+
+        // The hash was replaced, so this sign-in took the re-hash path (U8)
+        Assert.Equal(IdentityV3FormatMarker, Convert.FromBase64String(await StoredHashAsync(email))[0]);
+        var record = Assert.Single(await LoginRecordsOfAsync(userId));
+        Assert.Equal((SucceededOutcome, (string?)null), (record.Outcome, record.ErrorCode));
+    }
+
     // Stores the user as it was stored before #167: the unsalted SHA-256 hash of the password
     private async Task<string> SeedLegacyUserAsync(string email)
     {
@@ -91,6 +110,15 @@ public class LoginUserRehashTests(ApiFactory factory) : IClassFixture<ApiFactory
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DContext>();
         return (await db.Users.AsNoTracking().SingleAsync(u => u.Email == email)).HashedPassword;
+    }
+
+    private async Task<List<DbAuditRecord>> LoginRecordsOfAsync(Guid userId)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<DContext>();
+        return await db.AuditRecords.AsNoTracking()
+            .Where(r => r.Action == LoginUserAction && r.ActorUserId == userId)
+            .ToListAsync();
     }
 
     private record LoginResponse(string Token);

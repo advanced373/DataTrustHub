@@ -1,4 +1,5 @@
 using DataTrustHub.Domain.Users;
+using DataTrustHub.Features._Shared.Auditing;
 using DataTrustHub.Features._Shared.Jwt;
 using DataTrustHub.Features._Shared.Registration;
 using DataTrustHub.Features.Authentication.LoginUser;
@@ -32,6 +33,7 @@ public class AuthenticationHandlerTests
     private readonly FakePasswordHasher _hasher = new();
     private readonly CountingUnitOfWork _unitOfWork = new();
     private readonly RecordingJwtTokenGenerator _jwtGenerator = new();
+    private readonly AuditScope _auditScope = new();
 
     // --- RegisterUser ---
 
@@ -99,6 +101,38 @@ public class AuthenticationHandlerTests
         Assert.Equal(0, _unitOfWork.SaveChangesCalls);
     }
 
+    // --- AC1 and AC2 of #134: the signed-in user is the actor of a successful sign-in only ---
+
+    [Fact]
+    public async Task LoginUser_ValidCredentials_SetsTheSignedInUserAsTheActor()
+    {
+        var user = _users.Seed(Email);
+
+        await LoginHandler().Handle(new LoginUserCommand(Email, Email), default);
+
+        Assert.Equal(user.Id, _auditScope.ActorUserId);
+    }
+
+    [Fact]
+    public async Task LoginUser_WrongPassword_SetsNoActor()
+    {
+        _users.Seed(Email);
+
+        await LoginHandler().Handle(new LoginUserCommand(Email, WrongPassword), default);
+
+        Assert.Null(_auditScope.ActorUserId);
+    }
+
+    [Fact]
+    public async Task LoginUser_UnknownEmail_SetsNoActor()
+    {
+        _users.Seed(Email);
+
+        await LoginHandler().Handle(new LoginUserCommand(UnknownEmail, Password), default);
+
+        Assert.Null(_auditScope.ActorUserId);
+    }
+
     // --- AC2 and AC4 of #123: a case or space variant is the same address (U7) ---
 
     [Fact]
@@ -145,7 +179,7 @@ public class AuthenticationHandlerTests
     private RegisterUserHandler RegisterHandler() =>
         new(_users, _registrationRequests, _hasher, _unitOfWork, Options.Create(new RegistrationOptions()), _clock);
 
-    private LoginUserHandler LoginHandler() => new(_users, _hasher, _jwtGenerator, _unitOfWork);
+    private LoginUserHandler LoginHandler() => new(_users, _hasher, _jwtGenerator, _unitOfWork, _auditScope);
 
     private sealed class RecordingJwtTokenGenerator : IJwtTokenGenerator
     {

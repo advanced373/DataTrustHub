@@ -250,6 +250,23 @@ public class CreateAndListClearancesTests(ApiFactory factory) : IClassFixture<Ap
         Assert.Equal(onPolicy, Assert.Single(listed).Id);
     }
 
+    // #74 part 4c, AC3: both filters together narrow to that user's clearance on that policy
+    [Fact]
+    public async Task ListClearances_UserIdAndPolicyIdFilters_ReturnOnlyThatUsersClearanceOnThatPolicy()
+    {
+        var grant = await CreateGrantScenarioAsync(factory, "clearance_list_both");
+        var (_, guestId) = await AddUserWithRoleAsync(factory, grant.Organization, "clearance_list_both_guest", GuestRole);
+        var secondPolicyId = await CreatePolicyAsync(grant.OrgAdmin, "clearance_list_both second policy", grant.OrganizationId);
+        var wanted = await CreateClearanceAsync(grant.OrgAdmin, grant.OrganizationId, grant.MemberId, grant.PolicyId);
+        await CreateClearanceAsync(grant.OrgAdmin, grant.OrganizationId, grant.MemberId, secondPolicyId);
+        await CreateClearanceAsync(grant.OrgAdmin, grant.OrganizationId, guestId, grant.PolicyId);
+
+        var listed = await ListAsync(
+            grant.OrgAdmin, grant.OrganizationId, $"?userId={grant.MemberId}&policyId={grant.PolicyId}");
+
+        Assert.Equal(wanted, Assert.Single(listed).Id);
+    }
+
     // A policyId of another organization gives an empty list, never its clearances
     [Fact]
     public async Task ListClearances_PolicyIdOfAnotherOrganization_ReturnsEmpty()

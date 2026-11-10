@@ -47,12 +47,14 @@ authorization policies.
   (business rules live in the entities) and save once with `IUnitOfWork.SaveChangesAsync`. They never see
   `DContext` or `Db*` types.
 - **Queries** (read only) in DataManagement read through the `IDataItemQueries` and
-  `IClassificationOptionQueries` ports. In Administration, the organization, membership, policy and
-  clearance queries (`GetOrganization`, `ListOrganizations`, `ListMembers`, `ListMyOrganizations`,
-  `GetPolicy`, `ListPolicies`, `GetClearance`, `ListClearances`) read through the `IOrganizationQueries`,
-  `IMembershipQueries`, `IPolicyQueries` and `IClearanceQueries` ports; the other Administration queries
-  still read `DContext` with `AsNoTracking` and move behind `I*Queries` ports in the later parts of
-  ADR-0012 step 4 (#74).
+  `IClassificationOptionQueries` ports. In Administration, the organization, membership, policy,
+  clearance, account, user lookup and registration request queries (`GetOrganization`,
+  `ListOrganizations`, `ListMembers`, `ListMyOrganizations`, `GetPolicy`, `ListPolicies`, `GetClearance`,
+  `ListClearances`, `GetAccount`, `ListAccounts`, `FindUserByEmail`, `ListRegistrationRequests`) read
+  through the `IOrganizationQueries`, `IMembershipQueries`, `IPolicyQueries`, `IClearanceQueries`,
+  `IUserQueries` and `IRegistrationRequestQueries` ports; only the audit record queries
+  (`ListAuditRecords`, `ListOrganizationAuditRecords`) still read `DContext` with `AsNoTracking`, and move
+  behind an `I*Queries` port in the last part of ADR-0012 step 4 (#74).
 
 ## Slice anatomy
 

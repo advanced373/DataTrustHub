@@ -97,5 +97,11 @@ public class ListMembersHandlerTests
             Calls++;
             return Task.FromResult<IReadOnlyList<MyOrganization>>([]);
         }
+
+        public Task<string?> FindRoleAsync(Guid userId, Guid organizationId, CancellationToken cancellationToken)
+        {
+            Calls++;
+            return Task.FromResult<string?>(null);
+        }
     }
 }

@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using DataTrustHub.Domain.Auditing;
 using DataTrustHub.Features.Tests.Administration.Helpers;
 using DataTrustHub.Features.Tests.Helpers;
@@ -79,6 +80,20 @@ public class ListAuditRecordsTests(SqliteApiFactory factory) : IClassFixture<Sql
         var records = await ListAsync(scenario.PlatformAdmin, Filters(userId: platformAdminId, action: AppointOrganizationAdminAction));
 
         Assert.Single(records);
+    }
+
+    // #23 AC11: the rename names an organization, and is still a tenant-level action
+    [Fact]
+    public async Task ListAuditRecords_RenameOfAnOrganization_IsInThePlatformTrail()
+    {
+        var (platformAdmin, organizationId) = await CreateOrganizationWithoutMembersAsync(factory, "audit_platform_rename");
+        var platformAdminId = await PlatformAdminIdAsync(factory, "audit_platform_rename");
+        (await platformAdmin.PutAsJsonAsync($"{AdminSetup.OrganizationsEndpoint}/{organizationId}", new { Name = "audit_platform_rename renamed" }))
+            .EnsureSuccessStatusCode();
+
+        var records = await ListAsync(platformAdmin, Filters(userId: platformAdminId, action: RenameOrganizationAction));
+
+        Assert.Equal(organizationId, Assert.Single(records).TargetId);
     }
 
     [Fact]

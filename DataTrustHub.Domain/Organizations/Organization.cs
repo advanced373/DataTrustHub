@@ -15,4 +15,7 @@ public sealed class Organization
     public string Name { get; private set; }
 
     public static Organization Create(string name) => new(Guid.NewGuid(), name);
+
+    // The name stays unique across organizations (O1); the use case checks it before saving
+    public void Rename(string name) => Name = name;
 }

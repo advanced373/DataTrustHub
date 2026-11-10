@@ -11,6 +11,7 @@ using DataTrustHub.Features.Administration.DeleteOrganization;
 using DataTrustHub.Features.Administration.DeletePolicy;
 using DataTrustHub.Features.Administration.LeaveOrganization;
 using DataTrustHub.Features.Administration.RemoveMember;
+using DataTrustHub.Features.Administration.RenameOrganization;
 using NetArchTest.Rules;
 using Xunit;
 using static DataTrustHub.Features.Tests.Architecture.ArchitectureConstants;
@@ -24,6 +25,7 @@ public class AdministrationCommandHandlerArchitectureTests
     [
         typeof(CreateOrganizationHandler),
         typeof(CreatePolicyHandler),
+        typeof(RenameOrganizationHandler),
         typeof(DeleteOrganizationHandler),
         typeof(DeletePolicyHandler),
         typeof(CreateAccountHandler),

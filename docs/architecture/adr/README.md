@@ -44,3 +44,4 @@ Status values: `Proposed`, `Accepted`, `Superseded by ADR-NNNN`, `Deprecated`.
 | [0026](0026-registration-requests.md) | Sign-ups wait for approval as registration requests | Accepted | 2026-11-03 |
 | [0027](0027-notification-emails-without-a-message-broker.md) | Notification emails are sent directly through ACS, without a message broker | Accepted | 2026-11-04 |
 | [0028](0028-pbkdf2-password-hashing-with-rehash-on-sign-in.md) | Passwords are hashed with PBKDF2 (ASP.NET Core Identity) and re-hashed on sign-in | Accepted | 2026-11-04 |
+| [0029](0029-what-may-be-updated-on-organizations-policies-and-clearances.md) | What may be updated on organizations, policies and clearances, and by whom | Accepted | 2026-11-06 |

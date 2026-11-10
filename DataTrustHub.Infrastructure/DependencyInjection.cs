@@ -5,10 +5,13 @@ using DataTrustHub.Domain.DataItems;
 using DataTrustHub.Domain.Memberships;
 using DataTrustHub.Domain.Organizations;
 using DataTrustHub.Domain.Policies;
+using DataTrustHub.Domain.ReadModels.ClassificationOptions;
+using DataTrustHub.Domain.ReadModels.DataItems;
 using DataTrustHub.Domain.Registrations;
 using DataTrustHub.Domain.Users;
 using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.Infrastructure.Persistance.Auditing;
+using DataTrustHub.Infrastructure.Persistance.ReadModels;
 using DataTrustHub.Infrastructure.Persistance.Repositories;
 using DataTrustHub.Infrastructure.Services;
 using Microsoft.AspNetCore.Identity;
@@ -40,6 +43,7 @@ namespace DataTrustHub.Infrastructure
             services.AddOptions<PasswordHasherOptions>();
             services.AddSingleton<IPasswordHasher, PasswordHasher>();
             AddRepositories(services);
+            AddReadSide(services);
             AddAuditLog(services);
 
             return services;
@@ -56,6 +60,13 @@ namespace DataTrustHub.Infrastructure
             services.AddScoped<IMembershipRepository, MembershipRepository>();
             services.AddScoped<IRegistrationRequestRepository, RegistrationRequestRepository>();
             services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<DContext>());
+        }
+
+        // The read-side ports of the query handlers (ADR-0012 step 4), scoped like the DContext they read
+        private static void AddReadSide(IServiceCollection services)
+        {
+            services.AddScoped<IDataItemQueries, DataItemQueries>();
+            services.AddScoped<IClassificationOptionQueries, ClassificationOptionQueries>();
         }
 
         // Scoped like the context options it builds its own short-lived context from; it never shares the

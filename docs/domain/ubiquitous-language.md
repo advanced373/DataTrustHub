@@ -98,7 +98,7 @@ These are the words for how the code is structured (ADR-0012).
 |---|---|
 | **Domain layer** | `DataTrustHub.Domain`: entities, value objects, domain errors and ports. It has no EF Core and does not reference Infrastructure |
 | **Application layer** | `DataTrustHub.Features`: one **use case** per vertical slice, as a command handler or a query handler |
-| **Infrastructure layer** | `DataTrustHub.Infrastructure`: the adapters (repositories, mappers, `DContext`) |
+| **Infrastructure layer** | `DataTrustHub.Infrastructure`: the adapters (repositories, read-side queries, mappers, `DContext`) |
 | **Presentation layer** | `DataTrustHub.API` (Carter endpoints) and the WebApp |
 | **Entity** | A domain object with an identity and behaviour: `User`, `RegistrationRequest`, `Organization`, `Policy`, `Clearance`, `Membership`, `DataItem`, and `AuditRecord`, which is only appended |
 | **Aggregate root** | An entity that is loaded and saved as a whole, through its own repository. Today every entity is its own aggregate root |
@@ -107,13 +107,14 @@ These are the words for how the code is structured (ADR-0012).
 | **Factory method** | The only way to create a new entity. It applies the entity's rules: `User.Register`, `RegistrationRequest.Submit`, `Policy.Create`, `Clearance.Grant`, `DataItem.CreateClassified` |
 | **Rehydration** | Rebuilding a stored entity without running its creation rules, through an `internal` constructor that only the persistence mappers can see |
 | **Domain error** | An expected rule failure, returned as a `Result` instead of thrown: `UserErrors`, `DataItemErrors`, `MembershipErrors`, `RegistrationRequestErrors` |
-| **Port** | An interface the domain or application layer needs, implemented outside it: `I*Repository`, `IUnitOfWork`, `IPasswordHasher`, `IAuditLog` |
+| **Port** | An interface the domain or application layer needs, implemented outside it: `I*Repository`, `I*Queries`, `IUnitOfWork`, `IPasswordHasher`, `IAuditLog` |
 | **Adapter** | The Infrastructure implementation of a port |
 | **Repository** | A port that loads and stores one aggregate as an entity. Only commands use repositories |
 | **Unit of work** | A port that commits all changes of one command in a single transaction: `IUnitOfWork`, implemented by `DContext` |
 | **Command / command handler** | A use case that changes state. It loads aggregates, calls their behaviour and saves once (`ICommandHandler`) |
 | **Query / query handler** | A use case that only reads (`IQueryHandler`). It uses read models, not aggregates (the CQRS read side, ADR-0012 step 4) |
-| **Read model** | A flat shape built for display, served by an `I*Queries` port |
+| **Read side** | The ports query handlers read through: `I*Queries`, declared in `DataTrustHub.Domain/ReadModels` and implemented in `DataTrustHub.Infrastructure/Persistance/ReadModels`. Each method projects straight to read models in SQL, untracked, and applies the SQL forms of the read rule and the delete rule (`DataAccess.VisibleTo`, `DataAccess.DeletableBy`) in the database. DataManagement reads only through it (`IDataItemQueries`, `IClassificationOptionQueries`); the Administration queries still read `DContext` until they move (ADR-0012 step 4) |
+| **Read model** | A flat record of primitive values built for display, served by an `I*Queries` port. It is not the HTTP response: the query handler maps it to the slice's response |
 | **Persistence model** | The shape of an EF table, `Db*` (`DbUser`, `DbDataItem`). It exists only in Infrastructure. Never call it an entity |
 | **Mapper** | Converts between a persistence model and an entity (Mapperly). It lives in Infrastructure |
 | **Input validation** | Checks on the shape of a request (required fields, length, format), in the slice's `*Validator`. Business rules do not go here |

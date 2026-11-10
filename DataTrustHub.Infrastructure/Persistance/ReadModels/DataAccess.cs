@@ -1,14 +1,14 @@
 using DataTrustHub.Domain.Memberships;
-using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.Infrastructure.Persistance.Model;
 
-namespace DataTrustHub.Features.DataManagement;
+namespace DataTrustHub.Infrastructure.Persistance.ReadModels;
 
-// The read rule for data items, shared by the DataManagement read slices (#5), in its SQL form
+// The read rule for data items, shared by the data item read side (#5, ADR-0012 step 4), in its SQL form
 // (ADR-0014, D3'): a non-deleted personal item (no policy) is visible to its owner only; a
 // non-deleted classified item is visible only to holders of a clearance on the item's policy with a
 // priority at least the item's, the owner included. Personal items match no clearance, because their
-// policy is NULL. The Admin role grants nothing here (need-to-know).
+// policy is NULL. The Admin role grants nothing here (need-to-know). Public, so the equivalence tests can
+// hold each SQL form against its entity form (#99).
 public static class DataAccess
 {
     public static IQueryable<DbDataItem> VisibleTo(this IQueryable<DbDataItem> items, DContext db, Guid userId) =>

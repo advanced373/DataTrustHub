@@ -50,7 +50,7 @@ public class CallerIdRuleLocationTests
         Assert.Empty(offenders);
     }
 
-    // Every endpoint that reads the caller id is one of the 23 rows of CallerIdEndpointTests, and the reverse.
+    // Every endpoint that reads the caller id is one of the 25 rows of CallerIdEndpointTests, and the reverse.
     // Beyond the spec on purpose: it guards future endpoints, so a new endpoint that reads the caller id
     // must be added to CallerIdEndpointTests
     [Fact]

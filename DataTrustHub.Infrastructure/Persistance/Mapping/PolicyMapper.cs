@@ -13,4 +13,10 @@ internal static partial class PolicyMapper
 
     [MapperIgnoreTarget(nameof(DbPolicy.ClassificationLevels))]
     internal static partial DbPolicy ToDb(this Policy source);
+
+    // Copies onto a tracked row; the key never changes
+    [MapperIgnoreSource(nameof(Policy.Id))]
+    [MapperIgnoreTarget(nameof(DbPolicy.Id))]
+    [MapperIgnoreTarget(nameof(DbPolicy.ClassificationLevels))]
+    internal static partial void CopyTo(this Policy source, [MappingTarget] DbPolicy target);
 }

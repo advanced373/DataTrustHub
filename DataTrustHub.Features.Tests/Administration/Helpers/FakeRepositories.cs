@@ -137,6 +137,7 @@ internal sealed class FakePolicyRepository : IPolicyRepository
 {
     internal List<Policy> Stored { get; } = [];
     internal List<Policy> Added { get; } = [];
+    internal List<Policy> Updated { get; } = [];
     internal List<Policy> Removed { get; } = [];
 
     internal Policy Seed(string name, Guid organizationId)
@@ -155,6 +156,10 @@ internal sealed class FakePolicyRepository : IPolicyRepository
     public Task<bool> NameExistsInOrganizationAsync(string name, Guid organizationId, CancellationToken cancellationToken) =>
         Task.FromResult(Stored.Any(p => p.Name == name && p.OrganizationId == organizationId));
 
+    public Task<bool> NameExistsForOtherInOrganizationAsync(
+        string name, Guid organizationId, Guid excludingPolicyId, CancellationToken cancellationToken) =>
+        Task.FromResult(Stored.Any(p => p.Id != excludingPolicyId && p.Name == name && p.OrganizationId == organizationId));
+
     public Task<bool> AnyInOrganizationAsync(Guid organizationId, CancellationToken cancellationToken) =>
         Task.FromResult(Stored.Any(p => p.OrganizationId == organizationId));
 
@@ -162,6 +167,12 @@ internal sealed class FakePolicyRepository : IPolicyRepository
         Task.FromResult<IReadOnlyList<Guid>>(Stored.Where(p => p.OrganizationId == organizationId).Select(p => p.Id).ToList());
 
     public void Add(Policy policy) => Added.Add(policy);
+
+    public Task UpdateAsync(Policy policy, CancellationToken cancellationToken)
+    {
+        Updated.Add(policy);
+        return Task.CompletedTask;
+    }
 
     public Task RemoveAsync(Policy policy, CancellationToken cancellationToken)
     {
@@ -176,6 +187,7 @@ internal sealed class FakeClearanceRepository : IClearanceRepository
     internal HashSet<Guid> PoliciesWithClearances { get; } = [];
     internal List<Clearance> Stored { get; } = [];
     internal List<Clearance> Added { get; } = [];
+    internal List<Clearance> Updated { get; } = [];
     internal List<Clearance> Removed { get; } = [];
 
     internal Clearance Seed(Guid userId, Guid policyId)
@@ -200,6 +212,12 @@ internal sealed class FakeClearanceRepository : IClearanceRepository
     public Task AddAsync(Clearance clearance, CancellationToken cancellationToken)
     {
         Added.Add(clearance);
+        return Task.CompletedTask;
+    }
+
+    public Task UpdateAsync(Clearance clearance, CancellationToken cancellationToken)
+    {
+        Updated.Add(clearance);
         return Task.CompletedTask;
     }
 

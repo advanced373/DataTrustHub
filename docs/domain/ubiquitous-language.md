@@ -29,7 +29,7 @@ The access rules:
      *Public* up to *Top Secret*.
 4. An organization admin gives a member, guest or organization admin of the organization a
    **clearance**: access to one of its policies, up to one classification level. An organization admin
-   never grants a clearance to themselves; another organization admin does.
+   never grants or changes a clearance of their own; another organization admin does.
 5. A user may read a classified data item only if they hold a clearance on its policy at that level or
    higher. The owner has no special right on it: classified data belongs to the organization. Only the
    owner reads a personal data item (ADR-0014).
@@ -71,9 +71,11 @@ architecture that implements them is in ADR-0012 and [the architecture overview]
 | **Organization** | A tenant: the company that policies, clearances and classified data belong to. The word is never *group*. The old *Group* names in the API and the UI are being renamed (#91) | `Organization` |
 | **Rename an organization** | The platform admin gives an organization a new name. The name stays unique across organizations (O1); the organization keeps its id, memberships and policies | `RenameOrganization`, `Organization.Rename` |
 | **Policy** | A named area of access inside one organization. Every classified data item belongs to one policy | `Policy` |
+| **Rename a policy** | An organization admin gives a policy of their organization a new name. The name stays unique within the organization (P2); the policy keeps its id, organization and clearances, so its classified data items stay readable by the same users | `RenamePolicy`, `Policy.Rename` |
 | **Classification level** | A named sensitivity level with a priority: Public (0), Internal, Confidential, Secret, Top Secret (4) | `ClassificationLevel` |
 | **Clearance** | Grants a user access to one policy at one classification level, and to every level below it | `Clearance`, `Clearance.Allows` |
 | **Grant a clearance** | An organization admin gives a clearance on one of the organization's policies to a member, guest or organization admin of that organization. Never to themselves: another organization admin of the organization must grant it (four-eyes). A user holds at most one clearance per policy | `CreateClearance`, `Clearance.Grant` |
+| **Change a clearance** | An organization admin gives a clearance on one of the organization's policies a new name and classification level; the new level applies to data access right away. Its user and policy never change: to move a clearance, revoke it and grant a new one. Never one's own clearance: another organization admin of the organization must change it (four-eyes) | `UpdateClearance`, `Clearance.Change` |
 | **Revoke a clearance** | An organization admin removes a clearance on one of the organization's policies. Revoking their own clearance is allowed, because it only removes access. Ending a membership also revokes the user's clearances there | `DeleteClearance` |
 | **Data item** | A stored file. Today it is always a document | `DataItem` |
 | **Owner** | The user who uploaded a data item. Don't use *uploader* in code | `DataItem.OwnerUserId` |

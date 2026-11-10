@@ -7,7 +7,7 @@ namespace DataTrustHub.Features.Tests.Shared;
 
 // AC3 of #119: every endpoint that reads the caller id answers exactly as before when the id is missing or
 // malformed: 401 with an empty body, from the endpoint itself (the caller is an authenticated platform admin, so
-// the route's authorization passes). All 23 endpoints that read the caller id are covered, not a sample: each is
+// the route's authorization passes). All 25 endpoints that read the caller id are covered, not a sample: each is
 // one row below, so no endpoint is left to an argument that it behaves like another
 public abstract class CallerIdEndpointTests<TFactory>(TFactory factory) : IClassFixture<TFactory>
     where TFactory : CallerClaimsApiFactory
@@ -48,6 +48,11 @@ public abstract class CallerIdEndpointTests<TFactory>(TFactory factory) : IClass
         ["ListMyOrganizations"] = () => new HttpRequestMessage(HttpMethod.Get, "/organizations/mine"),
         ["ListOrganizationAuditRecords"] = () => new HttpRequestMessage(HttpMethod.Get, $"/organizations/{OrganizationId}/audit-records"),
         ["ListPolicies"] = () => new HttpRequestMessage(HttpMethod.Get, $"/organizations/{OrganizationId}/policies"),
+        ["RenamePolicy"] = () => Json(HttpMethod.Put, $"/organizations/{OrganizationId}/policies/{OtherId}", new { Name = PolicyName }),
+        ["UpdateClearance"] = () => Json(HttpMethod.Put, $"/organizations/{OrganizationId}/clearances/{OtherId}", new
+        {
+            Name = ClearanceName, ClassificationLevelName = LevelName, ClassificationLevelPriority = LevelPriority
+        }),
         ["RemoveMember"] = () => new HttpRequestMessage(HttpMethod.Delete, $"/organizations/{OrganizationId}/members/{OtherId}"),
 
         // DataManagement

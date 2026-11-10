@@ -14,10 +14,13 @@ by feature and use case, not by technical layer, and feature folders do not depe
 ```
 DataTrustHub.SharedKernel     — Result<T>, Error, ErrorType, UserRoles (no dependencies)
 DataTrustHub.Domain           — entities, value objects, domain errors and the ports
-                                (I*Repository, IUnitOfWork, IPasswordHasher); no EF Core
-DataTrustHub.Features         — the application layer: one vertical slice per use case
+                                (I*Repository, IUnitOfWork, IPasswordHasher, and the read-side
+                                ports I*Queries with their read models in ReadModels/); no EF Core
+DataTrustHub.Features         — the application layer: one vertical slice per use case; depends on
+                                the Domain ports only, never on Infrastructure types or EF Core
 DataTrustHub.Infrastructure   — EF Core DContext (also the unit of work), persistence models (Db*),
-                                Mapperly repositories, migrations, PasswordHasher
+                                Mapperly repositories, the internal I*Queries implementations
+                                (Persistance/ReadModels), migrations, PasswordHasher
 DataTrustHub.API              — ASP.NET Core Minimal API host: wires everything together
 DataTrustHub.WebApp           — ASP.NET Core MVC frontend (folder DataTrustHub/), a client of the API (ADR-0005)
 DataTrustHub.Features.Tests   — unit, integration (WebApplicationFactory), migration and architecture tests
@@ -53,8 +56,15 @@ authorization policies.
   `ListClearances`, `GetAccount`, `ListAccounts`, `FindUserByEmail`, `ListRegistrationRequests`,
   `ListAuditRecords`, `ListOrganizationAuditRecords`) read through the `IOrganizationQueries`,
   `IMembershipQueries`, `IPolicyQueries`, `IClearanceQueries`, `IUserQueries`,
-  `IRegistrationRequestQueries` and `IAuditRecordQueries` ports. No query handler reads `DContext` any
-  more (ADR-0012 step 4, #74).
+  `IRegistrationRequestQueries` and `IAuditRecordQueries` ports. Each port lives in `Domain/ReadModels`
+  and returns read models (sealed records of primitive values); its one internal implementation in
+  Infrastructure reads `DContext` with `AsNoTracking`. For the caller's access check a query may also
+  load an aggregate through its repository: `ListMembers`, `FindUserByEmail`, `GetPolicy`, `ListPolicies`,
+  `GetClearance`, `ListClearances` and `ListOrganizationAuditRecords` load the caller's membership through
+  `IMembershipRepository`, and never change or save it. One exception: `ListRegistrationRequests` calls
+  `IRegistrationRequestRepository.RemoveExpiredAsync` before reading, the lazy purge of ADR-0026 §5. No handler sees `DContext`, `Db*` or EF Core
+  (ADR-0012 step 4, #74); the SQL form of the data item read and delete rule (`DataAccess`) is internal
+  to Infrastructure. The architecture tests check these rules for the whole project (ADR-0012 step 5).
 
 ## Slice anatomy
 

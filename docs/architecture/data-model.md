@@ -127,5 +127,7 @@ The append-only audit trail (ADR-0016). A record outlives what it names, so it h
 ## Database access
 
 - **Commands** go through the Domain ports (`I*Repository`, `IUnitOfWork`), implemented in Infrastructure.
-- **Queries** read `DContext` with `AsNoTracking` until ADR-0012 step 4 (#74).
+- **Queries** go through the read-side ports `I*Queries` (`Domain/ReadModels`), which return read models.
+  Their internal implementations in Infrastructure (`Persistance/ReadModels`) read `DContext` with
+  `AsNoTracking`; no handler reads `DContext` (ADR-0012 step 4, #74).
 - Only the Database Owner adds migrations (ADR-0003); CI/CD applies them (ADR-0018).

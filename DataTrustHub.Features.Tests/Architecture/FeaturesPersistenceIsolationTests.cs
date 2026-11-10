@@ -10,8 +10,10 @@ namespace DataTrustHub.Features.Tests.Architecture;
 
 // #74 (ADR-0012 step 4, part 4e, AC6): with the audit trails on the read side, no handler in Features reads DContext.
 // Project-wide, in the assembly (IL) and in the source: no type in DataTrustHub.Features references DContext or a
-// persistence model (Db*), and no source file names the DataTrustHub.Infrastructure.Persistance namespace. The project
-// reference from Features to Infrastructure stays for the DI wiring (ADR-0012 §1); its own rule is part of step 5
+// persistence model (Db*), and no source file names the DataTrustHub.Infrastructure.Persistance namespace.
+// #74 (ADR-0012 step 5, AC1): the layering rule for the whole project. No type in DataTrustHub.Features depends on
+// DataTrustHub.Infrastructure (any namespace) or EF Core, and no source file names either; it replaces the per-slice
+// and per-PR copies. The project reference from Features to Infrastructure stays for the DI wiring (ADR-0012 §1)
 public class FeaturesPersistenceIsolationTests
 {
     private const string PersistenceNamespace = InfrastructureNamespace + NamespaceSeparator + "Persistance";
@@ -22,9 +24,41 @@ public class FeaturesPersistenceIsolationTests
     // Build output, not source
     private static readonly string[] GeneratedFolders = ["bin", "obj"];
 
+    // A non-comment line naming the Infrastructure layer (any namespace) or EF Core
+    private static readonly Regex InfrastructureOrEntityFramework =
+        new(@"DataTrustHub\.Infrastructure|Microsoft\.EntityFrameworkCore", RegexOptions.CultureInvariant);
+
     // A non-comment line naming the context or a persistence model
     private static readonly Regex ContextOrPersistenceModel =
         new(@"\bDContext\b|\bDb[A-Z]\w*", RegexOptions.CultureInvariant);
+
+    [Fact]
+    public void FeaturesTypes_ShouldNotDependOnInfrastructureOrEntityFramework()
+    {
+        Assert.NotEmpty(Types.InAssembly(FeaturesAssembly).GetTypes());
+
+        var result = Types.InAssembly(FeaturesAssembly)
+            .ShouldNot().HaveDependencyOnAny(InfrastructureNamespace, EntityFrameworkNamespace)
+            .GetResult();
+
+        ArchitectureAssert.Passed(result, "No type in Features may depend on Infrastructure or EF Core");
+    }
+
+    // Reads the source too: an unused using directive or an inlined constant leaves no trace in the assembly
+    [Fact]
+    public void FeaturesSourceFiles_DoNotNameInfrastructureOrEntityFramework()
+    {
+        var files = SourceFiles().ToList();
+        Assert.NotEmpty(files);
+
+        var offenders = files
+            .SelectMany(Lines)
+            .Where(line => !IsComment(line.Text) && InfrastructureOrEntityFramework.IsMatch(line.Text))
+            .Select(line => $"{line.Path}:{line.Line}: {line.Text.Trim()}")
+            .ToList();
+
+        ArchitectureAssert.Passed(offenders, "No Features source file may name Infrastructure or EF Core");
+    }
 
     [Fact]
     public void FeaturesTypes_ShouldNotDependOnThePersistenceNamespace()

@@ -1,5 +1,6 @@
 using DataTrustHub.Domain.Abstractions;
 using DataTrustHub.Domain.Users;
+using DataTrustHub.Features._Shared.Auditing;
 using DataTrustHub.Features._Shared.Jwt;
 using DataTrustHub.Features._Shared.Messaging;
 using DataTrustHub.SharedKernel;
@@ -14,13 +15,15 @@ public class LoginUserHandler(
     IUserRepository users,
     IPasswordHasher hasher,
     IJwtTokenGenerator jwtGenerator,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    AuditScope auditScope)
     : ICommandHandler<LoginUserCommand, Result<string>>
 {
     private readonly IUserRepository _users = users;
     private readonly IPasswordHasher _hasher = hasher;
     private readonly IJwtTokenGenerator _jwtGenerator = jwtGenerator;
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
+    private readonly AuditScope _auditScope = auditScope;
 
     public async Task<Result<string>> Handle(
         LoginUserCommand command,
@@ -38,6 +41,9 @@ public class LoginUserHandler(
         var verification = _hasher.VerifyHashedPassword(user.HashedPassword, command.Password);
         if (verification == PasswordVerificationResult.Failed)
             return Result.Failure<string>(Errors.InvalidCredentials);
+
+        // The password is verified: the sign-in is recorded with the signed-in user as its actor
+        _auditScope.SetActor(user.Id);
 
         if (verification == PasswordVerificationResult.SuccessRehashNeeded)
             await ReplacePasswordHashAsync(user, command.Password, cancellationToken);

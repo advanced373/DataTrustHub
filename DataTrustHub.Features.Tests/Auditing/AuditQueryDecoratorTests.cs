@@ -194,6 +194,35 @@ public class AuditQueryDecoratorTests
         Assert.Equal(_actorUserId, Assert.Single(_harness.AuditLog.Appended).ActorUserId);
     }
 
+    // AC4 and AC5 of #134: a query keeps the claim as actor unless its handler sets one in the audit scope
+
+    [Fact]
+    public async Task Handle_AnonymousCaller_RecordsNoActor()
+    {
+        _harness.SignInAnonymous();
+        var handler = _harness.DecorateQuery<AuditedProbeQuery, Result>(_ => Task.FromResult(Result.Success()));
+
+        await handler.Handle(new AuditedProbeQuery(), default);
+
+        Assert.Null(Assert.Single(_harness.AuditLog.Appended).ActorUserId);
+    }
+
+    [Fact]
+    public async Task Handle_HandlerSetsActor_ScopesActorWinsOverTheClaim()
+    {
+        var scopeActorUserId = Guid.NewGuid();
+        _harness.SignIn(new Claim(JwtRegisteredClaimNames.Sub, _actorUserId.ToString()));
+        var handler = _harness.DecorateQuery<AuditedProbeQuery, Result>(_ =>
+        {
+            _harness.AuditScope.SetActor(scopeActorUserId);
+            return Task.FromResult(Result.Success());
+        });
+
+        await handler.Handle(new AuditedProbeQuery(), default);
+
+        Assert.Equal(scopeActorUserId, Assert.Single(_harness.AuditLog.Appended).ActorUserId);
+    }
+
     [Fact]
     public async Task Handle_OrganizationScopedQuery_RecordsItsOrganizationAndNoTarget()
     {

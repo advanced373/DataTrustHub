@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using DataTrustHub.Domain.Abstractions;
 using DataTrustHub.Domain.Users;
+using DataTrustHub.Features._Shared.Auditing;
 using DataTrustHub.Features._Shared.Jwt;
 using DataTrustHub.Features.Authentication.LoginUser;
 using DataTrustHub.Features.Tests.Administration.Helpers;
@@ -30,6 +31,7 @@ public class LoginUserRehashHandlerTests
     private readonly FakePasswordHasher _hasher = new();
     private readonly CountingUnitOfWork _unitOfWork = new();
     private readonly StubJwtTokenGenerator _jwtGenerator = new();
+    private readonly AuditScope _auditScope = new();
 
     // --- AC7 ---
 
@@ -96,6 +98,17 @@ public class LoginUserRehashHandlerTests
         Assert.Empty(_jwtGenerator.Calls);
     }
 
+    // AC3 of #134: a sign-in that also replaces the password hash (U8) is recorded with its actor too
+    [Fact]
+    public async Task LoginUser_LegacyHashAndRightPassword_SetsTheSignedInUserAsTheActor()
+    {
+        var user = SeedWithHash(FakePasswordHasher.LegacyHashPrefix + Password);
+
+        await Handler(_hasher, _unitOfWork).Handle(new LoginUserCommand(Email, Password), default);
+
+        Assert.Equal(user.Id, _auditScope.ActorUserId);
+    }
+
     // --- AC8 ---
 
     [Fact]
@@ -159,7 +172,7 @@ public class LoginUserRehashHandlerTests
     }
 
     private LoginUserHandler Handler(IPasswordHasher hasher, IUnitOfWork unitOfWork) =>
-        new(_users, hasher, _jwtGenerator, unitOfWork);
+        new(_users, hasher, _jwtGenerator, unitOfWork, _auditScope);
 
     private static void AssertInvalidCredentials(Result<string> result)
     {

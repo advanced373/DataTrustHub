@@ -18,9 +18,11 @@ public sealed class AdminSeeder(
     ILogger<AdminSeeder> logger) : BackgroundService
 {
     private const string SkippedLog = "Admin seeding skipped: {Section} is not configured.";
-    private const string CreatedLog = "Admin account {Email} created.";
-    private const string PromotedLog = "User {Email} promoted to admin.";
-    private const string FailedLog = "Admin seeding failed; it is tried again at the next start.";
+    // Email addresses are personal data: no log message names the admin's email (#170)
+    private const string CreatedLog = "Admin account created.";
+    private const string PromotedLog = "Existing user promoted to admin.";
+    private const string FailedLog =
+        "Admin seeding failed with {ExceptionType}; it is tried again at the next start.";
 
     private readonly AdminSeedOptions _options = options.Value;
 
@@ -35,15 +37,16 @@ public sealed class AdminSeeder(
             return;
         }
 
-        // An unreachable database (e.g. a paused serverless database, ADR-0021) must not stop the application;
-        // the exception carries no admin password and the log message adds no secret
+        // An unreachable database (e.g. a paused serverless database, ADR-0021) must not stop the application.
+        // Only the exception type is logged: a duplicate-key message quotes the admin's email, so neither the
+        // exception nor its message reaches the log
         try
         {
             await SeedAsync(stoppingToken);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            logger.LogError(exception, FailedLog);
+            logger.LogError(FailedLog, exception.GetType().Name);
         }
     }
 
@@ -67,7 +70,7 @@ public sealed class AdminSeeder(
     {
         var admin = User.CreateAdmin(_options.Email!, hasher.HashPassword(_options.Password!));
         users.Add(admin);
-        logger.LogInformation(CreatedLog, admin.Email);
+        logger.LogInformation(CreatedLog);
         return true;
     }
 
@@ -78,7 +81,7 @@ public sealed class AdminSeeder(
         if (!user.PromoteToAdmin()) return false;
 
         await users.UpdateAsync(user, cancellationToken);
-        logger.LogInformation(PromotedLog, user.Email);
+        logger.LogInformation(PromotedLog);
         return true;
     }
 }

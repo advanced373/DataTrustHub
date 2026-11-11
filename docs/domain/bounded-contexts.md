@@ -45,16 +45,16 @@ It is about the data itself, and applying the read rule to it.
 
 | | |
 |---|---|
-| **Owns** | `DataItem` |
+| **Owns** | `DataItem`, `Share` (ADR-0015) |
 | **Use cases** | upload (personal or classified), list, download, delete, list the classification options a user may use |
-| **Code today** | `Features/DataManagement` |
+| **Code today** | `Features/DataManagement`; the `Share` aggregate and its repository (`Domain/Shares`) |
 | **Consumes** | clearances from Access Governance (`Clearance.Allows`), and the user id from Identity and Access |
 
-### Planned
+### In progress: sharing
 
-- **Sharing** (#3): giving another user access to a data item.
-
-It will become a context, or a part of one, when it is designed.
+Sharing (#3, ADR-0015) is part of Data Management: a `Share` gives one recipient read access to one data
+item. The aggregate and its table exist; the use cases (share, revoke, *Shared with me*) and the read rule
+that counts active shares (D3″) come next.
 
 ### Cross-cutting: the audit trail
 

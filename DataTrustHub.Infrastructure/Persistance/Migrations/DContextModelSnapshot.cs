@@ -255,6 +255,39 @@ namespace DataTrustHub.Infrastructure.Migrations
                     b.ToTable("RegistrationRequests");
                 });
 
+            modelBuilder.Entity("DataTrustHub.Infrastructure.Persistance.Model.DbShare", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("DataItemId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("RecipientUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("SharedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("SharedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RecipientUserId");
+
+                    b.HasIndex("DataItemId", "RecipientUserId");
+
+                    b.ToTable("Shares");
+                });
+
             modelBuilder.Entity("DataTrustHub.Infrastructure.Persistance.Model.DbUser", b =>
                 {
                     b.Property<Guid>("Id")
@@ -298,6 +331,15 @@ namespace DataTrustHub.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("ClassificationLevel");
+                });
+
+            modelBuilder.Entity("DataTrustHub.Infrastructure.Persistance.Model.DbShare", b =>
+                {
+                    b.HasOne("DataTrustHub.Infrastructure.Persistance.Model.DbDataItem", null)
+                        .WithMany()
+                        .HasForeignKey("DataItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("DataTrustHub.Infrastructure.Persistance.Model.DbPolicy", b =>

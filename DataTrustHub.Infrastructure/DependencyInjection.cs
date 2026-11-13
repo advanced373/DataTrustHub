@@ -15,6 +15,7 @@ using DataTrustHub.Domain.ReadModels.Policies;
 using DataTrustHub.Domain.ReadModels.Registrations;
 using DataTrustHub.Domain.ReadModels.Users;
 using DataTrustHub.Domain.Registrations;
+using DataTrustHub.Domain.Shares;
 using DataTrustHub.Domain.Users;
 using DataTrustHub.Infrastructure.Persistance;
 using DataTrustHub.Infrastructure.Persistance.Auditing;
@@ -66,6 +67,7 @@ namespace DataTrustHub.Infrastructure
             services.AddScoped<IDataItemRepository, DataItemRepository>();
             services.AddScoped<IMembershipRepository, MembershipRepository>();
             services.AddScoped<IRegistrationRequestRepository, RegistrationRequestRepository>();
+            services.AddScoped<IShareRepository, ShareRepository>();
             services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<DContext>());
         }
 

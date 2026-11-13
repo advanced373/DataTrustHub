@@ -279,6 +279,50 @@ name.
 | D6 | A file is required and is at most 100 MB. Its name is at most 512 characters | Use case: `AddDataItem` (`DataItem.NoFileProvided`, `DataItem.FileTooLarge`), and Validator |
 | D7 | The owner must be an existing user | Use case: `AddDataItem` (`DataItem.UserNotFound`) |
 
+## Share
+
+*Context: Data Management.* Read access to one data item for one recipient, given by the item's owner
+(ADR-0015, #3). Source: `Domain/Shares/Share.cs`.
+
+It is its own aggregate, not part of `DataItem`: a share is created and revoked on its own, and the
+*Shared with me* list is read per recipient. It references the data item and the users by id.
+
+| Attribute | Notes |
+|---|---|
+| `Id` | |
+| `DataItemId` | The shared data item (by id) |
+| `RecipientUserId` | The user the item is shared with (by id) |
+| `SharedByUserId` | The user who shared it, the item's owner (by id) |
+| `SharedAt` | When it was shared, in UTC |
+| `ExpiresAt` | Optional expiry date, in UTC; after it the share is ignored |
+| `RevokedAt` | When it was revoked, in UTC; empty while it is not revoked |
+
+**Factory method:** `Create(dataItemId, recipientUserId, sharedByUserId, sharedAt, expiresAt)` returns a
+`Result`: an expiry date that is not later than `sharedAt` gives `Share.ExpiryNotAfterSharedAt` (400, S4).
+
+**Behaviour:**
+- `IsActiveAt(now)` is true when the share is not revoked and has no expiry date or one later than `now`
+  (S5).
+- `Revoke(revokedAt)` sets `RevokedAt`. A share already revoked answers `Share.NotFound`, as if it did not
+  exist, and keeps its first revocation time.
+
+The repository `IShareRepository` also covers what the use cases need beyond one share:
+`HasActiveAsync(dataItemId, recipientUserId, now)` for S3, `RevokeAllForDataItemAsync` when an item is
+deleted, and `RemoveAllForUserAsync` (the user as recipient or as the one who shared) for account deletion.
+Every change is saved through `IUnitOfWork`.
+
+| # | Invariant / rule | Enforced in |
+|---|---|---|
+| S1 | Only the owner shares or revokes. For a classified item, only while a member of its organization | Use case: share / revoke (planned, #3) |
+| S2 | A classified item is shared only with a recipient whose clearance allows reading it | Use case: share (planned, #3), through `Clearance.Allows` |
+| S3 | At most one active share per data item and recipient | Use case: share (planned, #3), through `IShareRepository.HasActiveAsync` |
+| S4 | An expiry date, if given, is later than the moment of sharing | Entity: `Create` → `Share.ExpiryNotAfterSharedAt` (400) |
+| S5 | A share is active if it is not revoked, not expired, and its data item is not deleted | Entity: `IsActiveAt` (revocation and expiry); `IShareRepository.HasActiveAsync` applies the same comparison in the database. The deleted item is checked by the read rule (D3″, planned, #3) |
+
+Database: table `Shares`, indexed on `RecipientUserId` (*Shared with me*) and on (`DataItemId`,
+`RecipientUserId`) (S3). A foreign key to `DataItems`; none to `Users`, as for `DataItem.OwnerUserId`, so a
+share never blocks an account deletion.
+
 ## AuditRecord
 
 *Cross-cutting: the audit trail (ADR-0016).* One entry of the audit trail: who did what, on which

@@ -46,9 +46,11 @@ Access Governance                       (bounded context)
     └── MembershipRole                  (value object)
 
 Data Management                         (bounded context)
-└── DataItem aggregate
-    └── DataItem                        (entity, aggregate root)  ──▶ OwnerUserId, PolicyId
-        uses ClassificationLevel        (value object, from Access Governance)
+├── DataItem aggregate
+│   └── DataItem                        (entity, aggregate root)  ──▶ OwnerUserId, PolicyId
+│       uses ClassificationLevel        (value object, from Access Governance)
+└── Share aggregate
+    └── Share                           (entity, aggregate root)  ──▶ DataItemId, RecipientUserId, SharedByUserId
 ```
 
 `──▶` is a reference **by id** to another aggregate. It is not an object held inside this one.
@@ -61,9 +63,10 @@ Data Management                         (bounded context)
 | Access Governance | Clearance | `Clearance` | `ClassificationLevel` | `IClearanceRepository` |
 | Access Governance | Membership | `Membership` | `MembershipRole` | `IMembershipRepository` |
 | Data Management | DataItem | `DataItem` | uses `ClassificationLevel` when classifying | `IDataItemRepository` |
+| Data Management | Share | `Share` | — | `IShareRepository` |
 
 So today:
-- There are **6 entities**, and each is the root of its own aggregate (**6 aggregates**). None of
+- There are **7 entities**, and each is the root of its own aggregate (**7 aggregates**). None of
   them contains another entity.
 - There are **3 value objects**: `EmailAddress`, `ClassificationLevel` and `MembershipRole`.
 - There are **3 bounded contexts**. They are still a proposal; see

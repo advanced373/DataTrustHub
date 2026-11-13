@@ -84,6 +84,11 @@ architecture that implements them is in ADR-0012 and [the architecture overview]
 | **Security marking** | The label shown on a data item, e.g. `SECRET` | `DataItem.SecurityMarking` |
 | **Read rule** | A user may read a classified data item only if they hold a clearance on its policy at or above its level; its owner has no special right on it. A personal data item is read by its owner only. A deleted data item is read by no one (ADR-0014, D3′) | `DataItem.IsReadableBy` |
 | **Delete rule** | A personal data item is deleted by its owner only. A classified data item belongs to its organization (its policy's organization): it is deleted by its owner while they are a member there (any role), or by an organization admin there, even one who cannot read it. A classified data item whose policy no longer exists is deleted by its owner only (ADR-0014, D5′) | `DataItem.MarkDeleted`, `DeletionRights` |
+| **Share** | Read access to one data item for one user, the recipient, given by the item's owner: view and download only. It records who shared it, when, an optional expiry date and, once revoked, when. A share of a classified data item grants nothing new: the recipient's clearance must already allow reading it (ADR-0015). The use cases and the read rule that uses shares come next (#3) | `Share` |
+| **Recipient** | The user a data item is shared with | `Share.RecipientUserId` |
+| **Active share** | A share that is not revoked, not expired, and whose data item is not deleted. Only an active share counts (S5) | `Share.IsActiveAt`, `IShareRepository.HasActiveAsync` |
+| **Expiry date** | When a share stops counting. Optional; when given, it is later than the moment of sharing (S4) | `Share.ExpiresAt` |
+| **Revoke a share** | The owner ends a share before its expiry date. A share already revoked answers 404, as if it did not exist. Deleting a data item revokes all its shares (planned, #3) | `Share.Revoke`, `IShareRepository.RevokeAllForDataItemAsync` |
 | **Need-to-know** | An admin cannot bypass the read rule. A data item the user may not read answers 404, so its existence is not revealed | — |
 | **Download** | Opening one data item with its content (`GET /data/{id}`). Every download is recorded in the audit trail before the content is returned; if the record cannot be written, nothing is returned | `GetDataItem`, action `DataItem.Download` |
 | **Denied read** | An attempt to open a data item that exists (deleted or not) but that the read rule hides from the user. It answers 404 like a missing item, and is recorded with outcome *Denied* | `GetDataItem`, `AuditOutcome.Denied` |
@@ -103,13 +108,13 @@ These are the words for how the code is structured (ADR-0012).
 | **Application layer** | `DataTrustHub.Features`: one **use case** per vertical slice, as a command handler or a query handler |
 | **Infrastructure layer** | `DataTrustHub.Infrastructure`: the adapters (repositories, read-side queries, mappers, `DContext`) |
 | **Presentation layer** | `DataTrustHub.API` (Carter endpoints) and the WebApp |
-| **Entity** | A domain object with an identity and behaviour: `User`, `RegistrationRequest`, `Organization`, `Policy`, `Clearance`, `Membership`, `DataItem`, and `AuditRecord`, which is only appended |
+| **Entity** | A domain object with an identity and behaviour: `User`, `RegistrationRequest`, `Organization`, `Policy`, `Clearance`, `Membership`, `DataItem`, `Share`, and `AuditRecord`, which is only appended |
 | **Aggregate root** | An entity that is loaded and saved as a whole, through its own repository. Today every entity is its own aggregate root |
 | **Value object** | An immutable object defined by its values: `EmailAddress`, `ClassificationLevel`, `MembershipRole`, `DeletionRights` |
 | **Invariant / business rule** | A rule that must always hold. A rule of one aggregate lives in an entity method (`IsReadableBy`, `MarkDeleted`, `CheckCanBeDeletedBy`). A rule that needs other aggregates or the whole set (uniqueness, references, deletion guards) is checked in the use case through repositories. Never in validators. The full list is in [aggregates.md](aggregates.md) |
-| **Factory method** | The only way to create a new entity. It applies the entity's rules: `User.Register`, `RegistrationRequest.Submit`, `Policy.Create`, `Clearance.Grant`, `DataItem.CreateClassified` |
+| **Factory method** | The only way to create a new entity. It applies the entity's rules: `User.Register`, `RegistrationRequest.Submit`, `Policy.Create`, `Clearance.Grant`, `DataItem.CreateClassified`, `Share.Create` |
 | **Rehydration** | Rebuilding a stored entity without running its creation rules, through an `internal` constructor that only the persistence mappers can see |
-| **Domain error** | An expected rule failure, returned as a `Result` instead of thrown: `UserErrors`, `DataItemErrors`, `MembershipErrors`, `RegistrationRequestErrors` |
+| **Domain error** | An expected rule failure, returned as a `Result` instead of thrown: `UserErrors`, `DataItemErrors`, `MembershipErrors`, `RegistrationRequestErrors`, `ShareErrors` |
 | **Port** | An interface the domain or application layer needs, implemented outside it: `I*Repository`, `I*Queries`, `IUnitOfWork`, `IPasswordHasher`, `IAuditLog` |
 | **Adapter** | The Infrastructure implementation of a port |
 | **Repository** | A port that loads and stores one aggregate as an entity. Only commands use repositories |

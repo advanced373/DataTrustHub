@@ -22,6 +22,7 @@ namespace DataTrustHub.Infrastructure.Persistance
         public DbSet<DbMembership> Memberships => Set<DbMembership>();
         public DbSet<DbAuditRecord> AuditRecords => Set<DbAuditRecord>();
         public DbSet<DbRegistrationRequest> RegistrationRequests => Set<DbRegistrationRequest>();
+        public DbSet<DbShare> Shares => Set<DbShare>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
